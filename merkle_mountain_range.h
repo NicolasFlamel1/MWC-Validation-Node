@@ -17,6 +17,13 @@
 #include "./saturate_math.h"
 #include "zip.h"
 
+// Check if Linux
+#ifdef __linux__
+
+	// Header files
+	#include <malloc.h>
+#endif
+
 using namespace std;
 
 
@@ -518,6 +525,13 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 	
 	// Clear prune list
 	pruneList.clear();
+	
+	// Check if Linux
+	#ifdef __linux__
+	
+		// Release memory
+		malloc_trim(0);
+	#endif
 }
 
 // Get root at size

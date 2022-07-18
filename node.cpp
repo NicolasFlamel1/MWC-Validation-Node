@@ -614,6 +614,13 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 		rangeproofs.setMinimumSize(this->headers.front().getOutputMerkleMountainRangeSize());
 	}
 	
+	// Check if Linux
+	#ifdef __linux__
+	
+		// Release memory
+		malloc_trim(0);
+	#endif
+	
 	// Check if updating sync state failed
 	if(!result) {
 	

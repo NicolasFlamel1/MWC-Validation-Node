@@ -4769,6 +4769,20 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 		return true;
 	}
 	
+	// Check if Linux
+	#ifdef __linux__
+	
+		// Release memory
+		malloc_trim(0);
+		
+		// Check if stopping read and write or is closing
+		if(stopReadAndWrite.load() || Common::isClosing()) {
+		
+			// Return true
+			return true;
+		}
+	#endif
+	
 	// Check if verifying kernel sums failed
 	if(!Crypto::verifyKernelSums(*transactionHashSetArchiveHeader, kernels, outputs)) {
 	
