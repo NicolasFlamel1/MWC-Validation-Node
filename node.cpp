@@ -1041,8 +1041,8 @@ void Node::sync() {
 			// Check if peer is connected and healthy
 			if(peer.getConnectionState() == Peer::ConnectionState::CONNECTED_AND_HEALTHY) {
 			
-				// Check if peer's total difficulty is higher than the highest total difficulty and its message queue isn't full
-				if(peer.getTotalDifficulty() > highestTotalDifficulty && !peer.isMessageQueueFull()) {
+				// Check if peer's total difficulty is higher than the highest total difficulty
+				if(peer.getTotalDifficulty() > highestTotalDifficulty) {
 				
 					// Set the highest total difficulty to the peer's total difficulty
 					highestTotalDifficulty = peer.getTotalDifficulty();
@@ -1089,23 +1089,27 @@ void Node::sync() {
 				}
 			}
 			
-			// Set peer distribution
-			uniform_int_distribution<vector<Peer *>::size_type> peerDistribution(0, syncablePeers.size() - 1);
+			// Check if a syncable peer exists
+			if(!syncablePeers.empty()) {
 			
-			// Start syncing with a random syncable peer
-			syncablePeers[peerDistribution(randomNumberGenerator)]->startSyncing(headers, syncedHeaderIndex);
-			
-			// Set is syncing to true
-			isSyncing = true;
-			
-			// Check if first sync
-			if(firstSync) {
-			
-				// Set first sync to false
-				firstSync = false;
-			
-				// Display text
-				Common::displayText("Syncing");
+				// Set peer distribution
+				uniform_int_distribution<vector<Peer *>::size_type> peerDistribution(0, syncablePeers.size() - 1);
+				
+				// Start syncing with a random syncable peer
+				syncablePeers[peerDistribution(randomNumberGenerator)]->startSyncing(headers, syncedHeaderIndex);
+				
+				// Set is syncing to true
+				isSyncing = true;
+				
+				// Check if first sync
+				if(firstSync) {
+				
+					// Set first sync to false
+					firstSync = false;
+				
+					// Display text
+					Common::displayText("Syncing");
+				}
 			}
 		}
 	}

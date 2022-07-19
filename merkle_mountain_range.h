@@ -46,7 +46,10 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		
 		// Initializer list constructor
 		explicit MerkleMountainRange(const initializer_list<MerkleMountainRangeLeafDerivedClass> &leaves);
-	
+		
+		// Destructor
+		~MerkleMountainRange();
+		
 		// Append leaf
 		void appendLeaf(const MerkleMountainRangeLeafDerivedClass &leaf);
 		
@@ -241,6 +244,13 @@ template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<Merkl
 		// Append leaf
 		appendLeaf(leaf);
 	}
+}
+
+// Destructor
+template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::~MerkleMountainRange() {
+
+	// Clear
+	clear();
 }
 
 // Append leaf

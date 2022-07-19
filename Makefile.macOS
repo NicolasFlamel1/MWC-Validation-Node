@@ -1,6 +1,6 @@
 # Program parameters
 NAME = "MWC Validation Node"
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 CC = "g++"
 STRIP = "strip"
 CFLAGS = -D PRUNE_RANGEPROOFS -I "blake2/include" -I "./secp256k1-zkp/dist/include" -I "./zlib/dist/include" -I "./libzip/dist/include" -I "./croaring/dist/include" -O3 -Wall -std=c++2a -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -ffunction-sections -fdata-sections -D PROGRAM_NAME=$(NAME) -D PROGRAM_VERSION=$(VERSION)

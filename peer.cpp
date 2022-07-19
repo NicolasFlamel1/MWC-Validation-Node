@@ -4141,7 +4141,7 @@ const bool Peer::processHeaders(list<Header> &&headers) {
 	
 	// Go through all headers
 	for(Header &header : headers) {
-
+	
 		// Check if first header
 		if(firstHeader) {
 		
@@ -4178,9 +4178,22 @@ const bool Peer::processHeaders(list<Header> &&headers) {
 			
 			// Check if header is the same as the known header
 			if(header == *knownHeader) {
-			
-				// Return false
-				return false;
+				
+				// Remove all known headers past the header
+				this->headers.rewindToNumberOfLeaves(header.getHeight() + 1);
+				
+				// Set synced header index to the newest known header if less than its self
+				syncedHeaderIndex = min(this->headers.back().getHeight(), syncedHeaderIndex);
+				
+				// Check if not at the max number of reorgs during headers sync
+				if(numberOfReorgsDuringHeadersSync != INT_MAX) {
+				
+					// Increment number of reorgs during headers sync
+					++numberOfReorgsDuringHeadersSync;
+				}
+				
+				// Go to the next header
+				continue;
 			}
 		}
 		
@@ -4207,8 +4220,8 @@ const bool Peer::processHeaders(list<Header> &&headers) {
 		// Check if previous header is newer than all known headers
 		if(header.getHeight() - 1 > this->headers.back().getHeight()) {
 		
-			// Return true
-			return true;
+			// Go to the next header
+			continue;
 		}
 		
 		// Get previous header
@@ -4257,8 +4270,8 @@ const bool Peer::processHeaders(list<Header> &&headers) {
 				++numberOfReorgsDuringHeadersSync;
 			}
 			
-			// Return true
-			return true;
+			// Go to the next header
+			continue;
 		}
 		
 		// Check if header doesn't come after the previous header
@@ -4320,8 +4333,8 @@ const bool Peer::processHeaders(list<Header> &&headers) {
 				++numberOfReorgsDuringHeadersSync;
 			}
 			
-			// Return true
-			return true;
+			// Go to the next header
+			continue;
 		}
 		
 		// Initialize secondary scaling sum to zero
@@ -4458,6 +4471,23 @@ const bool Peer::processHeaders(list<Header> &&headers) {
 				
 				// Add header to the list of known headers
 				this->headers.appendLeaf(move(header));
+			}
+			
+			// Otherwise
+			else {
+			
+				// Remove all known headers past the header
+				this->headers.rewindToNumberOfLeaves(header.getHeight() + 1);
+				
+				// Set synced header index to the newest known header if less than its self
+				syncedHeaderIndex = min(this->headers.back().getHeight(), syncedHeaderIndex);
+			}
+			
+			// Check if not at the max number of reorgs during headers sync
+			if(numberOfReorgsDuringHeadersSync != INT_MAX) {
+			
+				// Increment number of reorgs during headers sync
+				++numberOfReorgsDuringHeadersSync;
 			}
 		}
 		
