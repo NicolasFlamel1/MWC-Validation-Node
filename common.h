@@ -154,6 +154,9 @@ class Common final {
 		// Display text
 		static void displayText(const string &text);
 		
+		// Free memory
+		static void freeMemory();
+		
 		// Read uint8
 		template<typename StorageClass> static const uint8_t readUint8(const StorageClass &buffer, const typename StorageClass::size_type offset);
 		
@@ -180,6 +183,9 @@ class Common final {
 		
 		// Display mutex
 		static mutex displayLock;
+		
+		// Memory lock
+		static mutex memoryLock;
 };
 
 

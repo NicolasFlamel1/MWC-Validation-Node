@@ -974,139 +974,139 @@ const vector<uint8_t>::size_type Message::getMaximumPayloadLength(const Type typ
 		// Error response
 		case Type::ERROR_RESPONSE:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 0;
 
 		// Hand
 		case Type::HAND:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 128;
 		
 		// Shake
 		case Type::SHAKE:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 88;
 		
 		// Ping
 		case Type::PING:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 16;
 		
 		// Pong
 		case Type::PONG:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 16;
 		
 		// Get peer addresses
 		case Type::GET_PEER_ADDRESSES:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 4;
 		
 		// Peer addresses
 		case Type::PEER_ADDRESSES:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 4 + (1 + 16 + 2) * MAXIMUM_NUMBER_OF_PEER_ADDRESSES;
 		
 		// Get headers
 		case Type::GET_HEADERS:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 1 + 32 * MAXIMUM_NUMBER_OF_BLOCK_HASHES;
 		
 		// Header
 		case Type::HEADER:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 365;
 		
 		// Headers
 		case Type::HEADERS:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 2 + 365 * MAXIMUM_NUMBER_OF_HEADERS;
 		
 		// Get block
 		case Type::GET_BLOCK:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 32;
 		
 		// Block
 		case Type::BLOCK:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 		
 		// Get compact block
 		case Type::GET_COMPACT_BLOCK:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 32;
 		
 		// Compact block
 		case Type::COMPACT_BLOCK:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return Consensus::MAXIMUM_BLOCK_LENGTH / 10;
 		
 		// Stem transaction
 		case Type::STEM_TRANSACTION:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 		
 		// Transaction
 		case Type::TRANSACTION:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 		
 		// Transaction hash set request
 		case Type::TRANSACTION_HASH_SET_REQUEST:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 40;
 		
 		// Transaction hash set archive
 		case Type::TRANSACTION_HASH_SET_ARCHIVE:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 64;
 		
 		// Ban reason
 		case Type::BAN_REASON:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 64;
 		
 		// Get transaction
 		case Type::GET_TRANSACTION:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 32;
 		
 		// Transaction kernel
 		case Type::TRANSACTION_KERNEL:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 32;
 		
 		// Tor address
 		case Type::TOR_ADDRESS:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return 128;
 		
 		// Default
 		default:
 		
-			// Return maximum payload length
+			// Return maximum payload length (mwc-node uses this value)
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 	}
 }

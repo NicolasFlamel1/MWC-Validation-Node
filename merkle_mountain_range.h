@@ -17,13 +17,6 @@
 #include "./saturate_math.h"
 #include "zip.h"
 
-// Check if Linux
-#ifdef __linux__
-
-	// Header files
-	#include <malloc.h>
-#endif
-
 using namespace std;
 
 
@@ -46,9 +39,6 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		
 		// Initializer list constructor
 		explicit MerkleMountainRange(const initializer_list<MerkleMountainRangeLeafDerivedClass> &leaves);
-		
-		// Destructor
-		~MerkleMountainRange();
 		
 		// Append leaf
 		void appendLeaf(const MerkleMountainRangeLeafDerivedClass &leaf);
@@ -244,13 +234,6 @@ template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<Merkl
 		// Append leaf
 		appendLeaf(leaf);
 	}
-}
-
-// Destructor
-template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::~MerkleMountainRange() {
-
-	// Clear
-	clear();
 }
 
 // Append leaf
@@ -536,12 +519,8 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 	// Clear prune list
 	pruneList.clear();
 	
-	// Check if Linux
-	#ifdef __linux__
-	
-		// Release memory
-		malloc_trim(0);
-	#endif
+	// Free memory
+	Common::freeMemory();
 }
 
 // Get root at size

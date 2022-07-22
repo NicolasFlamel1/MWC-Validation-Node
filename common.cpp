@@ -13,6 +13,13 @@
 	#include <libkern/OSByteOrder.h>
 #endif
 
+// Check if Linux
+#ifdef __linux__
+
+	// Header files
+	#include <malloc.h>
+#endif
+
 using namespace std;
 
 
@@ -65,6 +72,9 @@ atomic_bool Common::signalOccurred(false);
 
 // Display lock
 mutex Common::displayLock;
+
+// Memory lock
+mutex Common::memoryLock;
 
 
 // Supporting function implementation
@@ -466,6 +476,29 @@ void Common::displayText(const string &text) {
 		
 		// Print text
 		cout << text << endl;
+	}
+	
+	// Catch errors
+	catch(...) {
+	
+	}
+}
+
+// Free memory
+void Common::freeMemory() {
+
+	// Try
+	try {
+
+		// Lock memory lock
+		lock_guard lock(memoryLock);
+		
+		// Check if Linux
+		#ifdef __linux__
+		
+			// Free memory
+			malloc_trim(0);
+		#endif
 	}
 	
 	// Catch errors

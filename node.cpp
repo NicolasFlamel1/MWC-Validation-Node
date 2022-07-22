@@ -614,12 +614,8 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 		rangeproofs.setMinimumSize(this->headers.front().getOutputMerkleMountainRangeSize());
 	}
 	
-	// Check if Linux
-	#ifdef __linux__
-	
-		// Release memory
-		malloc_trim(0);
-	#endif
+	// Free memory
+	Common::freeMemory();
 	
 	// Check if updating sync state failed
 	if(!result) {
@@ -868,6 +864,9 @@ void Node::removeDisconnectedPeers() {
 		// Remove peer and go to next peer
 		i = peers.erase(i);
 	}
+	
+	// Free memory
+	Common::freeMemory();
 }
 
 // Remove random peer
@@ -955,6 +954,9 @@ void Node::removeRandomPeer() {
 
 		// Remove peer
 		peers.erase(peer);
+		
+		// Free memory
+		Common::freeMemory();
 		
 		// Break
 		break;

@@ -4799,19 +4799,15 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 		return true;
 	}
 	
-	// Check if Linux
-	#ifdef __linux__
+	// Free memory
+	Common::freeMemory();
+		
+	// Check if stopping read and write or is closing
+	if(stopReadAndWrite.load() || Common::isClosing()) {
 	
-		// Release memory
-		malloc_trim(0);
-		
-		// Check if stopping read and write or is closing
-		if(stopReadAndWrite.load() || Common::isClosing()) {
-		
-			// Return true
-			return true;
-		}
-	#endif
+		// Return true
+		return true;
+	}
 	
 	// Check if verifying kernel sums failed
 	if(!Crypto::verifyKernelSums(*transactionHashSetArchiveHeader, kernels, outputs)) {
@@ -4848,9 +4844,6 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 			
 			// Unlock write lock
 			writeLock.unlock();
-			
-			// Clear headers
-			headers.clear();
 			
 			// Notify peers that event occurred
 			eventOccurred.notify_one();
@@ -5362,9 +5355,6 @@ const bool Peer::processBlock(vector<uint8_t > &&buffer) {
 			
 			// Unlock write lock
 			writeLock.unlock();
-			
-			// Clear headers
-			headers.clear();
 			
 			// Notify peers that event occurred
 			eventOccurred.notify_one();
