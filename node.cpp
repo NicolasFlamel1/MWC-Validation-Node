@@ -593,7 +593,7 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 		this->headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(this->headers.front().getHeight() + 1));
 	}
 	
-	// Check if kernels minimum size can be updates
+	// Check if kernels minimum size can be updated
 	if(this->headers.front().getKernelMerkleMountainRangeSize() > kernels.getMinimumSize()) {
 	
 		// Set kernels minimum size to the first header

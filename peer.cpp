@@ -1982,19 +1982,8 @@ void Peer::readAndWrite() {
 							// Check if work operation has finished
 							if(workerOperation.valid() && workerOperation.wait_for(0s) == future_status::ready) {
 							
-								// Try
-								try {
-							
-									// Check if performing work operation failed
-									if(!workerOperation.get()) {
-									
-										// Set ban to true
-										ban = true;
-									}
-								}
-								
-								// Catch errors
-								catch(...) {
+								// Check if performing work operation failed
+								if(!workerOperation.get()) {
 								
 									// Set ban to true
 									ban = true;
@@ -4832,7 +4821,7 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 		
 		// Check if not disconnected
 		if(connectionState != ConnectionState::DISCONNECTED) {
-			
+		
 			// Set node's sync state
 			node.setSyncState(move(headers), transactionHashSetArchiveHeader->getHeight(), move(kernels), move(outputs), move(rangeproofs));
 			
@@ -5338,7 +5327,7 @@ const bool Peer::processBlock(vector<uint8_t > &&buffer) {
 			
 			// Otherwise
 			else {
-		
+			
 				// Check if updating node's sync state failed
 				if(!node.updateSyncState(move(headers), syncedHeaderIndex + 1, move(block))) {
 				

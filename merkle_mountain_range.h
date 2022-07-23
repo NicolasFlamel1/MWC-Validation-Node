@@ -406,7 +406,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 		}
 		
 		// Go through all prune history events from newest to oldest
-		for(map<uint64_t, unordered_set<uint64_t>>::const_reverse_iterator i = pruneHistory.crbegin(); i != pruneHistory.crend();) {
+		for(map<uint64_t, unordered_set<uint64_t>>::const_reverse_iterator i = pruneHistory.crbegin(); i != pruneHistory.crend(); ++i) {
 		
 			// Check if prune history event was rewinded
 			if(i->first > numberOfLeaves) {
@@ -445,18 +445,29 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 						pruneList.erase(prunedLeafIndex);
 					}
 				}
-				
-				// Increment index
-				++i;
-				
-				// Remove prune history event
-				pruneHistory.erase(i.base());
 			}
 			
 			// Otherwise
 			else {
 			
+				// Check if a prune history event was rewinded
+				if(i != pruneHistory.crbegin()) {
+				
+					// Remove rewinded prune history events
+					pruneHistory.erase(i.base(), pruneHistory.cend());
+				}
+			
 				// break
+				break;
+			}
+			
+			// Check if all prune history events were rewinded
+			if(next(i) == pruneHistory.crend()) {
+			
+				// Clear prune history
+				pruneHistory.clear();
+				
+				// Break
 				break;
 			}
 		}
