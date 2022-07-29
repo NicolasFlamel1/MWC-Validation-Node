@@ -228,6 +228,9 @@ template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<Merkl
 	minimumSize(0)
 {
 
+	// Set sum to zero
+	memset(&sum, 0, sizeof(sum));
+	
 	// Go through all leaves
 	for(const MerkleMountainRangeLeafDerivedClass &leaf : leaves) {
 	
