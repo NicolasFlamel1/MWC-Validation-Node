@@ -2961,43 +2961,61 @@ const bool Peer::processRequestsAndOrResponses() {
 										// Get IP address from the healthy peer
 										string ipAddress = healthyPeer.first.substr(0, portOffset);
 										
+										// Set is IPv4 to true
+										bool isIpv4 = true;
+										
 										// Check if IP address is enclosed in brackets
 										if(ipAddress.front() == '[' && ipAddress.back() == ']') {
 										
 											// Remove enclosing brackets from IP address
 											ipAddress = ipAddress.substr(sizeof('['), ipAddress.size() - sizeof('[') - sizeof(']'));
+											
+											// Set is IPv4 to false
+											isIpv4 = false;
 										}
 										
 										// Set port from the healthy peer
 										const char *port = &healthyPeer.first[portOffset + sizeof(':')];
 										
-										// Append IPv4 address to list and get it
-										addresses.emplace_back();
-										in_addr &ipv4Address = get<in_addr>(addresses.back());
-									
-										// Check if IP address is an IPv4 address
-										if(inet_pton(AF_INET, ipAddress.c_str(), &ipv4Address) == 1) {
+										// Check if is IPv4
+										if(isIpv4) {
 										
-											// Set network address's family to IPv4
-											networkAddress.family = NetworkAddress::Family::IPV4;
+											// Append IPv4 address to list and get it
+											addresses.emplace_back(in_addr());
+											in_addr &ipv4Address = get<in_addr>(addresses.back());
 											
-											// Set network address's address to the IPv4 address
-											networkAddress.address = &ipv4Address;
+											// Check if parsing ip address was successful
+											if(inet_pton(AF_INET, ipAddress.c_str(), &ipv4Address) == 1) {
 											
-											// Set network address's address length to the IPv4 address length
-											networkAddress.addressLength = sizeof(ipv4Address);
+												// Set network address's family to IPv4
+												networkAddress.family = NetworkAddress::Family::IPV4;
+												
+												// Set network address's address to the IPv4 address
+												networkAddress.address = &ipv4Address;
+												
+												// Set network address's address length to the IPv4 address length
+												networkAddress.addressLength = sizeof(ipv4Address);
+												
+												// Set network address's port to the port
+												networkAddress.port = htons(atoi(port));
+											}
 											
-											// Set network address's port to the port
-											networkAddress.port = htons(atoi(port));
+											// Otherwise
+											else {
+											
+												// Go to next healthy peer
+												continue;
+											}
 										}
 										
 										// Otherwise
 										else {
 										
-											// Get IPv6 address from list
+											// Append IPv6 address to list and get it
+											addresses.emplace_back(in6_addr());
 											in6_addr &ipv6Address = get<in6_addr>(addresses.back());
-										
-											// Check if IP address is an IPv6 address
+											
+											// Check if parsing ip address was successful
 											if(inet_pton(AF_INET6, ipAddress.c_str(), &ipv6Address) == 1) {
 											
 												// Set network address's family to IPv6
