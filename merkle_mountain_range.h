@@ -1060,7 +1060,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 		if(!expectingAllHashes) {
 		
 			// Go through all of the Merkle mountain range's unpruned leafs
-			for(const pair<uint64_t, MerkleMountainRangeLeafDerivedClass> &unprunedLeaf : merkleMountainRange.unprunedLeaves) {
+			for(const pair<const uint64_t, MerkleMountainRangeLeafDerivedClass> &unprunedLeaf : merkleMountainRange.unprunedLeaves) {
 
 				// Go through the leaf's node and its ancestors
 				for(uint64_t j = getLeafsIndex(unprunedLeaf.first); j < merkleMountainRange.numberOfHashes; j = getParentIndex(j)) {
@@ -1292,14 +1292,18 @@ template<typename MerkleMountainRangeLeafDerivedClass> const bool MerkleMountain
 	// Set height to size
 	uint64_t height = size;
 	
-	// Go through all peak sizes
-	for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height); peakSize; peakSize >>= 1) {
+	// Check if height isn't zero
+	if(height) {
 	
-		// Check if height is greater than or equal to the peak size
-		if(height >= peakSize) {
+		// Go through all peak sizes
+		for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height); peakSize; peakSize >>= 1) {
 		
-			// Update height
-			height -= peakSize;
+			// Check if height is greater than or equal to the peak size
+			if(height >= peakSize) {
+			
+				// Update height
+				height -= peakSize;
+			}
 		}
 	}
 	
@@ -1323,17 +1327,21 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 	// Set number of leaves to zero
 	uint64_t numberOfLeaves = 0;
 	
-	// Go through all peak sizes
-	for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height); peakSize; peakSize >>= 1) {
+	// Check if height isn't zero
+	if(height) {
 	
-		// Check if height is greater than or equal to the peak size
-		if(height >= peakSize) {
+		// Go through all peak sizes
+		for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height); peakSize; peakSize >>= 1) {
 		
-			// Increase number of leaves
-			numberOfLeaves += (peakSize + 1) / 2;
+			// Check if height is greater than or equal to the peak size
+			if(height >= peakSize) {
 			
-			// Update height
-			height -= peakSize;
+				// Increase number of leaves
+				numberOfLeaves += (peakSize + 1) / 2;
+				
+				// Update height
+				height -= peakSize;
+			}
 		}
 	}
 	
@@ -1612,20 +1620,24 @@ template<typename MerkleMountainRangeLeafDerivedClass> const vector<uint64_t> Me
 	// Set height to size
 	uint64_t height = size;
 	
-	// Go through all peak sizes
-	for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height), peakSum = 0; peakSize; peakSize >>= 1) {
+	// Check if height isn't zero
+	if(height) {
 	
-		// Check if height is greater than or equal to the peak size
-		if(height >= peakSize) {
+		// Go through all peak sizes
+		for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height), peakSum = 0; peakSize; peakSize >>= 1) {
 		
-			// Update peak sum
-			peakSum += peakSize;
+			// Check if height is greater than or equal to the peak size
+			if(height >= peakSize) {
 			
-			// Append peak index to list
-			peakIndices.push_back(peakSum - 1);
-		
-			// Update height
-			height -= peakSize;
+				// Update peak sum
+				peakSum += peakSize;
+				
+				// Append peak index to list
+				peakIndices.push_back(peakSum - 1);
+			
+				// Update height
+				height -= peakSize;
+			}
 		}
 	}
 	
@@ -1639,14 +1651,18 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 	// Set height to index
 	uint64_t height = index;
 	
-	// Go through all peak sizes
-	for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height); peakSize; peakSize >>= 1) {
+	// Check if height isn't zero
+	if(height) {
 	
-		// Check if height is greater than or equal to the peak size
-		if(height >= peakSize) {
+		// Go through all peak sizes
+		for(uint64_t peakSize = UINT64_MAX >> Common::numberOfLeadingZeros(height); peakSize; peakSize >>= 1) {
 		
-			// Update height
-			height -= peakSize;
+			// Check if height is greater than or equal to the peak size
+			if(height >= peakSize) {
+			
+				// Update height
+				height -= peakSize;
+			}
 		}
 	}
 	

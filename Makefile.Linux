@@ -50,7 +50,7 @@ dependencies:
 	unzip "./master.zip"
 	rm "./master.zip"
 	mv "./secp256k1-zkp-master" "./secp256k1-zkp"
-	cd "./secp256k1-zkp" && "./autogen.sh" && "./configure" --prefix="$(CURDIR)/secp256k1-zkp/dist" --enable-endomorphism --enable-experimental --enable-module-generator --enable-module-commitment --enable-module-rangeproof --enable-module-bulletproof --enable-module-aggsig --disable-shared --disable-tests --disable-benchmark && make && make install
+	cd "./secp256k1-zkp" && "./autogen.sh" && "./configure" --prefix="$(CURDIR)/secp256k1-zkp/dist" --enable-endomorphism --enable-experimental --enable-module-generator --enable-module-commitment --enable-module-rangeproof --enable-module-bulletproof --enable-module-aggsig --with-bignum=no --disable-shared --disable-tests --disable-benchmark && make && make install
 	
 	# Zlib
 	wget "https://github.com/madler/zlib/archive/refs/tags/v1.2.12.zip"
