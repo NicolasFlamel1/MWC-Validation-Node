@@ -20,7 +20,7 @@ const size_t Crypto::SECP256K1_SCRATCH_SPACE_LENGTH = 30 * Common::BYTES_IN_A_KI
 const size_t Crypto::SECP256k1_NUMBER_OF_GENERATORS = 256;
 
 // Secp256k1 context
-const unique_ptr<secp256k1_context, decltype(&secp256k1_context_destroy)> Crypto::secp256k1Context(secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY), secp256k1_context_destroy);
+const unique_ptr<secp256k1_context, decltype(&secp256k1_context_destroy)> Crypto::secp256k1Context(secp256k1_context_create(SECP256K1_CONTEXT_VERIFY), secp256k1_context_destroy);
 
 // Secp256k1 scratch space
 const unique_ptr<secp256k1_scratch_space, decltype(&secp256k1_scratch_space_destroy)> Crypto::secp256k1ScratchSpace(secp256k1_scratch_space_create(secp256k1Context.get(), SECP256K1_SCRATCH_SPACE_LENGTH), secp256k1_scratch_space_destroy);
