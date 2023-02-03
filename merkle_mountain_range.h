@@ -18,6 +18,7 @@
 #include "zip.h"
 
 using namespace std;
+using namespace roaring;
 
 
 // Classes
@@ -844,7 +845,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 		}
 		
 		// Initialize newest pruned node index
-		uint64_t newestPrunedNodeIndex;
+		uint64_t newestPrunedNodeIndex = 0;
 		
 		// Set newest pruned node index is valid to false
 		bool newestPrunedNodeIndexIsValid = false;
