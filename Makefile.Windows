@@ -64,7 +64,7 @@ dependencies:
 	unzip "./v1.10.0.zip"
 	rm "./v1.10.0.zip"
 	mv "./libzip-1.10.0" "./libzip"
-	cd "./libzip" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/libzip/dist" -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DZLIB_INCLUDE_DIR="../zlib/dist/include" -DZLIB_LIBRARY="../zlib/dist/lib" -DENABLE_BZIP2=OFF -DENABLE_LZMA=OFF -DENABLE_OPENSSL=OFF -DENABLE_WINDOWS_CRYPTO=OFF -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix "./CMakeLists.txt" && make && make install
+	cd "./libzip" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/libzip/dist" -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DZLIB_INCLUDE_DIR="../zlib/dist/include" -DZLIB_LIBRARY="../zlib/dist/lib" -DENABLE_BZIP2=OFF -DENABLE_ZSTD=OFF -DENABLE_LZMA=OFF -DENABLE_OPENSSL=OFF -DENABLE_WINDOWS_CRYPTO=OFF -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix "./CMakeLists.txt" && make && make install
 	
 	# CRoaring
 	wget "https://github.com/RoaringBitmap/CRoaring/archive/refs/tags/v1.0.1.zip"
