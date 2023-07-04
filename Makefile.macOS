@@ -29,7 +29,7 @@ all:
 	
 # Make clean
 clean:
-	rm -rf "./$(PROGRAM_NAME)" "./master.zip" "./BLAKE2-master" "./blake2" "./secp256k1-zkp-master" "./secp256k1-zkp" "./v1.2.13.zip" "./zlib-1.2.13" "./zlib" "./v1.10.0.zip" "./libzip-1.10.0" "./libzip" "./cmake-3.26.4-macos-universal.tar.gz" "./cmake-3.26.4-macos-universal" "./cmake" "./v1.3.0.zip" "./CRoaring-1.3.0" "./croaring"
+	rm -rf "./$(PROGRAM_NAME)" "./master.zip" "./BLAKE2-master" "./blake2" "./secp256k1-zkp-master" "./secp256k1-zkp" "./v1.2.13.zip" "./zlib-1.2.13" "./zlib" "./v1.10.0.zip" "./libzip-1.10.0" "./libzip" "./cmake-3.26.4-macos-universal.tar.gz" "./cmake-3.26.4-macos-universal" "./cmake" "./v1.0.1.zip" "./CRoaring-1.0.1" "./croaring"
 
 # Make run
 run:
@@ -72,10 +72,10 @@ dependencies:
 	rm -r "./cmake"
 	
 	# CRoaring
-	curl -f -LOk "https://github.com/RoaringBitmap/CRoaring/archive/refs/tags/v1.3.0.zip"
-	unzip "./v1.3.0.zip"
-	rm "./v1.3.0.zip"
-	mv "./CRoaring-1.3.0" "./croaring"
+	curl -f -LOk "https://github.com/RoaringBitmap/CRoaring/archive/refs/tags/v1.0.1.zip"
+	unzip "./v1.0.1.zip"
+	rm "./v1.0.1.zip"
+	mv "./CRoaring-1.0.1" "./croaring"
 	curl -f -LOk "https://github.com/Kitware/CMake/releases/download/v3.26.4/cmake-3.26.4-macos-universal.tar.gz"
 	tar -xf "./cmake-3.26.4-macos-universal.tar.gz"
 	rm "./cmake-3.26.4-macos-universal.tar.gz"
