@@ -1,6 +1,6 @@
 // Header guard
-#ifndef PEER_H
-#define PEER_H
+#ifndef MWC_VALIDATION_NODE_PEER_H
+#define MWC_VALIDATION_NODE_PEER_H
 
 
 // Header files
@@ -16,6 +16,10 @@
 #endif
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Classes
@@ -79,26 +83,38 @@ class Peer final {
 		// Destructor
 		~Peer();
 		
+		// Stop
+		void stop();
+		
+		// Get thread
+		thread &getThread();
+		
 		// Get lock
 		shared_mutex &getLock();
 		
 		// Get connection state
-		const ConnectionState getConnectionState() const;
+		ConnectionState getConnectionState() const;
 		
 		// Get syncing state
-		const SyncingState getSyncingState() const;
+		SyncingState getSyncingState() const;
 		
 		// Get identifier
 		const string &getIdentifier() const;
 		
 		// Get total difficulty
-		const uint64_t getTotalDifficulty() const;
+		uint64_t getTotalDifficulty() const;
 		
 		// Is message queue full
-		const bool isMessageQueueFull() const;
+		bool isMessageQueueFull() const;
 		
 		// Start syncing
 		void startSyncing(const MerkleMountainRange<Header> &headers, const uint64_t syncedHeaderIndex);
+		
+		// Get headers
+		MerkleMountainRange<Header> &getHeaders();
+		
+		// Is worker operation running
+		bool isWorkerOperationRunning() const;
 	
 	// Private
 	private:
@@ -188,19 +204,19 @@ class Peer final {
 		void disconnect();
 		
 		// Process requests and/or responses
-		const bool processRequestsAndOrResponses();
+		bool processRequestsAndOrResponses();
 		
 		// Get locator headers block hashes
-		const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> getLocatorHeadersBlockHashes() const;
+		list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> getLocatorHeadersBlockHashes() const;
 		
 		// Process header
-		const bool processHeaders(list<Header> &&headers);
+		bool processHeaders(list<Header> &&headers);
 		
 		// Process transaction hash set archive
-		const bool processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentIndex, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentLength, const Header *transactionHashSetArchiveHeader);
+		bool processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentIndex, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentLength, const Header *transactionHashSetArchiveHeader);
 		
 		// Process block
-		const bool processBlock(vector<uint8_t> &&buffer);
+		bool processBlock(vector<uint8_t> &&buffer);
 		
 		// Stop read and write
 		atomic_bool stopReadAndWrite;
@@ -302,6 +318,9 @@ class Peer final {
 		// Main thread
 		thread mainThread;
 };
+
+
+}
 
 
 #endif

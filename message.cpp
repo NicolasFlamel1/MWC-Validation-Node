@@ -7,6 +7,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 // Check if floonet
@@ -36,6 +40,8 @@ const uint8_t Message::MAXIMUM_NUMBER_OF_BLOCK_HASHES = 20;
 
 // Compatible protocol versions
 const set<uint32_t> Message::COMPATIBLE_PROTOCOL_VERSIONS = {
+	0,
+	1,
 	2,
 	3
 };
@@ -62,7 +68,7 @@ const size_t Message::MAXIMUM_KERNELS_LENGTH = 100000;
 // Supporting function implementation
 
 // Create hand message
-const vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress) {
+vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -136,7 +142,7 @@ const vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uin
 }
 
 // Create ping message
-const vector<uint8_t> Message::createPingMessage(const uint64_t totalDifficulty, const uint64_t height) {
+vector<uint8_t> Message::createPingMessage(const uint64_t totalDifficulty, const uint64_t height) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -165,7 +171,7 @@ const vector<uint8_t> Message::createPingMessage(const uint64_t totalDifficulty,
 }
 
 // Create pong message
-const vector<uint8_t> Message::createPongMessage(const uint64_t totalDifficulty, const uint64_t height) {
+vector<uint8_t> Message::createPongMessage(const uint64_t totalDifficulty, const uint64_t height) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -194,7 +200,7 @@ const vector<uint8_t> Message::createPongMessage(const uint64_t totalDifficulty,
 }
 
 // Create get peer addresses message
-const vector<uint8_t> Message::createGetPeerAddressesMessage(const Node::Capabilities capabilities) {
+vector<uint8_t> Message::createGetPeerAddressesMessage(const Node::Capabilities capabilities) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -213,7 +219,7 @@ const vector<uint8_t> Message::createGetPeerAddressesMessage(const Node::Capabil
 }
 
 // Create peer addresses message
-const vector<uint8_t> Message::createPeerAddressesMessage(const vector<NetworkAddress> &peerAddresses) {
+vector<uint8_t> Message::createPeerAddressesMessage(const vector<NetworkAddress> &peerAddresses) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -246,7 +252,7 @@ const vector<uint8_t> Message::createPeerAddressesMessage(const vector<NetworkAd
 }
 
 // Create get headers message
-const vector<uint8_t> Message::createGetHeadersMessage(const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> &blockHashes) {
+vector<uint8_t> Message::createGetHeadersMessage(const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> &blockHashes) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -279,7 +285,7 @@ const vector<uint8_t> Message::createGetHeadersMessage(const list<array<uint8_t,
 }
 
 // Create get block message
-const vector<uint8_t> Message::createGetBlockMessage(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]) {
+vector<uint8_t> Message::createGetBlockMessage(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -298,7 +304,7 @@ const vector<uint8_t> Message::createGetBlockMessage(const uint8_t blockHash[Cry
 }
 
 // Create get transaction hash set message
-const vector<uint8_t> Message::createGetTransactionHashSetMessage(const uint64_t height, const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]) {
+vector<uint8_t> Message::createGetTransactionHashSetMessage(const uint64_t height, const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -320,7 +326,7 @@ const vector<uint8_t> Message::createGetTransactionHashSetMessage(const uint64_t
 }
 
 // Create error message
-const vector<uint8_t> Message::createErrorMessage() {
+vector<uint8_t> Message::createErrorMessage() {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -336,7 +342,7 @@ const vector<uint8_t> Message::createErrorMessage() {
 }
 
 // Read message header
-const tuple<Message::Type, vector<uint8_t>::size_type> Message::readMessageHeader(const vector<uint8_t> &messageHeader) {
+tuple<Message::Type, vector<uint8_t>::size_type> Message::readMessageHeader(const vector<uint8_t> &messageHeader) {
 
 	// Check if message header isn't complete
 	if(messageHeader.size() < MESSAGE_HEADER_LENGTH) {
@@ -370,7 +376,7 @@ const tuple<Message::Type, vector<uint8_t>::size_type> Message::readMessageHeade
 }
 
 // Read shake message
-const tuple<Node::Capabilities, uint64_t, string, uint32_t> Message::readShakeMessage(const vector<uint8_t> &shakeMessage) {
+tuple<Node::Capabilities, uint64_t, string, uint32_t> Message::readShakeMessage(const vector<uint8_t> &shakeMessage) {
 
 	// Check if shake message doesn't contain a version
 	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint32_t)) {
@@ -482,7 +488,7 @@ const tuple<Node::Capabilities, uint64_t, string, uint32_t> Message::readShakeMe
 }
 
 // Read ping message
-const uint64_t Message::readPingMessage(const vector<uint8_t> &pingMessage) {
+uint64_t Message::readPingMessage(const vector<uint8_t> &pingMessage) {
 
 	// Check if ping message doesn't contain a total difficulty
 	if(pingMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint64_t)) {
@@ -523,7 +529,7 @@ const uint64_t Message::readPingMessage(const vector<uint8_t> &pingMessage) {
 }
 
 // Read pong message
-const uint64_t Message::readPongMessage(const vector<uint8_t> &pongMessage) {
+uint64_t Message::readPongMessage(const vector<uint8_t> &pongMessage) {
 
 	// Check if pong message doesn't contain a total difficulty
 	if(pongMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint64_t)) {
@@ -564,7 +570,7 @@ const uint64_t Message::readPongMessage(const vector<uint8_t> &pongMessage) {
 }
 
 // Read get peer addresses message
-const Node::Capabilities Message::readGetPeerAddressesMessage(const vector<uint8_t> &getPeerAddressesMessage) {
+Node::Capabilities Message::readGetPeerAddressesMessage(const vector<uint8_t> &getPeerAddressesMessage) {
 
 	// Check if get peer addresses message doesn't contain capabilities
 	if(getPeerAddressesMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(Node::Capabilities)) {
@@ -581,7 +587,7 @@ const Node::Capabilities Message::readGetPeerAddressesMessage(const vector<uint8
 }
 
 // Read peer addresses message
-const list<NetworkAddress> Message::readPeerAddressesMessage(const vector<uint8_t> &peerAddressesMessage) {
+list<NetworkAddress> Message::readPeerAddressesMessage(const vector<uint8_t> &peerAddressesMessage) {
 
 	// Check if peer addresses message doesn't contain the number of peer addresses
 	if(peerAddressesMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint32_t)) {
@@ -652,14 +658,14 @@ const list<NetworkAddress> Message::readPeerAddressesMessage(const vector<uint8_
 }
 
 // Read header message
-const Header Message::readHeaderMessage(const vector<uint8_t> &headerMessage) {
+Header Message::readHeaderMessage(const vector<uint8_t> &headerMessage) {
 
 	// Return reading header from header message
 	return readHeader(headerMessage, MESSAGE_HEADER_LENGTH);
 }
 
 // Read headers message
-const list<Header> Message::readHeadersMessage(const vector<uint8_t> &headersMessage) {
+list<Header> Message::readHeadersMessage(const vector<uint8_t> &headersMessage) {
 
 	// Check if headers message doesn't contain the number of headers
 	if(headersMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint16_t)) {
@@ -704,7 +710,7 @@ const list<Header> Message::readHeadersMessage(const vector<uint8_t> &headersMes
 }
 
 // Read block message
-const tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &blockMessage, const uint32_t protocolVersion) {
+tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &blockMessage, const uint32_t protocolVersion) {
 
 	// Read header from block message
 	const Header header = readHeader(blockMessage, MESSAGE_HEADER_LENGTH);
@@ -781,7 +787,9 @@ const tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &bloc
 		// Check protocol version
 		switch(protocolVersion) {
 		
-			// Two
+			// Zero, one, or two
+			case 0:
+			case 1:
 			case 2:
 			
 				// Update offset
@@ -844,28 +852,10 @@ const tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &bloc
 	for(uint64_t i = 0; i < numberOfKernels; ++i) {
 	
 		// Read kernel from block message
-		Kernel kernel = readKernel(blockMessage, offset);
+		Kernel kernel = readKernel(blockMessage, offset, protocolVersion);
 		
 		// Check kernel's features
 		switch(kernel.getFeatures()) {
-		
-			// Plain
-			case Kernel::Features::PLAIN:
-			
-				// Update offset
-				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-			
-				// Break
-				break;
-			
-			// Coinbase
-			case Kernel::Features::COINBASE:
-			
-				// Update offset
-				offset += sizeof(kernel.getFeatures()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-			
-				// Break
-				break;
 		
 			// Height locked
 			case Kernel::Features::HEIGHT_LOCKED:
@@ -876,9 +866,6 @@ const tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &bloc
 					// Throw exception
 					throw runtime_error("Kernel's lock height is greater than the header's height");
 				}
-				
-				// Update offset
-				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(kernel.getLockHeight()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 				
 				// Break
 				break;
@@ -893,18 +880,82 @@ const tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &bloc
 					throw runtime_error("Header version is less than four");
 				}
 				
-				// Update offset
-				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(kernel.getRelativeHeight()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-			
 				// Break
 				break;
 			
 			// Default
 			default:
 			
-				// Throw exception
-				throw runtime_error("Unknown features");
+				// Break
+				break;
+		}
+		
+		// Check protocol version
+		switch(protocolVersion) {
+		
+			// Zero or one
+			case 0:
+			case 1:
 			
+				// Update offset
+				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+				
+				// Break
+				break;
+			
+			// Two or three
+			case 2:
+			case 3:
+		
+				// Check kernel's features
+				switch(kernel.getFeatures()) {
+				
+					// Plain
+					case Kernel::Features::PLAIN:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+					
+					// Coinbase
+					case Kernel::Features::COINBASE:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+				
+					// Height locked
+					case Kernel::Features::HEIGHT_LOCKED:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(kernel.getLockHeight()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+						
+						// Break
+						break;
+					
+					// No recent duplicate
+					case Kernel::Features::NO_RECENT_DUPLICATE:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+					
+					// Default
+					default:
+					
+						// Throw exception
+						throw runtime_error("Unknown features");
+					
+						// Break
+						break;
+				}
+				
 				// Break
 				break;
 		}
@@ -921,7 +972,7 @@ const tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &bloc
 }
 
 // Read transaction hash set archive message
-const tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::size_type> Message::readTransactionHashSetArchiveMessage(const vector<uint8_t> &transactionHashSetArchiveMessage) {
+tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::size_type> Message::readTransactionHashSetArchiveMessage(const vector<uint8_t> &transactionHashSetArchiveMessage) {
 
 	// Check if transaction hash set archive message doesn't contain a block hash
 	if(transactionHashSetArchiveMessage.size() < MESSAGE_HEADER_LENGTH + Crypto::BLAKE2B_HASH_LENGTH) {
@@ -966,7 +1017,7 @@ const tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_
 }
 
 // Get maximum payload length
-const vector<uint8_t>::size_type Message::getMaximumPayloadLength(const Type type) {
+vector<uint8_t>::size_type Message::getMaximumPayloadLength(const Type type) {
 
 	// Check type
 	switch(type) {
@@ -1112,7 +1163,7 @@ const vector<uint8_t>::size_type Message::getMaximumPayloadLength(const Type typ
 }
 
 // Create message header
-const vector<uint8_t> Message::createMessageHeader(const Type type, const vector<uint8_t>::size_type payloadLength) {
+vector<uint8_t> Message::createMessageHeader(const Type type, const vector<uint8_t>::size_type payloadLength) {
 
 	// Initialize message header
 	vector<uint8_t> messageHeader;
@@ -1249,7 +1300,7 @@ void Message::writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress 
 }
 
 // Read network address
-const NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
+NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
 
 	// Initialize network address
 	NetworkAddress networkAddress;
@@ -1406,7 +1457,7 @@ const NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, 
 }
 
 // Read header
-const Header Message::readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
+Header Message::readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
 
 	// Check if header doesn't contain a version
 	if(buffer.size() < offset + sizeof(uint16_t)) {
@@ -1628,7 +1679,7 @@ const Header Message::readHeader(const vector<uint8_t> &buffer, const vector<uin
 }
 
 // Read input
-const Input Message::readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion) {
+Input Message::readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion) {
 
 	// Initialize features
 	Input::Features features;
@@ -1639,7 +1690,9 @@ const Input Message::readInput(const vector<uint8_t> &buffer, const vector<uint8
 	// Check protocol version
 	switch(protocolVersion) {
 	
-		// Two
+		// Zero, one, or two
+		case 0:
+		case 1:
 		case 2:
 		
 			// Check if input doesn't contain features
@@ -1695,7 +1748,7 @@ const Input Message::readInput(const vector<uint8_t> &buffer, const vector<uint8
 }
 
 // Read output
-const Output Message::readOutput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
+Output Message::readOutput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
 
 	// Check if output doesn't contain features
 	if(buffer.size() < offset + sizeof(Output::Features)) {
@@ -1722,7 +1775,7 @@ const Output Message::readOutput(const vector<uint8_t> &buffer, const vector<uin
 }
 
 // Read rangeproof
-const Rangeproof Message::readRangeproof(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
+Rangeproof Message::readRangeproof(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
 
 	// Check if rangeproof doesn't contain a length
 	if(buffer.size() < offset + sizeof(uint64_t)) {
@@ -1749,7 +1802,7 @@ const Rangeproof Message::readRangeproof(const vector<uint8_t> &buffer, const ve
 }
 
 // Read kernel
-const Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
+Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion) {
 
 	// Check if kernel doesn't contain features
 	if(buffer.size() < offset + sizeof(Kernel::Features)) {
@@ -1773,14 +1826,15 @@ const Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uin
 	// Initialize features size
 	vector<uint8_t>::size_type featuresSize;
 	
-	// Check features
-	switch(features) {
+	// Check protocol version
+	switch(protocolVersion) {
 	
-		// Plain
-		case Kernel::Features::PLAIN:
+		// Zero or one
+		case 0:
+		case 1:
 		
 			// Check if kernel doesn't contain a fee
-			if(buffer.size() < offset + sizeof(features) + sizeof(uint64_t)) {
+			if(buffer.size() < offset + sizeof(features) + sizeof(fee)) {
 			
 				// Throw exception
 				throw runtime_error("Kernel doesn't contain a fee");
@@ -1789,75 +1843,164 @@ const Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uin
 			// Get fee from kernel
 			fee = Common::readUint64(buffer, offset + sizeof(features));
 			
-			// Set features size
-			featuresSize = sizeof(fee);
-		
+			// Check features
+			switch(features) {
+			
+				// Plain, coinbase, or height locked
+				case Kernel::Features::PLAIN:
+				case Kernel::Features::COINBASE:
+				case Kernel::Features::HEIGHT_LOCKED:
+				
+					// Check if kernel doesn't contain a lock height
+					if(buffer.size() < offset + sizeof(features) + sizeof(fee) + sizeof(lockHeight)) {
+					
+						// Throw exception
+						throw runtime_error("Kernel doesn't contain a lock height");
+					}
+					
+					// Get lock height from kernel
+					lockHeight = Common::readUint64(buffer, offset + sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(lockHeight);
+					
+					// Break
+					break;
+				
+				// No recent duplicate
+				case Kernel::Features::NO_RECENT_DUPLICATE:
+				
+					// Check if kernel doesn't contain a relative height
+					if(buffer.size() < offset + sizeof(features) + sizeof(fee) + sizeof(relativeHeight)) {
+					
+						// Throw exception
+						throw runtime_error("Kernel doesn't contain a relative height");
+					}
+					
+					// Get relative height from kernel
+					relativeHeight = Common::readUint64(buffer, offset + sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(relativeHeight);
+					
+					// Break
+					break;
+				
+				// Default
+				default:
+				
+					// Throw exception
+					throw runtime_error("Unknown features");
+				
+					// Break
+					break;
+			}
+			
 			// Break
 			break;
 		
-		// Coinbase
-		case Kernel::Features::COINBASE:
+		// Two or three
+		case 2:
+		case 3:
 		
-			// Set features size
-			featuresSize = 0;
-		
-			// Break
-			break;
-		
-		// Height locked
-		case Kernel::Features::HEIGHT_LOCKED:
-		
-			// Check if kernel doesn't contain a fee
-			if(buffer.size() < offset + sizeof(features) + sizeof(uint64_t)) {
+			// Check features
+			switch(features) {
 			
-				// Throw exception
-				throw runtime_error("Kernel doesn't contain a fee");
+				// Plain
+				case Kernel::Features::PLAIN:
+				
+					// Check if kernel doesn't contain a fee
+					if(buffer.size() < offset + sizeof(features) + sizeof(fee)) {
+					
+						// Throw exception
+						throw runtime_error("Kernel doesn't contain a fee");
+					}
+					
+					// Get fee from kernel
+					fee = Common::readUint64(buffer, offset + sizeof(features));
+					
+					// Set features size
+					featuresSize = sizeof(fee);
+				
+					// Break
+					break;
+				
+				// Coinbase
+				case Kernel::Features::COINBASE:
+				
+					// Set features size
+					featuresSize = 0;
+				
+					// Break
+					break;
+				
+				// Height locked
+				case Kernel::Features::HEIGHT_LOCKED:
+				
+					// Check if kernel doesn't contain a fee
+					if(buffer.size() < offset + sizeof(features) + sizeof(fee)) {
+					
+						// Throw exception
+						throw runtime_error("Kernel doesn't contain a fee");
+					}
+					
+					// Get fee from kernel
+					fee = Common::readUint64(buffer, offset + sizeof(features));
+					
+					// Check if kernel doesn't contain a lock height
+					if(buffer.size() < offset + sizeof(features) + sizeof(fee) + sizeof(lockHeight)) {
+					
+						// Throw exception
+						throw runtime_error("Kernel doesn't contain a lock height");
+					}
+					
+					// Get lock height from kernel
+					lockHeight = Common::readUint64(buffer, offset + sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(lockHeight);
+				
+					// Break
+					break;
+				
+				// No recent duplicate
+				case Kernel::Features::NO_RECENT_DUPLICATE:
+				
+					// Check if kernel doesn't contain a fee
+					if(buffer.size() < offset + sizeof(features) + sizeof(fee)) {
+					
+						// Throw exception
+						throw runtime_error("Kernel doesn't contain a fee");
+					}
+					
+					// Get fee from kernel
+					fee = Common::readUint64(buffer, offset + sizeof(features));
+					
+					// Check if kernel doesn't contain a relative height
+					if(buffer.size() < offset + sizeof(features) + sizeof(fee) + sizeof(uint16_t)) {
+					
+						// Throw exception
+						throw runtime_error("Kernel doesn't contain a relative height");
+					}
+					
+					// Get relative height from kernel
+					relativeHeight = Common::readUint16(buffer, offset + sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(uint16_t);
+				
+					// Break
+					break;
+				
+				// Default
+				default:
+				
+					// Throw exception
+					throw runtime_error("Unknown features");
+				
+					// Break
+					break;
 			}
-			
-			// Get fee from kernel
-			fee = Common::readUint64(buffer, offset + sizeof(features));
-			
-			// Check if kernel doesn't contain a lock height
-			if(buffer.size() < offset + sizeof(features) + sizeof(fee) + sizeof(uint64_t)) {
-			
-				// Throw exception
-				throw runtime_error("Kernel doesn't contain a lock height");
-			}
-			
-			// Get lock height from kernel
-			lockHeight = Common::readUint64(buffer, offset + sizeof(features) + sizeof(fee));
-			
-			// Set features size
-			featuresSize = sizeof(fee) + sizeof(lockHeight);
-		
-			// Break
-			break;
-		
-		// No recent duplicate
-		case Kernel::Features::NO_RECENT_DUPLICATE:
-		
-			// Check if kernel doesn't contain a fee
-			if(buffer.size() < offset + sizeof(features) + sizeof(uint64_t)) {
-			
-				// Throw exception
-				throw runtime_error("Kernel doesn't contain a fee");
-			}
-			
-			// Get fee from kernel
-			fee = Common::readUint64(buffer, offset + sizeof(features));
-			
-			// Check if kernel doesn't contain a relative height
-			if(buffer.size() < offset + sizeof(features) + sizeof(fee) + sizeof(uint16_t)) {
-			
-				// Throw exception
-				throw runtime_error("Kernel doesn't contain a relative height");
-			}
-			
-			// Get relative height from kernel
-			relativeHeight = Common::readUint16(buffer, offset + sizeof(features) + sizeof(fee));
-			
-			// Set features size
-			featuresSize = sizeof(fee) + sizeof(relativeHeight);
 		
 			// Break
 			break;
@@ -1866,7 +2009,7 @@ const Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uin
 		default:
 		
 			// Throw exception
-			throw runtime_error("Unknown features");
+			throw runtime_error("Unknown protocol version");
 		
 			// Break
 			break;

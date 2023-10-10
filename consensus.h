@@ -1,6 +1,6 @@
 // Header guard
-#ifndef CONSENSUS_H
-#define CONSENSUS_H
+#ifndef MWC_VALIDATION_NODE_CONSENSUS_H
+#define MWC_VALIDATION_NODE_CONSENSUS_H
 
 
 // Header files
@@ -11,6 +11,10 @@
 #include "./rangeproof.h"
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Classes
@@ -112,28 +116,28 @@ class Consensus final {
 		Consensus() = delete;
 		
 		// Get header version
-		static const uint16_t getHeaderVersion(const uint64_t height);
+		static uint16_t getHeaderVersion(const uint64_t height);
 		
 		// Get block weight
-		static const uint64_t getBlockWeight(const uint64_t numberOfInputs, const uint64_t numberOfOutputs, const uint64_t numberOfKernels);
+		static uint64_t getBlockWeight(const uint64_t numberOfInputs, const uint64_t numberOfOutputs, const uint64_t numberOfKernels);
 		
 		// Is block hash banned
-		static const bool isBlockHashBanned(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
+		static bool isBlockHashBanned(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
 		
 		// Get graph weight
-		static const uint64_t getGraphWeight(const uint64_t height, const uint8_t edgeBits);
+		static uint64_t getGraphWeight(const uint64_t height, const uint8_t edgeBits);
 		
 		// Get C29 proof of work ratio
-		static const uint64_t getC29ProofOfWorkRatio(const uint64_t height);
+		static uint64_t getC29ProofOfWorkRatio(const uint64_t height);
 		
 		// Get maximum difficulty
-		static const uint64_t getMaximumDifficulty(const Header &header);
+		static uint64_t getMaximumDifficulty(const Header &header);
 		
 		// Get coinbase reward
-		static const uint64_t getCoinbaseReward(const uint64_t height);
+		static uint64_t getCoinbaseReward(const uint64_t height);
 		
 		// Get total number of coinbase rewards
-		static const uint64_t getTotalNumberOfCoinbaseRewards(const uint64_t height);
+		static uint64_t getTotalNumberOfCoinbaseRewards(const uint64_t height);
 	
 	// Private
 	private:
@@ -154,14 +158,17 @@ class Consensus final {
 		static const uint64_t C29_PROOF_OF_WORK_DURATION;
 		
 		// Get epoch reward
-		static const uint64_t getEpochReward(const uint8_t epoch);
+		static uint64_t getEpochReward(const uint8_t epoch);
 		
 		// Get epoch block offset
-		static const uint64_t getEpochBlockOffset(const uint8_t epoch);
+		static uint64_t getEpochBlockOffset(const uint8_t epoch);
 		
 		// Get epoch duration
-		static const uint64_t getEpochDuration(const uint8_t epoch);
+		static uint64_t getEpochDuration(const uint8_t epoch);
 };
+
+
+}
 
 
 #endif

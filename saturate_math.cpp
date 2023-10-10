@@ -5,10 +5,14 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Supporting function implementation
 
 // Add
-const uint64_t SaturateMath::add(const uint64_t firstAddend, const uint64_t secondAddend) {
+uint64_t SaturateMath::add(const uint64_t firstAddend, const uint64_t secondAddend) {
 
 	// Check if addition will overflow
 	if(secondAddend > UINT64_MAX - firstAddend) {
@@ -26,7 +30,7 @@ const uint64_t SaturateMath::add(const uint64_t firstAddend, const uint64_t seco
 }
 
 // Subtract
-const uint64_t SaturateMath::subtract(const uint64_t minuend, const uint64_t subtrahend) {
+uint64_t SaturateMath::subtract(const uint64_t minuend, const uint64_t subtrahend) {
 
 	// Check if subtraction will underflow
 	if(subtrahend > minuend) {
@@ -44,7 +48,7 @@ const uint64_t SaturateMath::subtract(const uint64_t minuend, const uint64_t sub
 }
 
 // Multiply
-const uint64_t SaturateMath::multiply(const uint64_t multiplicand, const uint64_t multiplier) {
+uint64_t SaturateMath::multiply(const uint64_t multiplicand, const uint64_t multiplier) {
 
 	// Check if multiplication will overflow
 	if(multiplicand && multiplier > UINT64_MAX / multiplicand) {

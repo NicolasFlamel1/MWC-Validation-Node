@@ -1,12 +1,13 @@
 // Header guard
-#ifndef MERKLE_MOUNTAIN_RANGE_H
-#define MERKLE_MOUNTAIN_RANGE_H
+#ifndef MWC_VALIDATION_NODE_MERKLE_MOUNTAIN_RANGE_H
+#define MWC_VALIDATION_NODE_MERKLE_MOUNTAIN_RANGE_H
 
 
 // Header files
 #include "./common.h"
 #include <array>
 #include <cstring>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <set>
@@ -18,7 +19,10 @@
 #include "zip.h"
 
 using namespace std;
-using namespace roaring;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Classes
@@ -51,19 +55,25 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		void pruneLeaf(const uint64_t leafIndex);
 		
 		// Get size
-		const uint64_t getSize() const;
+		uint64_t getSize() const;
 		
 		// Get number of leaves
-		const uint64_t getNumberOfLeaves() const;
+		uint64_t getNumberOfLeaves() const;
 		
 		// Get leaf
 		const MerkleMountainRangeLeafDerivedClass *getLeaf(const uint64_t leafIndex) const;
 		
+		// Leaf with lookup value exists
+		bool leafWithLookupValueExists(const vector<uint8_t> &lookupValue) const;
+		
 		// Get leaf by lookup value
 		const MerkleMountainRangeLeafDerivedClass *getLeafByLookupValue(const vector<uint8_t> &lookupValue) const;
 		
+		// Get leaf indices by lookup value
+		const unordered_set<uint64_t> &getLeafIndicesByLookupValue(const vector<uint8_t> &lookupValue) const;
+		
 		// Get leaf index by lookup value
-		const uint64_t getLeafIndexByLookupValue(const vector<uint8_t> &lookupValue) const;
+		uint64_t getLeafIndexByLookupValue(const vector<uint8_t> &lookupValue) const;
 		
 		// Rewind to size
 		void rewindToSize(const uint64_t size);
@@ -75,22 +85,25 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		void clear();
 		
 		// Get root at size
-		const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getRootAtSize(const uint64_t size) const;
+		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getRootAtSize(const uint64_t size) const;
 		
 		// Get root at number of leaves
-		const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getRootAtNumberOfLeaves(const uint64_t numberOfLeaves) const;
+		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getRootAtNumberOfLeaves(const uint64_t numberOfLeaves) const;
 		
 		// Iterator constant begin
-		const const_iterator cbegin() const;
+		const_iterator cbegin() const;
 		
 		// Iterator constant end
-		const const_iterator cend() const;
+		const_iterator cend() const;
 		
 		// Iterator constant reverse begin
-		const const_reverse_iterator crbegin() const;
+		const_reverse_iterator crbegin() const;
 		
 		// Iterator constant reverse end
-		const const_reverse_iterator crend() const;
+		const_reverse_iterator crend() const;
+		
+		// Empty
+		bool empty() const;
 		
 		// Front
 		const MerkleMountainRangeLeafDerivedClass &front() const;
@@ -105,19 +118,25 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		void setMinimumSize(const uint64_t minimumSize);
 		
 		// Get minimum size
-		const uint64_t getMinimumSize() const;
+		uint64_t getMinimumSize() const;
+		
+		// Save
+		void save(ofstream &file) const;
+		
+		// Restore
+		static MerkleMountainRange restore(ifstream &file);
 		
 		// Create from ZIP
-		static const MerkleMountainRange createFromZip(zip_t *zip, const char *dataPath, const char *hashesPath, const char *pruneListPath = nullptr, const char *leafSetPath = nullptr);
+		static MerkleMountainRange createFromZip(zip_t *zip, uint32_t protocolVersion, const char *dataPath, const char *hashesPath, const char *pruneListPath = nullptr, const char *leafSetPath = nullptr);
 		
 		// Is size valid
-		static const bool isSizeValid(const uint64_t size);
+		static bool isSizeValid(const uint64_t size);
 		
 		// Get number of leaves at size
-		static const uint64_t getNumberOfLeavesAtSize(const uint64_t size);
+		static uint64_t getNumberOfLeavesAtSize(const uint64_t size);
 		
 		// Get size at number of leaves
-		static const uint64_t getSizeAtNumberOfLeaves(const uint64_t numberOfLeaves);
+		static uint64_t getSizeAtNumberOfLeaves(const uint64_t numberOfLeaves);
 		
 	// Private
 	private:
@@ -129,7 +148,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 			public:
 			
 				// Operator
-				const size_t operator()(const vector<uint8_t> &lookupValue) const;
+				size_t operator()(const vector<uint8_t> &lookupValue) const;
 		};
 	
 		// Append leaf or pruned leaf
@@ -142,34 +161,34 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		void pruneHash(const uint64_t leafIndex);
 		
 		// Get peak indices at size
-		static const vector<uint64_t> getPeakIndicesAtSize(const uint64_t size);
+		static vector<uint64_t> getPeakIndicesAtSize(const uint64_t size);
 	
 		// Get height at index
-		static const uint64_t getHeightAtIndex(const uint64_t index);
+		static uint64_t getHeightAtIndex(const uint64_t index);
 		
 		// Get leaf's index
-		static const uint64_t getLeafsIndex(const uint64_t leafIndex);
+		static uint64_t getLeafsIndex(const uint64_t leafIndex);
 		
 		// Get left sibling index
-		static const uint64_t getLeftSiblingIndex(const uint64_t index);
+		static uint64_t getLeftSiblingIndex(const uint64_t index);
 		
 		// Get right sibling index
-		static const uint64_t getRightSiblingIndex(const uint64_t index);
+		static uint64_t getRightSiblingIndex(const uint64_t index);
 		
 		// Get parent index
-		static const uint64_t getParentIndex(const uint64_t index);
+		static uint64_t getParentIndex(const uint64_t index);
 		
 		// Get left child index
-		static const uint64_t getLeftChildIndex(const uint64_t index);
+		static uint64_t getLeftChildIndex(const uint64_t index);
 		
 		// Get right child index
-		static const uint64_t getRightChildIndex(const uint64_t index);
+		static uint64_t getRightChildIndex(const uint64_t index);
 		
 		// Get next peak index
-		static const uint64_t getNextPeakIndex(const uint64_t index);
+		static uint64_t getNextPeakIndex(const uint64_t index);
 		
 		// Lookup table
-		unordered_map<vector<uint8_t>, uint64_t, LookupValueHash> lookupTable;
+		unordered_map<vector<uint8_t>, unordered_set<uint64_t>, LookupValueHash> lookupTable;
 		
 		// Unpruned leaves
 		map<uint64_t, MerkleMountainRangeLeafDerivedClass> unprunedLeaves;
@@ -275,8 +294,15 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 	const optional<vector<uint8_t>> lookupValue = unprunedLeaves.at(leafIndex).getLookupValue();
 	if(lookupValue.has_value()) {
 	
-		// Remove lookup value from lookup table
-		lookupTable.erase(lookupValue.value());
+		// Remove leaf from lookup value from the lookup table
+		lookupTable.at(lookupValue.value()).erase(leafIndex);
+		
+		// Check if no more leaves have the lookup value
+		if(lookupTable.at(lookupValue.value()).empty()) {
+		
+			// Remove lookup value from the lookup table
+			lookupTable.erase(lookupValue.value());
+		}
 	}
 	
 	// Subtract from sum
@@ -290,14 +316,14 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 }
 
 // Get size
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getSize() const {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getSize() const {
 
 	// Return number of hashes
 	return numberOfHashes;
 }
 
 // Get number of leaves
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getNumberOfLeaves() const {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getNumberOfLeaves() const {
 
 	// Return number of leaves
 	return numberOfLeaves;
@@ -317,9 +343,23 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 	return &unprunedLeaves.at(leafIndex);
 }
 
+// Leaf with lookup value exists
+template<typename MerkleMountainRangeLeafDerivedClass> bool MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::leafWithLookupValueExists(const vector<uint8_t> &lookupValue) const {
+
+	// Return if lookup value exists in the lookup table
+	return lookupTable.contains(lookupValue);
+}
+
 // Get leaf by lookup value
 template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRangeLeafDerivedClass *MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafByLookupValue(const vector<uint8_t> &lookupValue) const {
 
+	// Check if duplicate lookup values are allowed
+	if(MerkleMountainRangeLeafDerivedClass::ALLOW_DUPLICATE_LOOKUP_VALUES) {
+	
+		// Throw exception
+		throw runtime_error("Lookup value can be more than one leaf");
+	}
+	
 	// Check if lookup value doesn't exist in the lookup table
 	if(!lookupTable.contains(lookupValue)) {
 	
@@ -327,12 +367,12 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 		return nullptr;
 	}
 	
-	// Return leaf with the lookup value
-	return getLeaf(lookupTable.at(lookupValue));
+	// Return first leaf with the lookup value
+	return getLeaf(*lookupTable.at(lookupValue).cbegin());
 }
 
-// Get leaf index by lookup value
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafIndexByLookupValue(const vector<uint8_t> &lookupValue) const {
+// Get leaf indices by lookup value
+template<typename MerkleMountainRangeLeafDerivedClass> const unordered_set<uint64_t> &MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafIndicesByLookupValue(const vector<uint8_t> &lookupValue) const {
 
 	// Check if lookup value doesn't exist in the lookup table
 	if(!lookupTable.contains(lookupValue)) {
@@ -341,8 +381,22 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 		throw runtime_error("Lookup value doesn't exist in the lookup table");
 	}
 	
-	// Return leaf index with the lookup value
+	// Return leaf indices with the lookup value
 	return lookupTable.at(lookupValue);
+}
+
+// Get leaf index by lookup value
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafIndexByLookupValue(const vector<uint8_t> &lookupValue) const {
+
+	// Check if duplicate lookup values are allowed
+	if(MerkleMountainRangeLeafDerivedClass::ALLOW_DUPLICATE_LOOKUP_VALUES) {
+	
+		// Throw exception
+		throw runtime_error("Lookup value can be more than one leaf");
+	}
+	
+	// Return first leaf index with the lookup value
+	return *getLeafIndicesByLookupValue(lookupValue).cbegin();
 }
 
 // Rewind to size
@@ -397,8 +451,15 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 				const optional<vector<uint8_t>> lookupValue = leaf.getLookupValue();
 				if(lookupValue.has_value()) {
 				
-					// Remove lookup value from lookup table
-					lookupTable.erase(lookupValue.value());
+					// Remove leaf from lookup value from the lookup table
+					lookupTable.at(lookupValue.value()).erase(i->first);
+					
+					// Check if no more leaves have the lookup value
+					if(lookupTable.at(lookupValue.value()).empty()) {
+					
+						// Remove lookup value from the lookup table
+						lookupTable.erase(lookupValue.value());
+					}
 				}
 				
 				// Subtract from sum
@@ -431,8 +492,19 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 						optional<vector<uint8_t>> lookupValue = unprunedLeaves.at(prunedLeafIndex).getLookupValue();
 						if(lookupValue.has_value()) {
 						
-							// Append lookup value to the lookup table
-							lookupTable.emplace(move(lookupValue.value()), prunedLeafIndex);
+							// Check if lookup value exists in the lookup table
+							if(lookupTable.contains(lookupValue.value())) {
+							
+								// Add leaf to lookup value in the lookup table
+								lookupTable.at(lookupValue.value()).emplace(prunedLeafIndex);
+							}
+							
+							// Otherwise
+							else {
+						
+								// Append lookup value to the lookup table
+								lookupTable.emplace(move(lookupValue.value()), unordered_set<uint64_t>({prunedLeafIndex}));
+							}
 						}
 						
 						// Add to sum
@@ -539,7 +611,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 }
 
 // Get root at size
-template<typename MerkleMountainRangeLeafDerivedClass> const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRootAtSize(const uint64_t size) const {
+template<typename MerkleMountainRangeLeafDerivedClass> array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRootAtSize(const uint64_t size) const {
 
 	// Check if size is invalid
 	if(size > numberOfHashes || !isSizeValid(size) || size < minimumSize) {
@@ -594,38 +666,45 @@ template<typename MerkleMountainRangeLeafDerivedClass> const array<uint8_t, Cryp
 }
 
 // Get root at number of leaves
-template<typename MerkleMountainRangeLeafDerivedClass> const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRootAtNumberOfLeaves(const uint64_t numberOfLeaves) const {
+template<typename MerkleMountainRangeLeafDerivedClass> array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRootAtNumberOfLeaves(const uint64_t numberOfLeaves) const {
 
 	// Get root at size at the number of leaves
 	return getRootAtSize(getSizeAtNumberOfLeaves(numberOfLeaves));
 }
 
 // Iterator constant begin
-template<typename MerkleMountainRangeLeafDerivedClass> const typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::cbegin() const {
+template<typename MerkleMountainRangeLeafDerivedClass> typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::cbegin() const {
 
 	// Return unpruned leaves constant begin
 	return unprunedLeaves.cbegin();
 }
 
 // Iterator constant end
-template<typename MerkleMountainRangeLeafDerivedClass> const typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::cend() const {
+template<typename MerkleMountainRangeLeafDerivedClass> typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::cend() const {
 
 	// Return unpruned leaves constant end
 	return unprunedLeaves.cend();
 }
 
 // Iterator constant reverse begin
-template<typename MerkleMountainRangeLeafDerivedClass> const typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_reverse_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::crbegin() const {
+template<typename MerkleMountainRangeLeafDerivedClass> typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_reverse_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::crbegin() const {
 
 	// Return unpruned leaves constant reverse begin
 	return unprunedLeaves.crbegin();
 }
 
 // Iterator constant reverse end
-template<typename MerkleMountainRangeLeafDerivedClass> const typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_reverse_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::crend() const {
+template<typename MerkleMountainRangeLeafDerivedClass> typename MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::const_reverse_iterator MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::crend() const {
 
 	// Return unpruned leaves constant reverse end
 	return unprunedLeaves.crend();
+}
+
+// Empty
+template<typename MerkleMountainRangeLeafDerivedClass> bool MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::empty() const {
+
+	// Return if unpruned leaves is empty
+	return unprunedLeaves.empty();
 }
 
 // Front
@@ -710,17 +789,309 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 }
 
 // Get minimum size
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getMinimumSize() const {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getMinimumSize() const {
 
 	// Return minimum size
 	return minimumSize;
 }
 
+// Save
+template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::save(ofstream &file) const {
+
+	// Write lookup table size to file
+	const uint64_t serializedLookupTableSize = Common::hostByteOrderToBigEndian(lookupTable.size());
+	file.write(reinterpret_cast<const char *>(&serializedLookupTableSize), sizeof(serializedLookupTableSize));
+	
+	// Go through all lookup values in the lookup table
+	for(const pair<const vector<uint8_t>, unordered_set<uint64_t>> &lookupValue : lookupTable) {
+	
+		// Write lookup value size to file
+		const uint64_t serializedLookupValueSize = Common::hostByteOrderToBigEndian(lookupValue.first.size());
+		file.write(reinterpret_cast<const char *>(&serializedLookupValueSize), sizeof(serializedLookupValueSize));
+		
+		// Write lookup value to file
+		file.write(reinterpret_cast<const char *>(lookupValue.first.data()), lookupValue.first.size());
+		
+		// Check if duplicate lookup values are allowed
+		if(MerkleMountainRangeLeafDerivedClass::ALLOW_DUPLICATE_LOOKUP_VALUES) {
+		
+			// Write lookup value number of leaves to file
+			const uint64_t serializedLookupValueNumberOfLeaves = Common::hostByteOrderToBigEndian(lookupValue.second.size());
+			file.write(reinterpret_cast<const char *>(&serializedLookupValueNumberOfLeaves), sizeof(serializedLookupValueNumberOfLeaves));
+			
+			// Go through all leaves in the lookup value
+			for(const uint64_t leafIndex : lookupValue.second) {
+			
+				// Write leaf index to file
+				const uint64_t serializedLeafIndex = Common::hostByteOrderToBigEndian(leafIndex);
+				file.write(reinterpret_cast<const char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+			}
+		}
+		
+		// Otherwise
+		else {
+		
+			// Write lookup value first leaf index to file
+			const uint64_t serializedFirstLeafIndex = Common::hostByteOrderToBigEndian(*lookupValue.second.cbegin());
+			file.write(reinterpret_cast<const char *>(&serializedFirstLeafIndex), sizeof(serializedFirstLeafIndex));
+		}
+	}
+	
+	// Write unpruned leaves size to file
+	const uint64_t serializedUnprunedLeavesSize = Common::hostByteOrderToBigEndian(unprunedLeaves.size());
+	file.write(reinterpret_cast<const char *>(&serializedUnprunedLeavesSize), sizeof(serializedUnprunedLeavesSize));
+	
+	// Go through all unpruned leaves
+	for(const pair<const uint64_t, MerkleMountainRangeLeafDerivedClass> &unprunedLeaf : unprunedLeaves) {
+	
+		// Write leaf index to file
+		const uint64_t serializedLeafIndex = Common::hostByteOrderToBigEndian(unprunedLeaf.first);
+		file.write(reinterpret_cast<const char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+		
+		// Write leaf to file
+		unprunedLeaf.second.save(file);
+	}
+	
+	// Write number of leaves to file
+	const uint64_t serializedNumberOfLeaves = Common::hostByteOrderToBigEndian(numberOfLeaves);
+	file.write(reinterpret_cast<const char *>(&serializedNumberOfLeaves), sizeof(serializedNumberOfLeaves));
+	
+	// Write unpruned hashes size to file
+	const uint64_t serializedUnprunedHashesSize = Common::hostByteOrderToBigEndian(unprunedHashes.size());
+	file.write(reinterpret_cast<const char *>(&serializedUnprunedHashesSize), sizeof(serializedUnprunedHashesSize));
+	
+	// Go through all unpruned hashes
+	for(const pair<const uint64_t, array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> &unprunedHash : unprunedHashes) {
+	
+		// Write index to file
+		const uint64_t serializedIndex = Common::hostByteOrderToBigEndian(unprunedHash.first);
+		file.write(reinterpret_cast<const char *>(&serializedIndex), sizeof(serializedIndex));
+		
+		// Write hash to file
+		file.write(reinterpret_cast<const char *>(unprunedHash.second.data()), unprunedHash.second.size());
+	}
+	
+	// Write number of hashes to file
+	const uint64_t serializedNumberOfHashes = Common::hostByteOrderToBigEndian(numberOfHashes);
+	file.write(reinterpret_cast<const char *>(&serializedNumberOfHashes), sizeof(serializedNumberOfHashes));
+	
+	// Write minimum size to file
+	const uint64_t serializedMinimumSize = Common::hostByteOrderToBigEndian(minimumSize);
+	file.write(reinterpret_cast<const char *>(&serializedMinimumSize), sizeof(serializedMinimumSize));
+	
+	// Write sum to file
+	MerkleMountainRangeLeafDerivedClass::saveSum(sum, file);
+	
+	// Write prune history size to file
+	const uint64_t serializedPruneHistorySize = Common::hostByteOrderToBigEndian(pruneHistory.size());
+	file.write(reinterpret_cast<const char *>(&serializedPruneHistorySize), sizeof(serializedPruneHistorySize));
+	
+	// Go through all prune history events
+	for(const pair<const uint64_t, unordered_set<uint64_t>> &pruneHistoryEvent : pruneHistory) {
+	
+		// Write prune history event number of leaves to file
+		const uint64_t serializedPruneHistoryEventNumberOfLeaves = Common::hostByteOrderToBigEndian(pruneHistoryEvent.first);
+		file.write(reinterpret_cast<const char *>(&serializedPruneHistoryEventNumberOfLeaves), sizeof(serializedPruneHistoryEventNumberOfLeaves));
+		
+		// Write prune history event size to file
+		const uint64_t serializedPruneHistoryEventSize = Common::hostByteOrderToBigEndian(pruneHistoryEvent.second.size());
+		file.write(reinterpret_cast<const char *>(&serializedPruneHistoryEventSize), sizeof(serializedPruneHistoryEventSize));
+		
+		// Go through all leaves pruned in the event
+		for(const uint64_t leafIndex : pruneHistoryEvent.second) {
+		
+			// Write leaf index to file
+			const uint64_t serializedLeafIndex = Common::hostByteOrderToBigEndian(leafIndex);
+			file.write(reinterpret_cast<const char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+		}
+	}
+	
+	// Write prune list size to file
+	const uint64_t serializedPruneListSize = Common::hostByteOrderToBigEndian(pruneList.size());
+	file.write(reinterpret_cast<const char *>(&serializedPruneListSize), sizeof(serializedPruneListSize));
+	
+	// Go through all leaves in the prune list
+	for(const pair<const uint64_t, MerkleMountainRangeLeafDerivedClass> &leaf : pruneList) {
+	
+		// Write leaf index to file
+		const uint64_t serializedLeafIndex = Common::hostByteOrderToBigEndian(leaf.first);
+		file.write(reinterpret_cast<const char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+		
+		// Write leaf to file
+		leaf.second.save(file);
+	}
+}
+
+// Restore
+template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::restore(ifstream &file) {
+
+	// Initialize Merkle mountain range
+	MerkleMountainRange merkleMountainRange;
+	
+	// Read lookup table size from file
+	uint64_t serializedLookupTableSize;
+	file.read(reinterpret_cast<char *>(&serializedLookupTableSize), sizeof(serializedLookupTableSize));
+	const uint64_t lookupTableSize = Common::bigEndianToHostByteOrder(serializedLookupTableSize);
+	
+	// Go through all lookup values in the lookup table
+	for(uint64_t i = 0; i < lookupTableSize; ++i) {
+	
+		// Read lookup value size from file
+		uint64_t serializedLookupValueSize;
+		file.read(reinterpret_cast<char *>(&serializedLookupValueSize), sizeof(serializedLookupValueSize));
+		
+		// Read lookup value from file
+		vector<uint8_t> lookupValue(Common::bigEndianToHostByteOrder(serializedLookupValueSize));
+		file.read(reinterpret_cast<char *>(lookupValue.data()), lookupValue.size());
+		
+		// Check if duplicate lookup values are allowed
+		if(MerkleMountainRangeLeafDerivedClass::ALLOW_DUPLICATE_LOOKUP_VALUES) {
+		
+			// Read lookup value number of leaves from file
+			uint64_t serializedLookupValueNumberOfLeaves;
+			file.read(reinterpret_cast<char *>(&serializedLookupValueNumberOfLeaves), sizeof(serializedLookupValueNumberOfLeaves));
+			const uint64_t lookupValueNumberOfLeaves = Common::bigEndianToHostByteOrder(serializedLookupValueNumberOfLeaves);
+			
+			// Go through all leaves in the lookup value
+			unordered_set<uint64_t> leaves;
+			for(uint64_t j = 0; j < lookupValueNumberOfLeaves; ++j) {
+			
+				// Read leaf index from file
+				uint64_t serializedLeafIndex;
+				file.read(reinterpret_cast<char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+				
+				// Add leaf index to leaves
+				leaves.emplace(Common::bigEndianToHostByteOrder(serializedLeafIndex));
+			}
+			
+			// Add lookup value to lookup table
+			merkleMountainRange.lookupTable.emplace(move(lookupValue), move(leaves));
+		}
+		
+		// Otherwise
+		else {
+		
+			// Read lookup value first leaf index from file
+			uint64_t serializedFirstLeafIndex;
+			file.read(reinterpret_cast<char *>(&serializedFirstLeafIndex), sizeof(serializedFirstLeafIndex));
+			
+			// Add lookup value to lookup table
+			merkleMountainRange.lookupTable.emplace(move(lookupValue), unordered_set<uint64_t>({Common::bigEndianToHostByteOrder(serializedFirstLeafIndex)}));
+		}
+	}
+	
+	// Read unpruned leaves size from file
+	uint64_t serializedUnprunedLeavesSize;
+	file.read(reinterpret_cast<char *>(&serializedUnprunedLeavesSize), sizeof(serializedUnprunedLeavesSize));
+	const uint64_t unprunedLeavesSize = Common::bigEndianToHostByteOrder(serializedUnprunedLeavesSize);
+	
+	// Go through all unpruned leaves
+	for(uint64_t i = 0; i < unprunedLeavesSize; ++i) {
+	
+		// Read leaf index from file
+		uint64_t serializedLeafIndex;
+		file.read(reinterpret_cast<char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+		
+		// Read leaf from file and add it to unpruned leaves
+		merkleMountainRange.unprunedLeaves.emplace(Common::bigEndianToHostByteOrder(serializedLeafIndex), MerkleMountainRangeLeafDerivedClass::restore(file));
+	}
+	
+	// Read number of leaves from file
+	uint64_t serializedNumberOfLeaves;
+	file.read(reinterpret_cast<char *>(&serializedNumberOfLeaves), sizeof(serializedNumberOfLeaves));
+	merkleMountainRange.numberOfLeaves = Common::bigEndianToHostByteOrder(serializedNumberOfLeaves);
+	
+	// Read unpruned hashes size from file
+	uint64_t serializedUnprunedHashesSize;
+	file.read(reinterpret_cast<char *>(&serializedUnprunedHashesSize), sizeof(serializedUnprunedHashesSize));
+	const uint64_t unprunedHashesSize = Common::bigEndianToHostByteOrder(serializedUnprunedHashesSize);
+	
+	// Go through all unpruned hashes
+	for(uint64_t i = 0; i < unprunedHashesSize; ++i) {
+	
+		// Read index from file
+		uint64_t serializedIndex;
+		file.read(reinterpret_cast<char *>(&serializedIndex), sizeof(serializedIndex));
+		
+		// Read hash from file
+		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> hash;
+		file.read(reinterpret_cast<char *>(hash.data()), hash.size());
+		
+		// Add hash to unpruned hashes
+		merkleMountainRange.unprunedHashes.emplace(Common::bigEndianToHostByteOrder(serializedIndex), move(hash));
+	}
+	
+	// Read number of hashes from file
+	uint64_t serializedNumberOfHashes;
+	file.read(reinterpret_cast<char *>(&serializedNumberOfHashes), sizeof(serializedNumberOfHashes));
+	merkleMountainRange.numberOfHashes = Common::bigEndianToHostByteOrder(serializedNumberOfHashes);
+	
+	// Read minimum size from file
+	uint64_t serializedMinimumSize;
+	file.read(reinterpret_cast<char *>(&serializedMinimumSize), sizeof(serializedMinimumSize));
+	merkleMountainRange.minimumSize = Common::bigEndianToHostByteOrder(serializedMinimumSize);
+	
+	// Read sum from file
+	MerkleMountainRangeLeafDerivedClass::restoreSum(merkleMountainRange.sum, file);
+	
+	// Read prune history size from file
+	uint64_t serializedPruneHistorySize;
+	file.read(reinterpret_cast<char *>(&serializedPruneHistorySize), sizeof(serializedPruneHistorySize));
+	const uint64_t pruneHistorySize = Common::bigEndianToHostByteOrder(serializedPruneHistorySize);
+	
+	// Go through all prune history events
+	for(uint64_t i = 0; i < pruneHistorySize; ++i) {
+	
+		// Read prune history event number of leaves from file
+		uint64_t serializedPruneHistoryEventNumberOfLeaves;
+		file.read(reinterpret_cast<char *>(&serializedPruneHistoryEventNumberOfLeaves), sizeof(serializedPruneHistoryEventNumberOfLeaves));
+		
+		// Read prune history event size from file
+		uint64_t serializedPruneHistoryEventSize;
+		file.read(reinterpret_cast<char *>(&serializedPruneHistoryEventSize), sizeof(serializedPruneHistoryEventSize));
+		const uint64_t pruneHistoryEventSize = Common::bigEndianToHostByteOrder(serializedPruneHistoryEventSize);
+		
+		// Go through all leaves pruned in the event
+		unordered_set<uint64_t> prunedLeaves;
+		for(uint64_t j = 0; j < pruneHistoryEventSize; ++j) {
+		
+			// Read leaf index from file
+			uint64_t serializedLeafIndex;
+			file.read(reinterpret_cast<char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+			
+			// Add leaf index to pruned leaves
+			prunedLeaves.emplace(Common::bigEndianToHostByteOrder(serializedLeafIndex));
+		}
+		
+		// Add prune history event to prune history events
+		merkleMountainRange.pruneHistory.emplace(Common::bigEndianToHostByteOrder(serializedPruneHistoryEventNumberOfLeaves), move(prunedLeaves));
+	}
+	
+	// Read prune list size from file
+	uint64_t serializedPruneListSize;
+	file.read(reinterpret_cast<char *>(&serializedPruneListSize), sizeof(serializedPruneListSize));
+	const uint64_t pruneListSize = Common::bigEndianToHostByteOrder(serializedPruneListSize);
+	
+	// Go through all leaves in the prune list
+	for(uint64_t i = 0; i < pruneListSize; ++i) {
+	
+		// Read leaf index from file
+		uint64_t serializedLeafIndex;
+		file.read(reinterpret_cast<char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
+		
+		// Read leaf from file and add it to prune list
+		merkleMountainRange.pruneList.emplace(Common::bigEndianToHostByteOrder(serializedLeafIndex), MerkleMountainRangeLeafDerivedClass::restore(file));
+	}
+	
+	// Return Merkle mountain range
+	return merkleMountainRange;
+}
+
 // Create from ZIP
-template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange<MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::createFromZip(zip_t *zip, const char *dataPath, const char *hashesPath, const char *pruneListPath, const char *leafSetPath) {
+template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::createFromZip(zip_t *zip, uint32_t protocolVersion, const char *dataPath, const char *hashesPath, const char *pruneListPath, const char *leafSetPath) {
 
 	// Initialize prune list
-	Roaring pruneList;
+	roaring::Roaring pruneList;
 	
 	// Check if prune list path exists
 	if(pruneListPath) {
@@ -775,7 +1146,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 		}
 		
 		// Get prune list
-		pruneList = Roaring::readSafe(reinterpret_cast<char *>(buffer.get()), fileInfo.size);
+		pruneList = roaring::Roaring::readSafe(reinterpret_cast<char *>(buffer.get()), fileInfo.size);
 	}
 	
 	// Initialize Merkle mountain range
@@ -786,7 +1157,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 	
 	{
 		// Initialize leaf set
-		Roaring leafSet;
+		roaring::Roaring leafSet;
 		
 		// Check if leaf set path exists
 		if(leafSetPath) {
@@ -841,7 +1212,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 			}
 			
 			// Get leaf set
-			leafSet = Roaring::readSafe(reinterpret_cast<char *>(buffer.get()), fileInfo.size);
+			leafSet = roaring::Roaring::readSafe(reinterpret_cast<char *>(buffer.get()), fileInfo.size);
 		}
 		
 		// Initialize newest pruned node index
@@ -908,10 +1279,10 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 		do {
 		
 			// Initialize buffer
-			array<uint8_t, MerkleMountainRangeLeafDerivedClass::SERIALIZED_LENGTH> buffer;
+			array<uint8_t, MerkleMountainRangeLeafDerivedClass::MAXIMUM_SERIALIZED_LENGTH> buffer;
 			
 			// Initialize remaining buffer size
-			typename array<uint8_t, MerkleMountainRangeLeafDerivedClass::SERIALIZED_LENGTH>::size_type remainingBufferSize;
+			typename array<uint8_t, MerkleMountainRangeLeafDerivedClass::MAXIMUM_SERIALIZED_LENGTH>::size_type remainingBufferSize;
 			
 			// Initialize leaf shift
 			uint64_t leafShift;
@@ -966,14 +1337,24 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 			
 			} while(++readLeafCount <= merkleMountainRange.numberOfLeaves - leafShift);
 			
-			// Check if buffer was completely filled
-			if(!remainingBufferSize) {
+			// Check if bytes were read
+			if(remainingBufferSize != buffer.size()) {
 			
+				// Check if at the first Merkle mountain range leaf
+				if(!merkleMountainRange.numberOfHashes) {
+				
+					// Set protocol version to the detected protocol version of the bytes
+					protocolVersion = MerkleMountainRangeLeafDerivedClass::getSerializedProtocolVersion(buffer, buffer.size() - remainingBufferSize, protocolVersion);
+				}
+			
+				// Get Merkle mountain range leaf from bytes
+				pair leaf = MerkleMountainRangeLeafDerivedClass::unserialize(buffer, buffer.size() - remainingBufferSize, protocolVersion, !merkleMountainRange.numberOfHashes);
+				
 				// Check if leaf set doesn't exist or leaf set contains the leaf
 				if(!leafSetPath || (merkleMountainRange.numberOfHashes < leafSet.maximum() && leafSet.contains(merkleMountainRange.numberOfHashes + 1))) {
 			
-					// Append Merkle mountain range leaf to the Merkle mountain range
-					merkleMountainRange.appendLeaf(MerkleMountainRangeLeaf<MerkleMountainRangeLeafDerivedClass, MerkleMountainRangeLeafDerivedClass::SERIALIZED_LENGTH>::unserialize(buffer, !merkleMountainRange.numberOfHashes));
+					// Append leaf to the Merkle mountain range
+					merkleMountainRange.appendLeaf(move(leaf.first));
 				}
 				
 				// Otherwise
@@ -981,6 +1362,20 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 				
 					// Append pruned leaf to the Merkle mountain range
 					merkleMountainRange.appendLeafOrPrunedLeaf(nullopt);
+				}
+				
+				// Check if some bytes wern't used
+				if(leaf.second < buffer.size() - remainingBufferSize) {
+				
+					// Check if going back by the number of unused bytes failed
+					if(zip_fseek(file.get(), static_cast<int64_t>(leaf.second) - (buffer.size() - remainingBufferSize), SEEK_CUR)) {
+					
+						// Throw exception
+						throw runtime_error("Going back by the number of unused bytes failed");
+					}
+					
+					// Cause unused bytes to be read
+					bytesRead = !0;
 				}
 				
 				// Loop while node is pruned
@@ -1013,13 +1408,6 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 						break;
 					}
 				}
-			}
-			
-			// Otherwise check if buffer was partially filled
-			else if(remainingBufferSize != buffer.size()) {
-			
-				// Throw exception
-				throw runtime_error("Buffer was partially filled");
 			}
 		
 		} while(bytesRead);
@@ -1288,7 +1676,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const MerkleMountainRange
 }
 
 // Is size valid
-template<typename MerkleMountainRangeLeafDerivedClass> const bool MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::isSizeValid(const uint64_t size) {
+template<typename MerkleMountainRangeLeafDerivedClass> bool MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::isSizeValid(const uint64_t size) {
 
 	// Set height to size
 	uint64_t height = size;
@@ -1313,7 +1701,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const bool MerkleMountain
 }
 
 // Get number of leaves at size
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getNumberOfLeavesAtSize(const uint64_t size) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getNumberOfLeavesAtSize(const uint64_t size) {
 
 	// Check if size is invalid
 	if(!isSizeValid(size)) {
@@ -1351,7 +1739,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 }
 
 // Get size at number of leaves
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getSizeAtNumberOfLeaves(const uint64_t numberOfLeaves) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getSizeAtNumberOfLeaves(const uint64_t numberOfLeaves) {
 
 	// Check if no leaves exist
 	if(!numberOfLeaves) {
@@ -1375,7 +1763,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 }
 
 // Operator
-template<typename MerkleMountainRangeLeafDerivedClass> const size_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::LookupValueHash::operator()(const vector<uint8_t> &lookupValue) const {
+template<typename MerkleMountainRangeLeafDerivedClass> size_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::LookupValueHash::operator()(const vector<uint8_t> &lookupValue) const {
 
 	// Return hash of the lookup value
 	return hash<string>()(Common::toHexString(lookupValue));
@@ -1391,15 +1779,30 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 		optional<vector<uint8_t>> lookupValue = leafOrPrunedLeaf.value().getLookupValue();
 		if(lookupValue.has_value()) {
 		
-			// Check if lookup value already exists in the lookup table
+			// Check if lookup value exists in the lookup table
 			if(lookupTable.contains(lookupValue.value())) {
 			
-				// Throw exception
-				throw runtime_error("Lookup value already exists in the lookup table");
+				// Check if duplicate lookup values are allowed
+				if(MerkleMountainRangeLeafDerivedClass::ALLOW_DUPLICATE_LOOKUP_VALUES) {
+				
+					// Add leaf to lookup value in the lookup table
+					lookupTable.at(lookupValue.value()).emplace(numberOfLeaves);
+				}
+				
+				// Otherwise
+				else {
+				
+					// Throw exception
+					throw runtime_error("Lookup value already exists in the lookup table");
+				}
 			}
 			
-			// Append lookup value to the lookup table
-			lookupTable.emplace(move(lookupValue.value()), numberOfLeaves);
+			// Otherwise
+			else {
+			
+				// Append lookup value to the lookup table
+				lookupTable.emplace(move(lookupValue.value()), unordered_set<uint64_t>({numberOfLeaves}));
+			}
 		}
 	
 		// Append leaf to list
@@ -1606,7 +2009,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 }
 
 // Get peak indices at size
-template<typename MerkleMountainRangeLeafDerivedClass> const vector<uint64_t> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getPeakIndicesAtSize(const uint64_t size) {
+template<typename MerkleMountainRangeLeafDerivedClass> vector<uint64_t> MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getPeakIndicesAtSize(const uint64_t size) {
 
 	// Check if size is invalid
 	if(!isSizeValid(size)) {
@@ -1647,7 +2050,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const vector<uint64_t> Me
 }
 
 // Get height at index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getHeightAtIndex(const uint64_t index) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getHeightAtIndex(const uint64_t index) {
 
 	// Set height to index
 	uint64_t height = index;
@@ -1672,14 +2075,14 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 }
 
 // Get leaf's index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafsIndex(const uint64_t leafIndex) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafsIndex(const uint64_t leafIndex) {
 
 	// Return leaf's index
 	return 2 * leafIndex - Common::numberOfOnes(leafIndex);
 }
 
 // Get left sibling index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeftSiblingIndex(const uint64_t index) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeftSiblingIndex(const uint64_t index) {
 
 	// Get height
 	const uint64_t height = getHeightAtIndex(index);
@@ -1689,7 +2092,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 }
 
 // Get right sibling index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRightSiblingIndex(const uint64_t index) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRightSiblingIndex(const uint64_t index) {
 
 	// Get height
 	const uint64_t height = getHeightAtIndex(index);
@@ -1699,7 +2102,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 }
 
 // Get parent index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getParentIndex(const uint64_t index) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getParentIndex(const uint64_t index) {
 
 	// Get height
 	const uint64_t height = getHeightAtIndex(index);
@@ -1720,7 +2123,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 }
 
 // Get left child index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeftChildIndex(const uint64_t index) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeftChildIndex(const uint64_t index) {
 
 	// Get height
 	const uint64_t height = getHeightAtIndex(index);
@@ -1730,14 +2133,14 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 }
 
 // Get right child index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRightChildIndex(const uint64_t index) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getRightChildIndex(const uint64_t index) {
 
 	// Return right child index
 	return index - 1;
 }
 
 // Get next peak index
-template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getNextPeakIndex(const uint64_t index) {
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getNextPeakIndex(const uint64_t index) {
 
 	// Set peak index to the next index
 	uint64_t peakIndex = index + 1;
@@ -1751,6 +2154,9 @@ template<typename MerkleMountainRangeLeafDerivedClass> const uint64_t MerkleMoun
 	
 	// Return peak index
 	return peakIndex;
+}
+
+
 }
 
 

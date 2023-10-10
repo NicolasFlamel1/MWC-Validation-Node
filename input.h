@@ -1,6 +1,6 @@
 // Header guard
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef MWC_VALIDATION_NODE_INPUT_H
+#define MWC_VALIDATION_NODE_INPUT_H
 
 
 // Header files
@@ -9,6 +9,10 @@
 #include "./output.h"
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Classes
@@ -39,13 +43,13 @@ class Input final {
 		explicit Input(const Features features, const uint8_t commitment[Crypto::COMMITMENT_LENGTH]);
 		
 		// Serialize
-		const vector<uint8_t> serialize() const;
+		vector<uint8_t> serialize() const;
 		
 		// Get lookup value
-		const vector<uint8_t> getLookupValue() const;
+		vector<uint8_t> getLookupValue() const;
 		
 		// Get features
-		const Features getFeatures() const;
+		Features getFeatures() const;
 		
 		// Get commitment
 		const secp256k1_pedersen_commitment &getCommitment() const;
@@ -59,6 +63,9 @@ class Input final {
 		// Commitment
 		secp256k1_pedersen_commitment commitment;
 };
+
+
+}
 
 
 #endif

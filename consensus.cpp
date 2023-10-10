@@ -7,6 +7,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 // Block time
@@ -331,7 +335,7 @@ const uint64_t Consensus::C29_PROOF_OF_WORK_DURATION = Consensus::YEAR_HEIGHT;
 // Supporting function implementation
 
 // Get header version
-const uint16_t Consensus::getHeaderVersion(const uint64_t height) {
+uint16_t Consensus::getHeaderVersion(const uint64_t height) {
 
 	// Check if height is before the C31 hard fork height
 	if(height < C31_HARD_FORK_HEIGHT) {
@@ -349,7 +353,7 @@ const uint16_t Consensus::getHeaderVersion(const uint64_t height) {
 }
 
 // Get block weight
-const uint64_t Consensus::getBlockWeight(const uint64_t numberOfInputs, const uint64_t numberOfOutputs, const uint64_t numberOfKernels) {
+uint64_t Consensus::getBlockWeight(const uint64_t numberOfInputs, const uint64_t numberOfOutputs, const uint64_t numberOfKernels) {
 
 	// Get input weight
 	const uint64_t inputsWeight = SaturateMath::multiply(numberOfInputs, BLOCK_INPUT_WEIGHT);
@@ -365,7 +369,7 @@ const uint64_t Consensus::getBlockWeight(const uint64_t numberOfInputs, const ui
 }
 
 // Is block hash banned
-const bool Consensus::isBlockHashBanned(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]) {
+bool Consensus::isBlockHashBanned(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]) {
 
 	// Go through all banned block hashes
 	for(size_t i = 0; i < (sizeof(BANNED_BLOCK_HASHES) ? sizeof(BANNED_BLOCK_HASHES) / sizeof(BANNED_BLOCK_HASHES[0]) : 0); ++i) {
@@ -383,7 +387,7 @@ const bool Consensus::isBlockHashBanned(const uint8_t blockHash[Crypto::BLAKE2B_
 }
 
 // Get graph weight
-const uint64_t Consensus::getGraphWeight(const uint64_t height, const uint8_t edgeBits) {
+uint64_t Consensus::getGraphWeight(const uint64_t height, const uint8_t edgeBits) {
 
 	// Check if height is before the C31 hard fork height or edge bits are at most C31
 	if(height < C31_HARD_FORK_HEIGHT || edgeBits <= C31_EDGE_BITS) {
@@ -401,14 +405,14 @@ const uint64_t Consensus::getGraphWeight(const uint64_t height, const uint8_t ed
 }
 
 // Get C29 proof of work ratio
-const uint64_t Consensus::getC29ProofOfWorkRatio(const uint64_t height) {
+uint64_t Consensus::getC29ProofOfWorkRatio(const uint64_t height) {
 
 	// Return C29 proof of work ratio
 	return SaturateMath::subtract(STARTING_C29_PROOF_OF_WORK_RATIO, height / (C29_PROOF_OF_WORK_DURATION / STARTING_C29_PROOF_OF_WORK_RATIO));
 }
 
 // Get maximum difficulty
-const uint64_t Consensus::getMaximumDifficulty(const Header &header) {
+uint64_t Consensus::getMaximumDifficulty(const Header &header) {
 
 	// Initialize scaling
 	uint64_t scaling;
@@ -441,7 +445,7 @@ const uint64_t Consensus::getMaximumDifficulty(const Header &header) {
 }
 
 // Get coinbase reward
-const uint64_t Consensus::getCoinbaseReward(const uint64_t height) {
+uint64_t Consensus::getCoinbaseReward(const uint64_t height) {
 
 	// Check if at the genesis block
 	if(height == GENESIS_BLOCK_HEADER.getHeight()) {
@@ -530,7 +534,7 @@ const uint64_t Consensus::getCoinbaseReward(const uint64_t height) {
 }
 
 // Get total number of coinbase rewards
-const uint64_t Consensus::getTotalNumberOfCoinbaseRewards(const uint64_t height) {
+uint64_t Consensus::getTotalNumberOfCoinbaseRewards(const uint64_t height) {
 
 	// Set total number of coinbase rewards to the genesis block reward
 	uint64_t totalNumberOfCoinbaseRewards = getEpochReward(0);
@@ -690,7 +694,7 @@ const uint64_t Consensus::getTotalNumberOfCoinbaseRewards(const uint64_t height)
 }
 
 // Get epoch reward
-const uint64_t Consensus::getEpochReward(const uint8_t epoch) {
+uint64_t Consensus::getEpochReward(const uint8_t epoch) {
 
 	// Check epoch
 	switch(epoch) {
@@ -815,7 +819,7 @@ const uint64_t Consensus::getEpochReward(const uint8_t epoch) {
 }
 
 // Get epoch block offset
-const uint64_t Consensus::getEpochBlockOffset(const uint8_t epoch) {
+uint64_t Consensus::getEpochBlockOffset(const uint8_t epoch) {
 
 	// Set epoch block offset to the C31 hard fork height
 	uint64_t epochBlockOffset = C31_HARD_FORK_HEIGHT;
@@ -849,7 +853,7 @@ const uint64_t Consensus::getEpochBlockOffset(const uint8_t epoch) {
 }
 
 // Get epoch duration
-const uint64_t Consensus::getEpochDuration(const uint8_t epoch) {
+uint64_t Consensus::getEpochDuration(const uint8_t epoch) {
 
 	// Check epoch
 	switch(epoch) {

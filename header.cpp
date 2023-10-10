@@ -11,6 +11,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 
@@ -159,14 +163,80 @@ Header::Header(const uint16_t version, const uint64_t height, const chrono::time
 }
 
 // Serialize
-const vector<uint8_t> Header::serialize() const {
+vector<uint8_t> Header::serialize() const {
 
 	// Return serialized header
 	return getProofNoncesBytes();
 }
 
+// Save
+void Header::save(ofstream &file) const {
+
+	// Write version to file
+	const uint16_t serializedVersion = htons(version);
+	file.write(reinterpret_cast<const char *>(&serializedVersion), sizeof(serializedVersion));
+	
+	// Write height to file
+	const uint64_t serializedHeight = Common::hostByteOrderToBigEndian(height);
+	file.write(reinterpret_cast<const char *>(&serializedHeight), sizeof(serializedHeight));
+	
+	// Write timestamp to file
+	const int64_t timestamp = chrono::duration_cast<chrono::seconds>(this->timestamp.time_since_epoch()).count();
+	const uint64_t serializedTimestamp = Common::hostByteOrderToBigEndian(*reinterpret_cast<const uint64_t *>(&timestamp));
+	file.write(reinterpret_cast<const char *>(&serializedTimestamp), sizeof(serializedTimestamp));
+	
+	// Write previous block hash to file
+	file.write(reinterpret_cast<const char *>(previousBlockHash), sizeof(previousBlockHash));
+	
+	// Write previous header root to file
+	file.write(reinterpret_cast<const char *>(previousHeaderRoot), sizeof(previousHeaderRoot));
+	
+	// Write output root to file
+	file.write(reinterpret_cast<const char *>(outputRoot), sizeof(outputRoot));
+	
+	// Write rangeproof root to file
+	file.write(reinterpret_cast<const char *>(rangeproofRoot), sizeof(rangeproofRoot));
+	
+	// Write kernel root to file
+	file.write(reinterpret_cast<const char *>(kernelRoot), sizeof(kernelRoot));
+	
+	// Write total kernel offset to file
+	file.write(reinterpret_cast<const char *>(totalKernelOffset), sizeof(totalKernelOffset));
+	
+	// Write output Merkle mountain range size to file
+	const uint64_t serializedOutputMerkleMountainRangeSize = Common::hostByteOrderToBigEndian(outputMerkleMountainRangeSize);
+	file.write(reinterpret_cast<const char *>(&serializedOutputMerkleMountainRangeSize), sizeof(serializedOutputMerkleMountainRangeSize));
+	
+	// Write kernel Merkle mountain range size to file
+	const uint64_t serializedKernelMerkleMountainRangeSize = Common::hostByteOrderToBigEndian(kernelMerkleMountainRangeSize);
+	file.write(reinterpret_cast<const char *>(&serializedKernelMerkleMountainRangeSize), sizeof(serializedKernelMerkleMountainRangeSize));
+	
+	// Write total difficulty to file
+	const uint64_t serializedTotalDifficulty = Common::hostByteOrderToBigEndian(totalDifficulty);
+	file.write(reinterpret_cast<const char *>(&serializedTotalDifficulty), sizeof(serializedTotalDifficulty));
+	
+	// Write secondary scaling to file
+	const uint32_t serializedsecondaryScaling = htonl(secondaryScaling);
+	file.write(reinterpret_cast<const char *>(&serializedsecondaryScaling), sizeof(serializedsecondaryScaling));
+	
+	// Write nonce to file
+	const uint64_t serializedNonce = Common::hostByteOrderToBigEndian(nonce);
+	file.write(reinterpret_cast<const char *>(&serializedNonce), sizeof(serializedNonce));
+	
+	// Write edge bits to file
+	file.write(reinterpret_cast<const char *>(&edgeBits), sizeof(edgeBits));
+	
+	// Go through all proof nonces
+	for(size_t i = 0; i < sizeof(proofNonces) / sizeof(proofNonces[0]); ++i) {
+	
+		// Write proof nonce to file
+		const uint64_t serializedProofNonce = Common::hostByteOrderToBigEndian(proofNonces[i]);
+		file.write(reinterpret_cast<const char *>(&serializedProofNonce), sizeof(serializedProofNonce));
+	}
+}
+
 // Equality operator
-const bool Header::operator==(const Header &other) const {
+bool Header::operator==(const Header &other) const {
 
 	// Check if versions differ
 	if(version != other.version) {
@@ -285,21 +355,21 @@ const bool Header::operator==(const Header &other) const {
 }
 
 // Inequality operator
-const bool Header::operator!=(const Header &other) const {
+bool Header::operator!=(const Header &other) const {
 
 	// Return if headers aren't equal
 	return !(*this == other);
 }
 
 // Get version
-const uint16_t Header::getVersion() const {
+uint16_t Header::getVersion() const {
 
 	// Return version
 	return version;
 }
 
 // Get height
-const uint64_t Header::getHeight() const {
+uint64_t Header::getHeight() const {
 
 	// Return height
 	return height;
@@ -355,42 +425,42 @@ const uint8_t *Header::getTotalKernelOffset() const {
 }
 
 // Get output Merkle mountain range size
-const uint64_t Header::getOutputMerkleMountainRangeSize() const {
+uint64_t Header::getOutputMerkleMountainRangeSize() const {
 
 	// Return output Merkle mountain range size
 	return outputMerkleMountainRangeSize;
 }
 
 // Get kernel Merkle mountain range size
-const uint64_t Header::getKernelMerkleMountainRangeSize() const {
+uint64_t Header::getKernelMerkleMountainRangeSize() const {
 
 	// Return kernel Merkle mountain range size
 	return kernelMerkleMountainRangeSize;
 }
 
 // Get total difficulty
-const uint64_t Header::getTotalDifficulty() const {
+uint64_t Header::getTotalDifficulty() const {
 
 	// Return total difficulty
 	return totalDifficulty;
 }
 
 // Get secondary scaling
-const uint32_t Header::getSecondaryScaling() const {
+uint32_t Header::getSecondaryScaling() const {
 
 	// Return secondary scaling
 	return secondaryScaling;
 }
 
 // Get nonce
-const uint64_t Header::getNonce() const {
+uint64_t Header::getNonce() const {
 
 	// Return nonce
 	return nonce;
 }
 
 // Get edge bits
-const uint8_t Header::getEdgeBits() const {
+uint8_t Header::getEdgeBits() const {
 
 	// Return edge bits
 	return edgeBits;
@@ -404,7 +474,7 @@ const uint64_t *Header::getProofNonces() const {
 }
 
 // Get block hash
-const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Header::getBlockHash() const {
+array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Header::getBlockHash() const {
 
 	// Initialize block hash
 	array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> blockHash;
@@ -423,8 +493,100 @@ const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Header::getBlockHash() const {
 	return blockHash;
 }
 
+// Restore
+Header Header::restore(ifstream &file) {
+
+	// Return header created from file
+	return Header(file);
+}
+
+// Save sum
+void Header::saveSum(const int &sum, ofstream &file) {
+
+}
+
+// Restore sum
+void Header::restoreSum(int &sum, ifstream &file) {
+
+}
+
+// Constructor
+Header::Header(ifstream &file) {
+
+	// Read version from file
+	uint16_t serializedVersion;
+	file.read(reinterpret_cast<char *>(&serializedVersion), sizeof(serializedVersion));
+	version = ntohs(serializedVersion);
+	
+	// Read height from file
+	uint64_t serializedHeight;
+	file.read(reinterpret_cast<char *>(&serializedHeight), sizeof(serializedHeight));
+	height = Common::bigEndianToHostByteOrder(serializedHeight);
+	
+	// Read timestamp from file
+	uint64_t serializedTimestamp;
+	file.read(reinterpret_cast<char *>(&serializedTimestamp), sizeof(serializedTimestamp));
+	serializedTimestamp = Common::bigEndianToHostByteOrder(serializedTimestamp);
+	timestamp = chrono::time_point<chrono::system_clock>(chrono::seconds(*reinterpret_cast<const int64_t *>(&serializedTimestamp)));
+	
+	// Read previous block hash from file
+	file.read(reinterpret_cast<char *>(previousBlockHash), sizeof(previousBlockHash));
+	
+	// Read previous header root from file
+	file.read(reinterpret_cast<char *>(previousHeaderRoot), sizeof(previousHeaderRoot));
+	
+	// Read output root from file
+	file.read(reinterpret_cast<char *>(outputRoot), sizeof(outputRoot));
+	
+	// Read rangeproof root from file
+	file.read(reinterpret_cast<char *>(rangeproofRoot), sizeof(rangeproofRoot));
+	
+	// Read kernel root from file
+	file.read(reinterpret_cast<char *>(kernelRoot), sizeof(kernelRoot));
+	
+	// Read total kernel offset from file
+	file.read(reinterpret_cast<char *>(totalKernelOffset), sizeof(totalKernelOffset));
+	
+	// Read output Merkle mountain range size from file
+	uint64_t serializedOutputMerkleMountainRangeSize;
+	file.read(reinterpret_cast<char *>(&serializedOutputMerkleMountainRangeSize), sizeof(serializedOutputMerkleMountainRangeSize));
+	outputMerkleMountainRangeSize = Common::bigEndianToHostByteOrder(serializedOutputMerkleMountainRangeSize);
+	
+	// Read kernel Merkle mountain range size from file
+	uint64_t serializedKernelMerkleMountainRangeSize;
+	file.read(reinterpret_cast<char *>(&serializedKernelMerkleMountainRangeSize), sizeof(serializedKernelMerkleMountainRangeSize));
+	kernelMerkleMountainRangeSize = Common::bigEndianToHostByteOrder(serializedKernelMerkleMountainRangeSize);
+	
+	// Read total difficulty from file
+	uint64_t serializedTotalDifficulty;
+	file.read(reinterpret_cast<char *>(&serializedTotalDifficulty), sizeof(serializedTotalDifficulty));
+	totalDifficulty = Common::bigEndianToHostByteOrder(serializedTotalDifficulty);
+	
+	// Read secondary scaling from file
+	uint32_t serializedSecondaryScaling;
+	file.read(reinterpret_cast<char *>(&serializedSecondaryScaling), sizeof(serializedSecondaryScaling));
+	secondaryScaling = ntohl(serializedSecondaryScaling);
+	
+	// Read nonce from file
+	uint64_t serializedNonce;
+	file.read(reinterpret_cast<char *>(&serializedNonce), sizeof(serializedNonce));
+	nonce = Common::bigEndianToHostByteOrder(serializedNonce);
+	
+	// Read edge bits from file
+	file.read(reinterpret_cast<char *>(&edgeBits), sizeof(edgeBits));
+	
+	// Go through all proof nonces
+	for(size_t i = 0; i < sizeof(proofNonces) / sizeof(proofNonces[0]); ++i) {
+	
+		// Read proof nonce from file
+		uint64_t serializedProofNonce;
+		file.read(reinterpret_cast<char *>(&serializedProofNonce), sizeof(serializedProofNonce));
+		proofNonces[i] = Common::bigEndianToHostByteOrder(serializedProofNonce);
+	}
+}
+
 // Get proof nonces bytes
-const vector<uint8_t> Header::getProofNoncesBytes() const {
+vector<uint8_t> Header::getProofNoncesBytes() const {
 
 	// Set number of proof nonces bytes
 	const uint64_t numberOfProofNoncesBytes = Common::numberOfBytesRequired(edgeBits * (sizeof(proofNonces) / sizeof(proofNonces[0])));

@@ -1,6 +1,6 @@
 // Header guard
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef MWC_VALIDATION_NODE_COMMON_H
+#define MWC_VALIDATION_NODE_COMMON_H
 
 
 // Definitions
@@ -38,6 +38,10 @@
 #endif
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Definitions
@@ -79,62 +83,59 @@ class Common final {
 		// Bytes in a kilobyte
 		static const int BYTES_IN_A_KILOBYTE;
 		
-		// Tor proxy address
-		static const char *TOR_PROXY_ADDRESS;
-		
-		// Tor proxy port
-		static const char *TOR_PROXY_PORT;
+		// HTTP port
+		static const uint16_t HTTP_PORT;
 		
 		// Constructor
 		Common() = delete;
 	
 		// Initialize
-		static const bool initialize();
+		static bool initialize();
 		
 		// Set closing
 		static void setClosing();
 		
 		// Is closing
-		static const bool isClosing();
+		static bool isClosing();
 		
 		// Error occurred
-		static const bool errorOccurred();
+		static bool errorOccurred();
 		
 		// Is UTF-8
-		static const bool isUtf8(const char *text, const size_t length);
+		static bool isUtf8(const char *text, const size_t length);
 		
 		// Number of bytes required
-		static const uint64_t numberOfBytesRequired(const uint64_t numberOfBits);
+		static uint64_t numberOfBytesRequired(const uint64_t numberOfBits);
 		
 		// Clamp
-		static const uint64_t clamp(const uint64_t value, const uint64_t goal, const uint64_t clampFactor);
+		static uint64_t clamp(const uint64_t value, const uint64_t goal, const uint64_t clampFactor);
 		
 		// Damp
-		static const uint64_t damp(const uint64_t value, const uint64_t goal, const uint64_t dampFactor);
+		static uint64_t damp(const uint64_t value, const uint64_t goal, const uint64_t dampFactor);
 		
 		// Number of leading zeros
-		static const int numberOfLeadingZeros(const uint64_t value);
+		static int numberOfLeadingZeros(const uint64_t value);
 		
 		// Number of ones
-		static const int numberOfOnes(const uint64_t value);
+		static int numberOfOnes(const uint64_t value);
 		
 		// To hex string
-		static const string toHexString(const uint8_t *data, const size_t length);
+		static string toHexString(const uint8_t *data, const size_t length);
 		
 		// To hex string
-		template<typename StorageClass> static const string toHexString(const StorageClass &data);
+		template<typename StorageClass> static string toHexString(const StorageClass &data);
 		
 		// Host byte order to big endian
-		static const uint64_t hostByteOrderToBigEndian(const uint64_t value);
+		static uint64_t hostByteOrderToBigEndian(const uint64_t value);
 		
 		// Big endian to host byte order
-		static const uint64_t bigEndianToHostByteOrder(const uint64_t value);
+		static uint64_t bigEndianToHostByteOrder(const uint64_t value);
 		
 		// Host byte order to little endian
-		static const uint64_t hostByteOrderToLittleEndian(const uint64_t value);
+		static uint64_t hostByteOrderToLittleEndian(const uint64_t value);
 		
 		// Little endian to host byte order
-		static const uint64_t littleEndianToHostByteOrder(const uint64_t value);
+		static uint64_t littleEndianToHostByteOrder(const uint64_t value);
 		
 		// Write uint8
 		static void writeUint8(vector<uint8_t> &buffer, const uint8_t value);
@@ -151,26 +152,23 @@ class Common final {
 		// Write int64
 		static void writeInt64(vector<uint8_t> &buffer, const int64_t value);
 		
-		// Display text
-		static void displayText(const string &text);
-		
 		// Free memory
 		static void freeMemory();
 		
 		// Read uint8
-		template<typename StorageClass> static const uint8_t readUint8(const StorageClass &buffer, const typename StorageClass::size_type offset);
+		template<typename StorageClass> static uint8_t readUint8(const StorageClass &buffer, const typename StorageClass::size_type offset);
 		
 		// Read uint16
-		template<typename StorageClass> static const uint16_t readUint16(const StorageClass &buffer, const typename StorageClass::size_type offset);
+		template<typename StorageClass> static uint16_t readUint16(const StorageClass &buffer, const typename StorageClass::size_type offset);
 		
 		// Read uint32
-		template<typename StorageClass> static const uint32_t readUint32(const StorageClass &buffer, const typename StorageClass::size_type offset);
+		template<typename StorageClass> static uint32_t readUint32(const StorageClass &buffer, const typename StorageClass::size_type offset);
 		
 		// Read uint64
-		template<typename StorageClass> static const uint64_t readUint64(const StorageClass &buffer, const typename StorageClass::size_type offset);
+		template<typename StorageClass> static uint64_t readUint64(const StorageClass &buffer, const typename StorageClass::size_type offset);
 		
 		// Read int64
-		template<typename StorageClass> static const int64_t readInt64(const StorageClass &buffer, const typename StorageClass::size_type offset);
+		template<typename StorageClass> static int64_t readInt64(const StorageClass &buffer, const typename StorageClass::size_type offset);
 		
 	// Private
 	private:
@@ -181,9 +179,6 @@ class Common final {
 		// Signal occurred
 		static atomic_bool signalOccurred;
 		
-		// Display mutex
-		static mutex displayLock;
-		
 		// Memory lock
 		static mutex memoryLock;
 };
@@ -192,14 +187,14 @@ class Common final {
 // Supporting function implementation
 
 // To hex string
-template<typename StorageClass> const string Common::toHexString(const StorageClass &data) {
+template<typename StorageClass> string Common::toHexString(const StorageClass &data) {
 
 	// Return hex string
 	return toHexString(data.data(), data.size());
 }
 
 // Read uint8
-template<typename StorageClass> const uint8_t Common::readUint8(const StorageClass &buffer, const typename StorageClass::size_type offset) {
+template<typename StorageClass> uint8_t Common::readUint8(const StorageClass &buffer, const typename StorageClass::size_type offset) {
 
 	// Check if buffer doesn't contain a uint8
 	if(buffer.size() < offset + sizeof(uint8_t)) {
@@ -213,7 +208,7 @@ template<typename StorageClass> const uint8_t Common::readUint8(const StorageCla
 }
 
 // Read uint16
-template<typename StorageClass> const uint16_t Common::readUint16(const StorageClass &buffer, const typename StorageClass::size_type offset) {
+template<typename StorageClass> uint16_t Common::readUint16(const StorageClass &buffer, const typename StorageClass::size_type offset) {
 
 	// Check if buffer doesn't contain a uint16
 	if(buffer.size() < offset + sizeof(uint16_t)) {
@@ -230,7 +225,7 @@ template<typename StorageClass> const uint16_t Common::readUint16(const StorageC
 }
 
 // Read uint32
-template<typename StorageClass> const uint32_t Common::readUint32(const StorageClass &buffer, const typename StorageClass::size_type offset) {
+template<typename StorageClass> uint32_t Common::readUint32(const StorageClass &buffer, const typename StorageClass::size_type offset) {
 
 	// Check if buffer doesn't contain a uint32
 	if(buffer.size() < offset + sizeof(uint32_t)) {
@@ -247,7 +242,7 @@ template<typename StorageClass> const uint32_t Common::readUint32(const StorageC
 }
 
 // Read uint64
-template<typename StorageClass> const uint64_t Common::readUint64(const StorageClass &buffer, const typename StorageClass::size_type offset) {
+template<typename StorageClass> uint64_t Common::readUint64(const StorageClass &buffer, const typename StorageClass::size_type offset) {
 
 	// Check if buffer doesn't contain a uint64
 	if(buffer.size() < offset + sizeof(uint64_t)) {
@@ -264,10 +259,14 @@ template<typename StorageClass> const uint64_t Common::readUint64(const StorageC
 }
 
 // Read int64
-template<typename StorageClass> const int64_t Common::readInt64(const StorageClass &buffer, const typename StorageClass::size_type offset) {
+template<typename StorageClass> int64_t Common::readInt64(const StorageClass &buffer, const typename StorageClass::size_type offset) {
 
-	// Return read uint64
-	return readUint64(buffer, offset);
+	// Return read uint64 as an int64
+	const uint64_t temp = readUint64(buffer, offset);
+	return *reinterpret_cast<const int64_t *>(&temp);
+}
+
+
 }
 
 

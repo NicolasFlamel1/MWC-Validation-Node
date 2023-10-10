@@ -10,6 +10,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 // Maximum relative height
@@ -128,7 +132,7 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 		throw runtime_error("Excess isn't a valid public key");
 	}
 	
-	// Check if public key is invalid
+	// Check if public key is invalid (mwc-node only checks first 32 bytes)
 	if(all_of(reinterpret_cast<uint8_t *>(&publicKey), reinterpret_cast<uint8_t *>(&publicKey) + 256 / Common::BITS_IN_A_BYTE, [](const uint8_t value) {
 	
 		// Return if value is zero
@@ -139,7 +143,7 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 		throw runtime_error("Public key is invalid");
 	}
 	
-	// Check if signature is invalid
+	// Check if signature is invalid (mwc-node only checks first 32 bytes)
 	if(all_of(signature, signature + 256 / Common::BITS_IN_A_BYTE, [](const uint8_t value) {
 	
 		// Return if value is zero
@@ -169,7 +173,7 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 }
 
 // Serialize
-const vector<uint8_t> Kernel::serialize() const {
+vector<uint8_t> Kernel::serialize() const {
 
 	// Initialize serialized kernel
 	vector<uint8_t> serializedKernel;
@@ -222,10 +226,25 @@ const vector<uint8_t> Kernel::serialize() const {
 	serializedKernel.insert(serializedKernel.cend(), cbegin(serializedExcess), cend(serializedExcess));
 	
 	// Append signature to serialized kernel
-	serializedKernel.insert(serializedKernel.cend(), reinterpret_cast<const uint8_t *>(&signature), reinterpret_cast<const uint8_t *>(&signature) + sizeof(signature));
+	serializedKernel.insert(serializedKernel.cend(), signature, signature + sizeof(signature));
 	
 	// Return serialized kernel
 	return serializedKernel;
+}
+
+// Get lookup value
+optional<vector<uint8_t>> Kernel::getLookupValue() const {
+
+	// Check if serializing excess failed
+	vector<uint8_t> serializedExcess(Crypto::COMMITMENT_LENGTH);
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedExcess.data(), &excess)) {
+	
+		// Throw exception
+		throw runtime_error("Serializing excess failed");
+	}
+	
+	// Return serialized excess
+	return serializedExcess;
 }
 
 // Add to sum
@@ -281,31 +300,15 @@ void Kernel::subtractFromSum(secp256k1_pedersen_commitment &sum, const Subtracti
 	// Check if subtracting because rewinded or discarded
 	if(subtractionReason == SubtractionReason::REWINDED || subtractionReason == SubtractionReason::DISCARDED) {
 	
-		// Check if serializing sum and/or excess failed
-		uint8_t serializedSum[Crypto::COMMITMENT_LENGTH];
-		uint8_t serializedExcess[Crypto::COMMITMENT_LENGTH];
-		if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedSum, &sum) || !secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedExcess, &excess)) {
+		// Check if sum is zero
+		if(all_of(reinterpret_cast<uint8_t *>(&sum), reinterpret_cast<uint8_t *>(&sum) + sizeof(sum), [](const uint8_t value) {
 		
-			// Throw exception
-			throw runtime_error("Serializing sum and/or excess failed");
-		}
-		
-		// Check if serialized sum and serialized excess are equal
-		if(!memcmp(serializedSum, serializedExcess, sizeof(serializedExcess))) {
-		
-			// Set sum to zero
-			memset(&sum, 0, sizeof(sum));
-		}
-		
-		// Otherwise
-		else {
+			// Return if value is zero
+			return !value;
+		})) {
 		
 			// Set positive excesses
-			const secp256k1_pedersen_commitment *positiveExcesses[] = {
-			
-				// Sum
-				&sum
-			};
+			const secp256k1_pedersen_commitment *positiveExcesses[] = {};
 			
 			// Set negative excesses
 			const secp256k1_pedersen_commitment *negativeExcesses[] = {
@@ -316,7 +319,7 @@ void Kernel::subtractFromSum(secp256k1_pedersen_commitment &sum, const Subtracti
 
 			// Check if adding to positive and negative excesses failed
 			secp256k1_pedersen_commitment result;
-			if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &result, positiveExcesses, 1, negativeExcesses, 1)) {
+			if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &result, positiveExcesses, 0, negativeExcesses, 1)) {
 			
 				// Throw exception
 				throw runtime_error("Adding to positive and negative excesses failed");
@@ -325,11 +328,93 @@ void Kernel::subtractFromSum(secp256k1_pedersen_commitment &sum, const Subtracti
 			// Set sum to the result
 			sum = result;
 		}
+		
+		// Otherwise
+		else {
+		
+			// Check if serializing sum and/or excess failed
+			uint8_t serializedSum[Crypto::COMMITMENT_LENGTH];
+			uint8_t serializedExcess[Crypto::COMMITMENT_LENGTH];
+			if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedSum, &sum) || !secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedExcess, &excess)) {
+			
+				// Throw exception
+				throw runtime_error("Serializing sum and/or excess failed");
+			}
+			
+			// Check if serialized sum and serialized excess are equal
+			if(!memcmp(serializedSum, serializedExcess, sizeof(serializedExcess))) {
+			
+				// Set sum to zero
+				memset(&sum, 0, sizeof(sum));
+			}
+			
+			// Otherwise
+			else {
+			
+				// Set positive excesses
+				const secp256k1_pedersen_commitment *positiveExcesses[] = {
+				
+					// Sum
+					&sum
+				};
+				
+				// Set negative excesses
+				const secp256k1_pedersen_commitment *negativeExcesses[] = {
+				
+					// Excess
+					&excess
+				};
+
+				// Check if adding to positive and negative excesses failed
+				secp256k1_pedersen_commitment result;
+				if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &result, positiveExcesses, 1, negativeExcesses, 1)) {
+				
+					// Throw exception
+					throw runtime_error("Adding to positive and negative excesses failed");
+				}
+				
+				// Set sum to the result
+				sum = result;
+			}
+		}
 	}
 }
 
+// Save
+void Kernel::save(ofstream &file) const {
+
+	// Write features to file
+	file.write(reinterpret_cast<const char *>(&features), sizeof(features));
+	
+	// Write fee to file
+	const uint64_t serializedFee = Common::hostByteOrderToBigEndian(fee);
+	file.write(reinterpret_cast<const char *>(&serializedFee), sizeof(serializedFee));
+	
+	// Write lock height to file
+	const uint64_t serializedLockHeight = Common::hostByteOrderToBigEndian(lockHeight);
+	file.write(reinterpret_cast<const char *>(&serializedLockHeight), sizeof(serializedLockHeight));
+	
+	// Write relative height to file
+	const uint64_t serializedRelativeHeight = Common::hostByteOrderToBigEndian(relativeHeight);
+	file.write(reinterpret_cast<const char *>(&serializedRelativeHeight), sizeof(serializedRelativeHeight));
+	
+	// Check if serializing excess failed
+	uint8_t serializedExcess[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedExcess, &excess)) {
+	
+		// Throw exception
+		throw runtime_error("Serializing excess failed");
+	}
+	
+	// Write excess to file
+	file.write(reinterpret_cast<const char *>(serializedExcess), sizeof(serializedExcess));
+	
+	// Write signature to file
+	file.write(reinterpret_cast<const char *>(signature), sizeof(signature));
+}
+
 // Equality operator
-const bool Kernel::operator==(const Kernel &other) const {
+bool Kernel::operator==(const Kernel &other) const {
 
 	// Check if features differ
 	if(features != other.features) {
@@ -376,7 +461,7 @@ const bool Kernel::operator==(const Kernel &other) const {
 	}
 	
 	// Check if signatures differ
-	if(memcmp(&signature, &other.signature, sizeof(other.signature))) {
+	if(memcmp(signature, other.signature, sizeof(other.signature))) {
 	
 		// Return false
 		return false;
@@ -387,35 +472,35 @@ const bool Kernel::operator==(const Kernel &other) const {
 }
 
 // Inequality operator
-const bool Kernel::operator!=(const Kernel &other) const {
+bool Kernel::operator!=(const Kernel &other) const {
 
 	// Return if kernels aren't equal
 	return !(*this == other);
 }
 
 // Get features
-const Kernel::Features Kernel::getFeatures() const {
+Kernel::Features Kernel::getFeatures() const {
 
 	// Return features
 	return features;
 }
 
 // Get fee
-const uint64_t Kernel::getFee() const {
+uint64_t Kernel::getFee() const {
 
 	// Return fee
 	return fee;
 }
 
 // Get lock height
-const uint64_t Kernel::getLockHeight() const {
+uint64_t Kernel::getLockHeight() const {
 
 	// Return lock height
 	return lockHeight;
 }
 
 // Get relative height
-const uint64_t Kernel::getRelativeHeight() const {
+uint64_t Kernel::getRelativeHeight() const {
 
 	// Return relative height
 	return relativeHeight;
@@ -429,70 +514,347 @@ const secp256k1_pedersen_commitment &Kernel::getExcess() const {
 }
 
 // Get signature
-const secp256k1_ecdsa_signature &Kernel::getSignature() const {
+const uint8_t *Kernel::getSignature() const {
 
 	// Return signature
 	return signature;
 }
 
-// Unserialize
-const Kernel Kernel::unserialize(const array<uint8_t, SERIALIZED_LENGTH> &serializedKernel, const bool isGenesisBlockKernel) {
+// Get serialized protocol version
+uint32_t Kernel::getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedKernel, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedKernelLength, const uint32_t protocolVersion) {
 
+	// Check if serialized kernel doesn't contain features
+	if(serializedKernelLength < sizeof(Kernel::Features)) {
+	
+		// Return protocol version
+		return protocolVersion;
+	}
+	
 	// Get features from serialized kernel
 	const Features features = (Common::readUint8(serializedKernel, 0) < static_cast<underlying_type_t<Features>>(Features::UNKNOWN)) ? static_cast<Features>(Common::readUint8(serializedKernel, 0)) : Features::UNKNOWN;
+	
+	// Check if features is invalid
+	if(features != Consensus::GENESIS_BLOCK_KERNEL.getFeatures()) {
+	
+		// Return protocol version
+		return protocolVersion;
+	}
+	
+	// Check if serialized kernel doesn't contain a fee
+	if(serializedKernelLength < sizeof(features) + sizeof(uint64_t)) {
+	
+		// Return protocol version
+		return protocolVersion;
+	}
 	
 	// Get fee from serialized kernel
 	const uint64_t fee = Common::readUint64(serializedKernel, sizeof(features));
 	
-	// Get data from serialized kernel
-	const uint64_t data = Common::readUint64(serializedKernel, sizeof(features) + sizeof(fee));
+	// Return version based on if the fee exists
+	return (fee == Consensus::GENESIS_BLOCK_KERNEL.getFee()) ? 0 : 2;
+}
+
+// Unserialize
+pair<Kernel, array<uint8_t, Kernel::MAXIMUM_SERIALIZED_LENGTH>::size_type> Kernel::unserialize(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedKernel, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedKernelLength, const uint32_t protocolVersion, const bool isGenesisBlockKernel) {
+
+	// Check if serialized kernel doesn't contain features
+	if(serializedKernelLength < sizeof(Kernel::Features)) {
 	
-	// Set lock height and relative height to zero
+		// Throw exception
+		throw runtime_error("Serialized kernel doesn't contain features");
+	}
+	
+	// Get features from serialized kernel
+	const Features features = (Common::readUint8(serializedKernel, 0) < static_cast<underlying_type_t<Features>>(Features::UNKNOWN)) ? static_cast<Features>(Common::readUint8(serializedKernel, 0)) : Features::UNKNOWN;
+	
+	// Set fee to zero
+	uint64_t fee = 0;
+	
+	// Set lock height to zero
 	uint64_t lockHeight = 0;
+	
+	// Set relative height to zero
 	uint64_t relativeHeight = 0;
 	
-	// Check features
-	switch(features) {
+	// Initialize features size
+	array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type featuresSize;
 	
-		// Plain, coinbase, or height locked
-		case Features::PLAIN:
-		case Features::COINBASE:
-		case Features::HEIGHT_LOCKED:
-		
-			// Set lock height to data
-			lockHeight = data;
+	// Check protocol version
+	switch(protocolVersion) {
+	
+		// Zero or one
+		case 0:
+		case 1:
+	
+			// Check if serialized kernel doesn't contain a fee and a lock height or a relative height
+			if(serializedKernelLength < sizeof(features) + sizeof(fee) + sizeof(uint64_t)) {
+			
+				// Throw exception
+				throw runtime_error("Serialized kernel doesn't contain a fee and a lock height or a relative height");
+			}
+			
+			// Get fee from serialized kernel
+			fee = Common::readUint64(serializedKernel, sizeof(features));
+			
+			// Check features
+			switch(features) {
+			
+				// Plain, coinbase, or height locked
+				case Features::PLAIN:
+				case Features::COINBASE:
+				case Features::HEIGHT_LOCKED:
+				
+					// Set lock height from serialized kernel
+					lockHeight = Common::readUint64(serializedKernel, sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(lockHeight);
+					
+					// Break
+					break;
+				
+				// No recent duplicate
+				case Features::NO_RECENT_DUPLICATE:
+				
+					// Set relative height from serialized kernel
+					relativeHeight = Common::readUint64(serializedKernel, sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(relativeHeight);
+					
+					// Break
+					break;
+				
+				// Default
+				default:
+				
+					// Throw exception
+					throw runtime_error("Unknown features");
+				
+					// Break
+					break;
+			}
 			
 			// Break
 			break;
 		
-		// No recent duplicate
-		case Features::NO_RECENT_DUPLICATE:
+		// Two or three
+		case 2:
+		case 3:
 		
-			// Set relative height to data
-			relativeHeight = data;
-		
+			// Check features
+			switch(features) {
+			
+				// Plain
+				case Features::PLAIN:
+				
+					// Check if serialized kernel doesn't contain a fee
+					if(serializedKernelLength < sizeof(features) + sizeof(fee)) {
+					
+						// Throw exception
+						throw runtime_error("Serialized kernel doesn't contain a fee");
+					}
+					
+					// Get fee from serialized kernel
+					fee = Common::readUint64(serializedKernel, sizeof(features));
+					
+					// Set features size
+					featuresSize = sizeof(fee);
+					
+					// Break
+					break;
+				
+				// Coinbase
+				case Features::COINBASE:
+				
+					// Set features size
+					featuresSize = 0;
+					
+					// Break
+					break;
+				
+				// Height locked
+				case Features::HEIGHT_LOCKED:
+				
+					// Check if serialized kernel doesn't contain a fee and a lock height
+					if(serializedKernelLength < sizeof(features) + sizeof(fee) + sizeof(lockHeight)) {
+					
+						// Throw exception
+						throw runtime_error("Serialized kernel doesn't contain a fee and a lock height");
+					}
+					
+					// Get fee from serialized kernel
+					fee = Common::readUint64(serializedKernel, sizeof(features));
+					
+					// Set lock height from serialized kernel
+					lockHeight = Common::readUint64(serializedKernel, sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(lockHeight);
+					
+					// Break
+					break;
+				
+				// No recent duplicate
+				case Features::NO_RECENT_DUPLICATE:
+				
+					// Check if serialized kernel doesn't contain a fee and a relative height
+					if(serializedKernelLength < sizeof(features) + sizeof(fee) + sizeof(uint16_t)) {
+					
+						// Throw exception
+						throw runtime_error("Serialized kernel doesn't contain a fee and a relative height");
+					}
+					
+					// Get fee from serialized kernel
+					fee = Common::readUint64(serializedKernel, sizeof(features));
+					
+					// Set relative height from serialized kernel
+					relativeHeight = Common::readUint16(serializedKernel, sizeof(features) + sizeof(fee));
+					
+					// Set features size
+					featuresSize = sizeof(fee) + sizeof(uint16_t);
+					
+					// Break
+					break;
+				
+				// Default
+				default:
+				
+					// Throw exception
+					throw runtime_error("Unknown features");
+				
+					// Break
+					break;
+			}
+			
 			// Break
 			break;
 		
 		// Default
 		default:
 		
+			// Throw exception
+			throw runtime_error("Unknown protocol version");
+		
 			// Break
 			break;
 	}
 	
+	// Check if serialized kernel doesn't contain an excess and a signature
+	if(serializedKernelLength < sizeof(features) + featuresSize + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Serialized kernel doesn't contain an excess and a signature");
+	}
+	
 	// Get excess from serialized kernel
-	const uint8_t *excess = &serializedKernel[sizeof(features) + sizeof(fee) + sizeof(data)];
+	const uint8_t *excess = &serializedKernel[sizeof(features) + featuresSize];
 	
 	// Get signature from serialized kernel
-	const uint8_t *signature = &serializedKernel[sizeof(features) + sizeof(fee) + sizeof(data) + Crypto::COMMITMENT_LENGTH];
+	const uint8_t *signature = &serializedKernel[sizeof(features) + featuresSize + Crypto::COMMITMENT_LENGTH];
 	
 	// Return kernel
-	return Kernel(features, fee, lockHeight, relativeHeight, excess, signature, isGenesisBlockKernel);
+	return {Kernel(features, fee, lockHeight, relativeHeight, excess, signature, isGenesisBlockKernel), sizeof(features) + featuresSize + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH};
+}
+
+// Restore
+Kernel Kernel::restore(ifstream &file) {
+
+	// Return kernel created from file
+	return Kernel(file);
+}
+
+// Save sum
+void Kernel::saveSum(const secp256k1_pedersen_commitment &sum, ofstream &file) {
+
+	// Check if sum isn't zero
+	uint8_t serializedSum[Crypto::COMMITMENT_LENGTH] = {};
+	if(any_of(reinterpret_cast<const uint8_t *>(&sum), reinterpret_cast<const uint8_t *>(&sum) + sizeof(sum), [](const uint8_t value) {
+	
+		// Return if value isn't zero
+		return value;
+	})) {
+	
+		// Check if serializing sum failed
+		if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedSum, &sum)) {
+		
+			// Throw exception
+			throw runtime_error("Serializing sum failed");
+		}
+	}
+	
+	// Write sum to file
+	file.write(reinterpret_cast<const char *>(serializedSum), sizeof(serializedSum));
+}
+
+// Restore sum
+void Kernel::restoreSum(secp256k1_pedersen_commitment &sum, ifstream &file) {
+
+	// Read sum from file
+	uint8_t serializedSum[Crypto::COMMITMENT_LENGTH];
+	file.read(reinterpret_cast<char *>(serializedSum), sizeof(serializedSum));
+	
+	// Check if sum is zero
+	if(all_of(serializedSum, serializedSum + sizeof(serializedSum), [](const uint8_t value) {
+	
+		// Return if value is zero
+		return !value;
+	})) {
+	
+		// Set sum to zero
+		memset(&sum, 0, sizeof(sum));
+	}
+	
+	// Otherwise
+	else {
+	
+		// Check if parsing sum failed
+		if(!secp256k1_pedersen_commitment_parse(secp256k1_context_no_precomp, &sum, serializedSum)) {
+	
+			// Throw exception
+			throw runtime_error("Parsing sum failed");
+		}
+	}
+}
+
+// Constructor
+Kernel::Kernel(ifstream &file) {
+
+	// Read features from file
+	file.read(reinterpret_cast<char *>(&features), sizeof(features));
+	
+	// Read fee from file
+	uint64_t serializedFee;
+	file.read(reinterpret_cast<char *>(&serializedFee), sizeof(serializedFee));
+	fee = Common::bigEndianToHostByteOrder(serializedFee);
+	
+	// Read lock height from file
+	uint64_t serializedLockHeight;
+	file.read(reinterpret_cast<char *>(&serializedLockHeight), sizeof(serializedLockHeight));
+	lockHeight = Common::bigEndianToHostByteOrder(serializedLockHeight);
+	
+	// Read relative height from file
+	uint64_t serializedRelativeHeight;
+	file.read(reinterpret_cast<char *>(&serializedRelativeHeight), sizeof(serializedRelativeHeight));
+	relativeHeight = Common::bigEndianToHostByteOrder(serializedRelativeHeight);
+	
+	// Read excess from file
+	uint8_t serializedExcess[Crypto::COMMITMENT_LENGTH];
+	file.read(reinterpret_cast<char *>(serializedExcess), sizeof(serializedExcess));
+	
+	// Check if parsing excess failed
+	if(!secp256k1_pedersen_commitment_parse(secp256k1_context_no_precomp, &excess, serializedExcess)) {
+	
+		// Throw exception
+		throw runtime_error("Parsing excess failed");
+	}
+	
+	// Read signature from file
+	file.read(reinterpret_cast<char *>(signature), sizeof(signature));
 }
 
 // Get message to sign
-const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Kernel::getMessageToSign() const {
+array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Kernel::getMessageToSign() const {
 
 	// Initialize data
 	vector<uint8_t> data;

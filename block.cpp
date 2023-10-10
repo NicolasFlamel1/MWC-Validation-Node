@@ -9,6 +9,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Supporting function implementation
 
 // Constructor
@@ -70,8 +74,22 @@ list<Output> &Block::getOutputs() {
 	return outputs;
 }
 
+// Get outputs
+const list<Output> &Block::getOutputs() const {
+
+	// Return outputs
+	return outputs;
+}
+
 // Get rangeproofs
 list<Rangeproof> &Block::getRangeproofs() {
+
+	// Return rangeproofs
+	return rangeproofs;
+}
+
+// Get rangeproofs
+const list<Rangeproof> &Block::getRangeproofs() const {
 
 	// Return rangeproofs
 	return rangeproofs;
@@ -84,8 +102,15 @@ list<Kernel> &Block::getKernels() {
 	return kernels;
 }
 
+// Get kernels
+const list<Kernel> &Block::getKernels() const {
+
+	// Return kernels
+	return kernels;
+}
+
 // Is sorted and unique
-const bool Block::isSortedAndUnique() const {
+bool Block::isSortedAndUnique() const {
 
 	// Go through all inputs
 	for(list<Input>::const_iterator i = next(inputs.cbegin()); i != inputs.cend(); ++i) {
@@ -191,7 +216,7 @@ const bool Block::isSortedAndUnique() const {
 }
 
 // Has valid weight
-const bool Block::hasValidWeight() const {
+bool Block::hasValidWeight() const {
 
 	// Get weight
 	const uint64_t blockWeight = Consensus::getBlockWeight(inputs.size(), outputs.size(), kernels.size());
@@ -208,7 +233,7 @@ const bool Block::hasValidWeight() const {
 }
 
 // Has unique no recent duplicate kernel excesses
-const bool Block::hasUniqueNoRecentDuplicateKernelExcesses() const {
+bool Block::hasUniqueNoRecentDuplicateKernelExcesses() const {
 
 	// Initialize serialized kernel excesses
 	set<array<uint8_t, Crypto::COMMITMENT_LENGTH>> serializedKernelExcesses;
@@ -244,7 +269,7 @@ const bool Block::hasUniqueNoRecentDuplicateKernelExcesses() const {
 }
 
 // Has valid cut through
-const bool Block::hasValidCutThrough() const {
+bool Block::hasValidCutThrough() const {
 
 	// Initialize serialized commitments
 	set<array<uint8_t, Crypto::COMMITMENT_LENGTH>> serializedCommitments;

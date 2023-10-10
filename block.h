@@ -1,6 +1,6 @@
 // Header guard
-#ifndef BLOCK_H
-#define BLOCK_H
+#ifndef MWC_VALIDATION_NODE_BLOCK_H
+#define MWC_VALIDATION_NODE_BLOCK_H
 
 
 // Header files
@@ -12,6 +12,10 @@
 #include "./rangeproof.h"
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Structures
@@ -31,26 +35,35 @@ struct Block final {
 		// Get outputs
 		list<Output> &getOutputs();
 		
+		// Get outputs
+		const list<Output> &getOutputs() const;
+		
 		// Get rangeproofs
 		list<Rangeproof> &getRangeproofs();
 		
+		// Get rangeproofs
+		const list<Rangeproof> &getRangeproofs() const;
+		
 		// Get kernels
 		list<Kernel> &getKernels();
+		
+		// Get kernels
+		const list<Kernel> &getKernels() const;
 		
 	// Private
 	private:
 	
 		// Is sorted and unique
-		const bool isSortedAndUnique() const;
+		bool isSortedAndUnique() const;
 		
 		// Has valid weight
-		const bool hasValidWeight() const;
+		bool hasValidWeight() const;
 		
 		// Has unique no recent duplicate kernel excesses
-		const bool hasUniqueNoRecentDuplicateKernelExcesses() const;
+		bool hasUniqueNoRecentDuplicateKernelExcesses() const;
 		
 		// Has valid cut through
-		const bool hasValidCutThrough() const;
+		bool hasValidCutThrough() const;
 	
 		// Inputs
 		list<Input> inputs;
@@ -64,6 +77,9 @@ struct Block final {
 		// Kernels
 		list<Kernel> kernels;
 };
+
+
+}
 
 
 #endif

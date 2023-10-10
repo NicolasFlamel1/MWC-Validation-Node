@@ -1,6 +1,6 @@
 // Header guard
-#ifndef CRYPTO_H
-#define CRYPTO_H
+#ifndef MWC_VALIDATION_NODE_CRYPTO_H
+#define MWC_VALIDATION_NODE_CRYPTO_H
 
 
 // Header files
@@ -9,6 +9,10 @@
 #include "secp256k1_bulletproofs.h"
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Classes
@@ -62,7 +66,7 @@ class Crypto final {
 		static const secp256k1_bulletproof_generators *getSecp256k1Generators();
 		
 		// Verify kernel sums
-		static const bool verifyKernelSums(const Header &header, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs);
+		static bool verifyKernelSums(const Header &header, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs);
 	
 	// Private
 	private:
@@ -77,11 +81,14 @@ class Crypto final {
 		static const unique_ptr<secp256k1_context, decltype(&secp256k1_context_destroy)> secp256k1Context;
 		
 		// Secp256k1 scratch space
-		static const unique_ptr<secp256k1_scratch_space, decltype(&secp256k1_scratch_space_destroy)> secp256k1ScratchSpace;
+		static thread_local const unique_ptr<secp256k1_scratch_space, decltype(&secp256k1_scratch_space_destroy)> secp256k1ScratchSpace;
 		
 		// Secp256k1 generators
 		static const unique_ptr<secp256k1_bulletproof_generators, void(*)(secp256k1_bulletproof_generators *)> secp256k1Generators;
 };
+
+
+}
 
 
 #endif

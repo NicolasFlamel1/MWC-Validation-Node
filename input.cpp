@@ -6,6 +6,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Supporting function implementation
 
 // Constructor
@@ -31,7 +35,7 @@ Input::Input(const Features features, const uint8_t commitment[Crypto::COMMITMEN
 }
 
 // Serialize
-const vector<uint8_t> Input::serialize() const {
+vector<uint8_t> Input::serialize() const {
 
 	// Initialize serialized input
 	vector<uint8_t> serializedInput;
@@ -59,7 +63,7 @@ const vector<uint8_t> Input::serialize() const {
 }
 
 // Get lookup value
-const vector<uint8_t> Input::getLookupValue() const {
+vector<uint8_t> Input::getLookupValue() const {
 
 	// Check if serializing commitment failed
 	vector<uint8_t> serializedCommitment(Crypto::COMMITMENT_LENGTH);
@@ -74,7 +78,7 @@ const vector<uint8_t> Input::getLookupValue() const {
 }
 
 // Get features
-const Input::Features Input::getFeatures() const {
+Input::Features Input::getFeatures() const {
 
 	// Return features
 	return features;

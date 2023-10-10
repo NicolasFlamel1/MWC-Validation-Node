@@ -1,6 +1,6 @@
 // Header guard
-#ifndef PROOF_OF_WORK_H
-#define PROOF_OF_WORK_H
+#ifndef MWC_VALIDATION_NODE_PROOF_OF_WORK_H
+#define MWC_VALIDATION_NODE_PROOF_OF_WORK_H
 
 
 // Header files
@@ -8,6 +8,10 @@
 #include "./header.h"
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Classes
@@ -22,7 +26,7 @@ class ProofOfWork final {
 		ProofOfWork() = delete;
 		
 		// Has valid proof of work
-		static const bool hasValidProofOfWork(const Header &header);
+		static bool hasValidProofOfWork(const Header &header);
 	
 	// Private
 	private:
@@ -58,7 +62,7 @@ class ProofOfWork final {
 				void hash(const uint64_t nonce, const uint8_t rotation);
 				
 				// Digest
-				const uint64_t digest() const;
+				uint64_t digest() const;
 			
 			// Private
 			private:
@@ -71,14 +75,17 @@ class ProofOfWork final {
 		};
 	
 		// Get proof of work hash
-		static const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getProofOfWorkHash(const Header &header);
+		static array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getProofOfWorkHash(const Header &header);
 		
 		// SipHash block
-		static const uint64_t sipHashBlock(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t nonce, const uint8_t rotation);
+		static uint64_t sipHashBlock(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t nonce, const uint8_t rotation);
 		
 		// SipNode
-		static const uint64_t sipNode(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t edge, const uint64_t uorv);
+		static uint64_t sipNode(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t edge, const uint64_t uorv);
 };
+
+
+}
 
 
 #endif

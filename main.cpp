@@ -1,8 +1,14 @@
 // Header files
 #include "./common.h"
+#include <iostream>
+#include <mutex>
 #include "./node.h"
 
 using namespace std;
+
+
+// Namespace
+using namespace MwcValidationNode;
 
 
 // Classes
@@ -70,23 +76,134 @@ int main() {
 		// Create node
 		Node node;
 		
-		// Set threads
-		const list threads = {
+		// Create message lock
+		mutex messageLock;
 		
-			// Node thread
-			&node.getThread()
-		};
+		// Set node's on start syncing callback
+		node.setOnStartSyncingCallback([&messageLock]() {
 		
-		// Go through all threads
-		for(thread *currentThread : threads) {
-		
-			// Check if current thread is running
-			if(currentThread->joinable()) {
+			// Try
+			try {
 			
-				// Wait for current thread to finish
-				currentThread->join();
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Display message
+				cout << "Syncing" << endl;
 			}
-		}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+		});
+		
+		// Set node's on synced syncing callback
+		node.setOnSyncedCallback([&messageLock]() {
+		
+			// Try
+			try {
+			
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Display message
+				cout << "Synced" << endl;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+		});
+		
+		// Set node's on reorg callback
+		node.setOnReorgCallback([&node, &messageLock](const uint64_t newHeight) -> bool {
+		
+			// Try
+			try {
+			
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Display message
+				cout << "Reorg occurred with depth: " << (node.getHeight() - newHeight + 1) << endl;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+			
+			// Return true;
+			return true;
+		});
+		
+		// Set node's on block callback
+		node.setOnBlockCallback([&messageLock](const Header &header, const Block &block) -> bool {
+		
+			// Try
+			try {
+			
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Display message
+				cout << "Block height: " << header.getHeight() << " at " << chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count() << endl;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+			
+			// Return true
+			return true;
+		});
+		
+		// Set node's on peer connect callback
+		node.setOnPeerConnectCallback([&messageLock](const string &peerIdentifier) {
+		
+			// Try
+			try {
+			
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Display message
+				cout << "Connected to peer: " << peerIdentifier << endl;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+		});
+		
+		// Set node's on peer disconnect callback
+		node.setOnPeerDisconnectCallback([&messageLock](const string &peerIdentifier) {
+		
+			// Try
+			try {
+			
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Display message
+				cout << "Disconnected from peer: " << peerIdentifier << endl;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+		});
+		
+		// Start node
+		node.start();
+		
+		// Wait for node to finish
+		node.getThread().join();
 		
 		// Check if an error occurred
 		if(Common::errorOccurred()) {

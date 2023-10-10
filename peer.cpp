@@ -21,6 +21,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 // Communication state
@@ -100,7 +104,7 @@ const chrono::minutes Peer::GET_TRANSACTION_HASH_SET_RESPONSE_REQUIRED_DURATION 
 const chrono::minutes Peer::GET_TRANSACTION_HASH_SET_ATTACHMENT_REQUIRED_DURATION = 60min;
 
 // Get block response required duration
-const chrono::minutes Peer::GET_BLOCK_RESPONSE_REQUIRED_DURATION = 1min;
+const chrono::minutes Peer::GET_BLOCK_RESPONSE_REQUIRED_DURATION = 2min;
 
 // Maximum allowed number of reorgs during headers sync
 const int Peer::MAXIMUM_ALLOWED_NUMBER_OF_REORGS_DURING_HEADERS_SYNC = 3;
@@ -171,6 +175,9 @@ Peer::~Peer() {
 	// Set stop read and write to true
 	stopReadAndWrite.store(true);
 	
+	// Set error occurred to false
+	bool errorOccurred = false;
+	
 	// Check if main thread is running
 	if(mainThread.joinable()) {
 	
@@ -183,6 +190,9 @@ Peer::~Peer() {
 	
 		// Catch errors
 		catch(...) {
+		
+			// Set error occurred to true
+			errorOccurred = true;
 		
 			// Set closing
 			Common::setClosing();
@@ -208,8 +218,8 @@ Peer::~Peer() {
 		// Set closed to false
 		bool closed = false;
 	
-		// Check if not closing
-		if(!Common::isClosing()) {
+		// Check if not stopping read and write and not closing
+		if(!stopReadAndWrite.load() && !Common::isClosing()) {
 		
 			// Try
 			try {
@@ -306,98 +316,102 @@ Peer::~Peer() {
 		
 		// Check if socket wasn't closed
 		if(!closed) {
-	
-			// Check if Windows
-			#ifdef _WIN32
-			
-				{
-			
-			// Otherwise
-			#else
 		
-				// Check if getting the socket's flags was successful 
-				const int socketFlags = fcntl(socket, F_GETFL);
-				
-				if(socketFlags != -1) {
-			#endif
-		
+			// Check if an error didn't occur
+			if(!errorOccurred) {
+			
 				// Check if Windows
 				#ifdef _WIN32
-			
-					// Check if setting the socket as blocking was successful
-					u_long nonBlocking = false;
-					if(!ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+				
+					{
 				
 				// Otherwise
 				#else
-		
-					// Check if setting the socket as blocking was successful
-					if(fcntl(socket, F_SETFL, socketFlags & ~O_NONBLOCK) != -1) {
+			
+					// Check if getting the socket's flags was successful 
+					const int socketFlags = fcntl(socket, F_GETFL);
+					
+					if(socketFlags != -1) {
 				#endif
+			
+					// Check if Windows
+					#ifdef _WIN32
 				
-					// Check if write buffer isn't empty
-					if(!writeBuffer.empty()) {
+						// Check if setting the socket as blocking was successful
+						u_long nonBlocking = false;
+						if(!ioctlsocket(socket, FIONBIO, &nonBlocking)) {
 					
-						// Check if Windows
-						#ifdef _WIN32
+					// Otherwise
+					#else
+			
+						// Check if setting the socket as blocking was successful
+						if(fcntl(socket, F_SETFL, socketFlags & ~O_NONBLOCK) != -1) {
+					#endif
+					
+						// Check if write buffer isn't empty
+						if(!writeBuffer.empty()) {
 						
-							// Set write timeout
-							const DWORD writeTimeout = CLOSING_WRITE_TIMEOUT * Common::MILLISECONDS_IN_A_SECOND;
+							// Check if Windows
+							#ifdef _WIN32
+							
+								// Set write timeout
+								const DWORD writeTimeout = CLOSING_WRITE_TIMEOUT * Common::MILLISECONDS_IN_A_SECOND;
+							
+							// Otherwise
+							#else
 						
-						// Otherwise
-						#else
-					
-							// Set write timeout
-							const timeval writeTimeout = {
-							
-								// Seconds
-								.tv_sec = CLOSING_WRITE_TIMEOUT
-							};
-						#endif
-					
-						// Check if setting socket's write timeout was successful
-						if(!setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&writeTimeout), sizeof(writeTimeout))) {
-					
-							// Loop through all bytes to send
-							decltype(function(send))::result_type bytesSent;
-							do {
-							
-								// Check if Windows
-								#ifdef _WIN32
-							
-									// Get bytes sent to socket
-									bytesSent = send(socket, reinterpret_cast<char *>(writeBuffer.data()), writeBuffer.size(), 0);
+								// Set write timeout
+								const timeval writeTimeout = {
 								
-								// Otherwise
-								#else
+									// Seconds
+									.tv_sec = CLOSING_WRITE_TIMEOUT
+								};
+							#endif
+						
+							// Check if setting socket's write timeout was successful
+							if(!setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&writeTimeout), sizeof(writeTimeout))) {
+						
+								// Loop through all bytes to send
+								decltype(function(send))::result_type bytesSent;
+								do {
 								
-									// Get bytes sent to socket
-									bytesSent = send(socket, writeBuffer.data(), writeBuffer.size(), MSG_NOSIGNAL);
-								#endif
+									// Check if Windows
+									#ifdef _WIN32
 								
-								// Check if bytes were sent
-								if(bytesSent > 0) {
-								
-									// Remove bytes from write buffer
-									writeBuffer.erase(writeBuffer.cbegin(), writeBuffer.cbegin() + bytesSent);
-								}
-								
-							} while(bytesSent > 0 && !writeBuffer.empty());
+										// Get bytes sent to socket
+										bytesSent = send(socket, reinterpret_cast<char *>(writeBuffer.data()), writeBuffer.size(), 0);
+									
+									// Otherwise
+									#else
+									
+										// Get bytes sent to socket
+										bytesSent = send(socket, writeBuffer.data(), writeBuffer.size(), MSG_NOSIGNAL);
+									#endif
+									
+									// Check if bytes were sent
+									if(bytesSent > 0) {
+									
+										// Remove bytes from write buffer
+										writeBuffer.erase(writeBuffer.cbegin(), writeBuffer.cbegin() + bytesSent);
+									}
+									
+								} while(bytesSent > 0 && !writeBuffer.empty());
+							}
 						}
-					}
-				
-					// Set linger timeout
-					const linger lingerTimeout = {
 					
-						// On
-						.l_onoff = true,
+						// Set linger timeout
+						const linger lingerTimeout = {
 						
-						// Timeout
-						.l_linger = LINGER_TIMEOUT
-					};
-					
-					// Set socket's linger timeout
-					setsockopt(socket, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char *>(&lingerTimeout), sizeof(lingerTimeout));
+							// On
+							.l_onoff = true,
+							
+							// Timeout
+							.l_linger = LINGER_TIMEOUT
+						};
+						
+						// Set socket's linger timeout
+						setsockopt(socket, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char *>(&lingerTimeout), sizeof(lingerTimeout));
+					}
 				}
 			}
 			
@@ -452,6 +466,20 @@ Peer::~Peer() {
 	}
 }
 
+// Stop
+void Peer::stop() {
+
+	// Set stop read and write to true
+	stopReadAndWrite.store(true);
+}
+
+// Get thread
+thread &Peer::getThread() {
+
+	// Return main thread
+	return mainThread;
+}
+
 // Get lock
 shared_mutex &Peer::getLock() {
 
@@ -460,14 +488,14 @@ shared_mutex &Peer::getLock() {
 }
 
 // Get connection state
-const Peer::ConnectionState Peer::getConnectionState() const {
+Peer::ConnectionState Peer::getConnectionState() const {
 
 	// Return connection state
 	return connectionState;
 }
 
 // Get syncing state
-const Peer::SyncingState Peer::getSyncingState() const {
+Peer::SyncingState Peer::getSyncingState() const {
 
 	// Return syncing state
 	return syncingState;
@@ -481,14 +509,14 @@ const string &Peer::getIdentifier() const {
 }
 
 // Get total difficulty
-const uint64_t Peer::getTotalDifficulty() const {
+uint64_t Peer::getTotalDifficulty() const {
 
 	// Return total difficulty
 	return totalDifficulty;
 }
 
 // Is message queue full
-const bool Peer::isMessageQueueFull() const {
+bool Peer::isMessageQueueFull() const {
 
 	// Return if messages can't be sent and received
 	return numberOfMessagesReceived >= MAXIMUM_NUMBER_OF_MESSAGES_RECEIVED_PER_INTERVAL / 2 - RESERVED_NUMBER_OF_MESSAGES_PER_INTERVAL || numberOfMessagesSent >= MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2 - RESERVED_NUMBER_OF_MESSAGES_PER_INTERVAL;
@@ -524,6 +552,20 @@ void Peer::startSyncing(const MerkleMountainRange<Header> &headers, const uint64
 	}
 }
 
+// Get headers
+MerkleMountainRange<Header> &Peer::getHeaders() {
+
+	// Return headers
+	return headers;
+}
+
+// Is worker operation running
+bool Peer::isWorkerOperationRunning() const {
+
+	// Return if worker operation exists
+	return workerOperation.valid();
+}
+
 // Connect
 void Peer::connect(const string &address) {
 
@@ -535,12 +577,12 @@ void Peer::connect(const string &address) {
 		
 		// Initialize current address and port
 		string currentAddress;
-		const char *port;
+		const char *port = nullptr;
 		
 		// Check if is Onion service
 		if(isOnionService) {
 		
-			// Check if Tor is enabled
+			// Check if tor is enabled
 			#ifdef TOR_ENABLE
 			
 				// Set current address to the address
@@ -558,7 +600,7 @@ void Peer::connect(const string &address) {
 				}
 				
 				// Check if address isn't a DNS seed
-				if(!Node::DNS_SEEDS.contains(address)) {
+				if(!node.getDnsSeeds().contains(address)) {
 				
 					// Notify peers that event occurred
 					eventOccurred.notify_one();
@@ -605,11 +647,11 @@ void Peer::connect(const string &address) {
 		// Initialize address info
 		addrinfo *addressInfo;
 		
-		// Check if Tor is enabled
+		// Check if tor is enabled
 		#ifdef TOR_ENABLE
 		
-			// Check if getting address info for the Tor proxy failed
-			if(getaddrinfo(Common::TOR_PROXY_ADDRESS, Common::TOR_PROXY_PORT, &hints, &addressInfo)) {
+			// Check if getting address info for the node's tor proxy failed
+			if(getaddrinfo(node.getTorProxyAddress().c_str(), node.getTorProxyPort().c_str(), &hints, &addressInfo)) {
 		
 		// Otherwise
 		#else
@@ -627,7 +669,7 @@ void Peer::connect(const string &address) {
 			}
 			
 			// Check if address isn't a DNS seed
-			if(!Node::DNS_SEEDS.contains(address)) {
+			if(!node.getDnsSeeds().contains(address)) {
 			
 				// Notify peers that event occurred
 				eventOccurred.notify_one();
@@ -648,6 +690,9 @@ void Peer::connect(const string &address) {
 			
 			// Set currently used to false
 			bool currentlyUsed = false;
+			
+			// Dont retry
+			bool dontRetry = false;
 			
 			// Set peer connected to false
 			bool peerConnected = false;
@@ -679,8 +724,15 @@ void Peer::connect(const string &address) {
 				#endif
 			};
 			
-			// Go through all servers for the address while not closing
-			for(const addrinfo *server = addressInfo; server && !Common::isClosing(); server = server->ai_next) {
+			// Check if tor is enabled
+			#ifdef TOR_ENABLE
+			
+				// Initialize current server
+				sockaddr_storage currentServer;
+			#endif
+			
+			// Go through all servers for the address while not stopping read and write and not closing
+			for(const addrinfo *server = addressInfo; server && !stopReadAndWrite.load() && !Common::isClosing(); server = server->ai_next) {
 			
 				// Initialize server identifier
 				string serverIdentifier;
@@ -704,97 +756,8 @@ void Peer::connect(const string &address) {
 				// Otherwise
 				else {
 				
-					// Check if Tor is enabled
-					#ifdef TOR_ENABLE
-					
-						// Check if getting address info for the current server was successful
-						addrinfo *currentServer;
-						if(!getaddrinfo(currentAddress.c_str(), port, &hints, &currentServer)) {
-						
-							// Automatically free current server when done
-							const unique_ptr<addrinfo, decltype(&freeaddrinfo)> currentServerUniquePointer(currentServer, freeaddrinfo);
-							
-							// Check if current server exists
-							if(currentServer) {
-							
-								// Check current server family
-								switch(currentServer->ai_family) {
-								
-									// IPv4
-									case AF_INET:
-									
-										{
-											// Get IPv4 info for the current server
-											const sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(currentServer->ai_addr);
-											
-											// Set server address's family to IPv4
-											serverAddress.family = NetworkAddress::Family::IPV4;
-											
-											// Set server address's address to the address
-											serverAddress.address = &ipv4Info->sin_addr;
-											
-											// Set server address's address length to the address length
-											serverAddress.addressLength = sizeof(ipv4Info->sin_addr);
-											
-											// Set server address's port to the port
-											serverAddress.port = ipv4Info->sin_port;
-											
-											// Check if getting the current server's IP string was successful
-											char ipString[INET_ADDRSTRLEN];
-											
-											if(inet_ntop(AF_INET, &ipv4Info->sin_addr, ipString, sizeof(ipString))) {
-											
-												// Set server identifier to the IP string with the port
-												serverIdentifier = string(ipString) + ':' + port;
-											}
-										}
-										
-										// Break
-										break;
-									
-									// IPv6
-									case AF_INET6:
-									
-										{
-											// Get IPv6 info for the current server
-											const sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(currentServer->ai_addr);
-											
-											// Set server address's family to IPv6
-											serverAddress.family = NetworkAddress::Family::IPV6;
-											
-											// Set server address's address to the address
-											serverAddress.address = &ipv6Info->sin6_addr;
-											
-											// Set server address's address length to the address length
-											serverAddress.addressLength = sizeof(ipv6Info->sin6_addr);
-											
-											// Set server address's port to the port
-											serverAddress.port = ipv6Info->sin6_port;
-											
-											// Check if getting the current server's IP string was successful
-											char ipString[INET6_ADDRSTRLEN];
-											
-											if(inet_ntop(AF_INET6, &ipv6Info->sin6_addr, ipString, sizeof(ipString))) {
-											
-												// Set server identifier to the IP string with the port
-												serverIdentifier = '[' + string(ipString) + "]:" + port;
-											}
-										}
-									
-										// Break
-										break;
-									
-									// Default
-									default:
-									
-										// Break
-										break;
-								}
-							}
-						}
-						
-					// Otherwise
-					#else
+					// Check if tor is disabled
+					#ifndef TOR_ENABLE
 			
 						// Check server family
 						switch(server->ai_family) {
@@ -859,12 +822,6 @@ void Peer::connect(const string &address) {
 										serverIdentifier = '[' + string(ipString) + "]:" + port;
 									}
 								}
-							
-								// Break
-								break;
-							
-							// Default
-							default:
 							
 								// Break
 								break;
@@ -933,150 +890,206 @@ void Peer::connect(const string &address) {
 					
 					// Set identifier to server identifier
 					identifier = move(serverIdentifier);
+				}
+				
+				// Otherwise
+				else {
+				
+					// Check if tor is disabled
+					#ifndef TOR_ENABLE
 					
-					// Create socket
-					socket = ::socket(server->ai_family, server->ai_socktype, server->ai_protocol);
+						// Check if no more servers exist
+						if(!server->ai_next) {
+						
+							// Set don't retry to true
+							dontRetry = true;
+						}
+						
+						// Go to next server
+						continue;
+					#endif
+				}
+					
+				// Create socket
+				socket = ::socket(server->ai_family, server->ai_socktype, server->ai_protocol);
+				
+				// Check if Windows
+				#ifdef _WIN32
+				
+					// Check if creating socket was successful
+					if(socket != INVALID_SOCKET) {
+				
+				// Otherwise
+				#else
+				
+					// Check if creating socket was successful
+					if(socket != -1) {
+				#endif
 					
 					// Check if Windows
 					#ifdef _WIN32
 					
-						// Check if creating socket was successful
-						if(socket != INVALID_SOCKET) {
+						{
 					
 					// Otherwise
 					#else
-					
-						// Check if creating socket was successful
-						if(socket != -1) {
-					#endif
+				
+						// Check if getting the socket's flags was successful 
+						int socketFlags = fcntl(socket, F_GETFL);
 						
+						if(socketFlags != -1) {
+					#endif
+					
 						// Check if Windows
 						#ifdef _WIN32
-						
-							{
+					
+							// Check if setting the socket as non-blocking was successful
+							u_long nonBlocking = true;
+							if(!ioctlsocket(socket, FIONBIO, &nonBlocking)) {
 						
 						// Otherwise
 						#else
-					
-							// Check if getting the socket's flags was successful 
-							const int socketFlags = fcntl(socket, F_GETFL);
-							
-							if(socketFlags != -1) {
+				
+							// Check if setting the socket as non-blocking was successful
+							if(fcntl(socket, F_SETFL, socketFlags | O_NONBLOCK) != -1) {
 						#endif
 						
+							// Set connected to false
+							bool connected = false;
+						
+							// Connect to server
+							int connectStatus = ::connect(socket, server->ai_addr, server->ai_addrlen);
+							
 							// Check if Windows
 							#ifdef _WIN32
-						
-								// Check if setting the socket as non-blocking was successful
-								u_long nonBlocking = true;
-								if(!ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+							
+								// Check if connecting to server was successful started
+								if(connectStatus == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK) {
 							
 							// Otherwise
 							#else
-					
-								// Check if setting the socket as non-blocking was successful
-								if(fcntl(socket, F_SETFL, socketFlags | O_NONBLOCK) != -1) {
+							
+								// Check if connecting to server was successful started
+								if(connectStatus == -1 && errno == EINPROGRESS) {
 							#endif
 							
-								// Set connected to false
-								bool connected = false;
-							
-								// Connect to server
-								const int connectStatus = ::connect(socket, server->ai_addr, server->ai_addrlen);
-								
 								// Check if Windows
 								#ifdef _WIN32
 								
-									// Check if connecting to server was successful started
-									if(connectStatus == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK) {
+									// Set sockets to monitor socket
+									WSAPOLLFD sockets = {
+									
+										// Socket
+										.fd = socket,
+										
+										// Events
+										.events = POLLOUT
+									};
+									
+									// Check if connecting to the server successfully finished
+									if(WSAPoll(&sockets, 1, CONNECT_TIMEOUT) > 0) {
 								
 								// Otherwise
 								#else
 								
-									// Check if connecting to server was successful started
-									if(connectStatus == -1 && errno == EINPROGRESS) {
+									// Set sockets to monitor socket
+									pollfd sockets = {
+									
+										// Socket
+										.fd = socket,
+										
+										// Events
+										.events = POLLOUT
+									};
+									
+									// Check if connecting to the server successfully finished
+									if(poll(&sockets, 1, CONNECT_TIMEOUT) > 0) {
 								#endif
 								
-									// Check if Windows
-									#ifdef _WIN32
-									
-										// Set sockets to monitor socket
-										WSAPOLLFD sockets = {
-										
-											// Socket
-											.fd = socket,
-											
-											// Events
-											.events = POLLOUT
-										};
-										
-										// Check if connecting to the server successfully finished
-										if(WSAPoll(&sockets, 1, CONNECT_TIMEOUT) > 0) {
-									
-									// Otherwise
-									#else
-									
-										// Set sockets to monitor socket
-										pollfd sockets = {
-										
-											// Socket
-											.fd = socket,
-											
-											// Events
-											.events = POLLOUT
-										};
-										
-										// Check if connecting to the server successfully finished
-										if(poll(&sockets, 1, CONNECT_TIMEOUT) > 0) {
-									#endif
-									
-										// Check if not closing
-										if(!Common::isClosing()) {
-									
-											// Set connected to true
-											connected = true;
-										}
+									// Check if not stopping read and write and not closing
+									if(!stopReadAndWrite.load() && !Common::isClosing()) {
+								
+										// Set connected to true
+										connected = true;
 									}
 								}
+							}
+							
+							// Otherwise check if connection was finished
+							else if(!connectStatus) {
+							
+								// Set connected to true
+								connected = true;
+							}
+							
+							// Check if connected
+							if(connected) {
+							
+								// Check if getting socket's error status was successful
+								int errorStatus;
+								socklen_t errorStatusLength = sizeof(errorStatus);
 								
-								// Otherwise check if connection was finished
-								else if(!connectStatus) {
+								if(!getsockopt(socket, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&errorStatus), &errorStatusLength)) {
 								
-									// Set connected to true
-									connected = true;
-								}
-								
-								// Check if connected
-								if(connected) {
-								
-									// Check if getting socket's error status was successful
-									int errorStatus;
-									socklen_t errorStatusLength = sizeof(errorStatus);
+									// Check if socket doesn't have any errors
+									if(!errorStatus) {
 									
-									if(!getsockopt(socket, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&errorStatus), &errorStatusLength)) {
+										// Set invalid server to false
+										bool invalidServer = false;
 									
-										// Check if socket doesn't have any errors
-										if(!errorStatus) {
+										// Check if tor is enabled
+										#ifdef TOR_ENABLE
 										
-											// Set invalid server to false
-											bool invalidServer = false;
+											// Check if Windows
+											#ifdef _WIN32
 										
-											// Check if Tor is enabled
-											#ifdef TOR_ENABLE
+												// Check if setting the socket as blocking failed
+												nonBlocking = false;
+												if(ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+											
+											// Otherwise
+											#else
+									
+												// Check if setting the socket as blocking failed
+												if(fcntl(socket, F_SETFL, socketFlags & ~O_NONBLOCK) == -1) {
+											#endif
+											
+												// Set invalid server
+												invalidServer = true;
+											}
+											
+											// Otherwise
+											else {
 											
 												// Check if Windows
 												#ifdef _WIN32
-											
-													// Check if setting the socket as blocking failed
-													u_long nonBlocking = false;
-													if(ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+													
+													// Set read timeout
+													const DWORD readTimeout = CONNECTING_READ_TIMEOUT * Common::MILLISECONDS_IN_A_SECOND;
+												
+													// Set write timeout
+													const DWORD writeTimeout = CONNECTING_WRITE_TIMEOUT * Common::MILLISECONDS_IN_A_SECOND;
 												
 												// Otherwise
 												#else
-										
-													// Check if setting the socket as blocking failed
-													if(fcntl(socket, F_SETFL, socketFlags & ~O_NONBLOCK) == -1) {
+												
+													// Set read timeout
+													const timeval readTimeout = {
+													
+														// Seconds
+														.tv_sec = CONNECTING_READ_TIMEOUT
+													};
+											
+													// Set write timeout
+													const timeval writeTimeout = {
+													
+														// Seconds
+														.tv_sec = CONNECTING_WRITE_TIMEOUT
+													};
 												#endif
+											
+												// Check if setting socket's read and write timeouts failed
+												if(setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&readTimeout), sizeof(readTimeout)) || setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&writeTimeout), sizeof(writeTimeout))) {
 												
 													// Set invalid server
 													invalidServer = true;
@@ -1084,36 +1097,36 @@ void Peer::connect(const string &address) {
 												
 												// Otherwise
 												else {
-												
+											
+													// Set authenticate request
+													const uint8_t authenticateRequest[] = {0x05, 0x01, 0x00};
+													
 													// Check if Windows
 													#ifdef _WIN32
-														
-														// Set read timeout
-														const DWORD readTimeout = CONNECTING_READ_TIMEOUT * Common::MILLISECONDS_IN_A_SECOND;
 													
-														// Set write timeout
-														const DWORD writeTimeout = CONNECTING_WRITE_TIMEOUT * Common::MILLISECONDS_IN_A_SECOND;
+														// Check if sending authenticate request failed
+														if(send(socket, reinterpret_cast<const char *>(authenticateRequest), sizeof(authenticateRequest), 0) != sizeof(authenticateRequest)) {
 													
 													// Otherwise
 													#else
 													
-														// Set read timeout
-														const timeval readTimeout = {
-														
-															// Seconds
-															.tv_sec = CONNECTING_READ_TIMEOUT
-														};
-												
-														// Set write timeout
-														const timeval writeTimeout = {
-														
-															// Seconds
-															.tv_sec = CONNECTING_WRITE_TIMEOUT
-														};
+														// Check if sending authenticate request failed
+														if(send(socket, authenticateRequest, sizeof(authenticateRequest), MSG_NOSIGNAL) != sizeof(authenticateRequest)) {
 													#endif
-												
-													// Check if setting socket's read and write timeouts failed
-													if(setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&readTimeout), sizeof(readTimeout)) || setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&writeTimeout), sizeof(writeTimeout))) {
+													
+														// Check if no more servers exist
+														if(!server->ai_next) {
+														
+															// Set retry to true
+															dontRetry = true;
+														}
+														
+														// Set invalid server
+														invalidServer = true;
+													}
+													
+													// Otherwise check if stopping read and write or closing
+													else if(stopReadAndWrite.load() || Common::isClosing()) {
 													
 														// Set invalid server
 														invalidServer = true;
@@ -1121,30 +1134,55 @@ void Peer::connect(const string &address) {
 													
 													// Otherwise
 													else {
-												
-														// Set authentication request
-														const uint8_t authenticationRequest[] = {0x05, 0x01, 0x00};
+													
+														// Initialize authenticate response
+														uint8_t authenticateResponse[sizeof("\x05\x00") - sizeof('\0')];
 														
-														// Check if Windows
-														#ifdef _WIN32
+														// Check if getting authenticate response failed
+														if(recv(socket, reinterpret_cast<char *>(authenticateResponse), sizeof(authenticateResponse), 0) != sizeof(authenticateResponse)) {
 														
-															// Check if sending authentication request failed
-															if(send(socket, reinterpret_cast<const char *>(authenticationRequest), sizeof(authenticationRequest), 0) != sizeof(authenticationRequest)) {
+															// Check if no more servers exist
+															if(!server->ai_next) {
+															
+																// Set retry to true
+																dontRetry = true;
+															}
+															
+															// Set invalid server
+															invalidServer = true;
+														}
 														
-														// Otherwise
-														#else
-														
-															// Check if sending authentication request failed
-															if(send(socket, authenticationRequest, sizeof(authenticationRequest), MSG_NOSIGNAL) != sizeof(authenticationRequest)) {
-														#endif
+														// Otherwise check if stopping read and write or closing
+														else if(stopReadAndWrite.load() || Common::isClosing()) {
 														
 															// Set invalid server
 															invalidServer = true;
 														}
 														
-														// Otherwise check if closing
-														else if(Common::isClosing()) {
+														// Otherwise check if not authenticated
+														else if(authenticateResponse[1]) {
 														
+															// Check if no more servers exist
+															if(!server->ai_next) {
+															
+																// Set retry to true
+																dontRetry = true;
+															}
+															
+															// Set invalid server
+															invalidServer = true;
+														}
+														
+														// Otherwise check if current address length is too big
+														else if(currentAddress.size() > UINT8_MAX) {
+														
+															// Check if no more servers exist
+															if(!server->ai_next) {
+															
+																// Set retry to true
+																dontRetry = true;
+															}
+															
 															// Set invalid server
 															invalidServer = true;
 														}
@@ -1152,107 +1190,683 @@ void Peer::connect(const string &address) {
 														// Otherwise
 														else {
 														
-															// Initialize authentication response
-															uint8_t authenticationResponse[sizeof("\x00\x00") - sizeof('\0')];
+															// Initialize port as number
+															decltype(sockaddr_in::sin_port) portAsNumber;
+														
+															// Check if is Onion service
+															if(isOnionService) {
 															
-															// Check if getting authentication response failed
-															if(recv(socket, reinterpret_cast<char *>(authenticationResponse), sizeof(authenticationResponse), 0) != sizeof(authenticationResponse)) {
-															
-																// Set invalid server
-																invalidServer = true;
-															}
-															
-															// Otherwise check if closing
-															else if(Common::isClosing()) {
-															
-																// Set invalid server
-																invalidServer = true;
-															}
-															
-															// Otherwise check if not authenticated
-															else if(authenticationResponse[1]) {
-															
-																// Set invalid server
-																invalidServer = true;
-															}
-															
-															// Otherwise check if current address length is too big
-															else if(currentAddress.size() > UINT8_MAX) {
-															
-																// Set invalid server
-																invalidServer = true;
+																// Set port as number to HTTP port
+																portAsNumber = htons(Common::HTTP_PORT);
 															}
 															
 															// Otherwise
 															else {
 															
-																// Initialize port as number
-																decltype(sockaddr_in::sin_port) portAsNumber;
+																// Set port as number to the port
+																portAsNumber = htons(atoi(port));
+															}
 															
-																// Check if is Onion service
-																if(isOnionService) {
+															// Initialize resolve request
+															uint8_t resolveRequest[sizeof("\x05\xF0\x00\x03") - sizeof('\0') + sizeof(uint8_t) + currentAddress.size() + sizeof(portAsNumber)];
+															
+															// Set resolve request's header
+															memcpy(resolveRequest, "\x05\xF0\x00\x03", sizeof("\x05\xF0\x00\x03") - sizeof('\0')); 
+															
+															// Set resolve request's address length to the current address length
+															resolveRequest[sizeof("\x05\xF0\x00\x03") - sizeof('\0')] = currentAddress.size();
+															
+															// Set resolve request's address to the current address
+															memcpy(&resolveRequest[sizeof("\x05\xF0\x00\x03") - sizeof('\0') + sizeof(uint8_t)], currentAddress.c_str(), currentAddress.size());
+															
+															// Set resolve request's port
+															memcpy(&resolveRequest[sizeof("\x05\xF0\x00\x03") - sizeof('\0') + sizeof(uint8_t) + currentAddress.size()], &portAsNumber, sizeof(portAsNumber));
+															
+															// Check if not an Onion service
+															if(!isOnionService) {
+															
+																// Check if Windows
+																#ifdef _WIN32
 																
-																	// Check if getting service info failed
-																	servent *serviceInfo = getservbyname("http", "tcp");
-																	if(!serviceInfo) {
+																	// Check if sending resolve request failed
+																	if(send(socket, reinterpret_cast<char *>(resolveRequest), sizeof(resolveRequest), 0) != static_cast<decltype(function(send))::result_type>(sizeof(resolveRequest))) {
+																
+																// Otherwise
+																#else
+																
+																	// Check if sending resolve request failed
+																	if(send(socket, resolveRequest, sizeof(resolveRequest), MSG_NOSIGNAL) != static_cast<decltype(function(send))::result_type>(sizeof(resolveRequest))) {
+																#endif
+																
+																	// Check if no more servers exist
+																	if(!server->ai_next) {
 																	
-																		// Set invalid server
-																		invalidServer = true;
+																		// Set retry to true
+																		dontRetry = true;
 																	}
 																	
-																	// Otherwise
-																	else {
-																	
-																		// Set port as number to the service info's port
-																		portAsNumber = serviceInfo->s_port;
-																	}
+																	// Set invalid server
+																	invalidServer = true;
+																}
+																
+																// Otherwise check if stopping read and write or closing
+																else if(stopReadAndWrite.load() || Common::isClosing()) {
+																
+																	// Set invalid server
+																	invalidServer = true;
 																}
 																
 																// Otherwise
 																else {
 																
-																	// Set port as number to the port
-																	portAsNumber = htons(atoi(port));
-																}
-																
-																// Check if server is valid
-																if(!invalidServer) {
-														
-																	// Initialize connection request
-																	uint8_t connectionRequest[sizeof("\x05\x01\x00\x03") - sizeof('\0') + sizeof(uint8_t) + currentAddress.size() + sizeof(portAsNumber)];
+																	// Initialize resolve response
+																	uint8_t resolveResponse[sizeof("\x05\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00") - sizeof('\0')];
 																	
-																	// Set connection request's header
-																	memcpy(connectionRequest, "\x05\x01\x00\x03", sizeof("\x05\x01\x00\x03") - sizeof('\0')); 
+																	// Check if getting resolve response failed
+																	const decltype(function(recv))::result_type resolveResponseSize = recv(socket, reinterpret_cast<char *>(resolveResponse), sizeof(resolveResponse), 0);
+																	if(resolveResponseSize != sizeof("\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00") - sizeof('\0') && resolveResponseSize != sizeof(resolveResponse)) {
 																	
-																	// Set connection request's address length to the current address length
-																	connectionRequest[sizeof("\x05\x01\x00\x03") - sizeof('\0')] = currentAddress.size();
+																		// Check if no more servers exist
+																		if(!server->ai_next) {
+																		
+																			// Set retry to true
+																			dontRetry = true;
+																		}
+																		
+																		// Set invalid server
+																		invalidServer = true;
+																	}
 																	
-																	// Set connection request's address to the current address
-																	memcpy(&connectionRequest[sizeof("\x05\x01\x00\x03") - sizeof('\0') + sizeof(uint8_t)], currentAddress.c_str(), currentAddress.size());
-																	
-																	// Set connection request's port
-																	memcpy(&connectionRequest[sizeof("\x05\x01\x00\x03") - sizeof('\0') + sizeof(uint8_t) + currentAddress.size()], &portAsNumber, sizeof(portAsNumber));
-																	
-																	// Check if Windows
-																	#ifdef _WIN32
-																	
-																		// Check if sending connection request failed
-																		if(send(socket, reinterpret_cast<char *>(connectionRequest), sizeof(connectionRequest), 0) != static_cast<decltype(function(send))::result_type>(sizeof(connectionRequest))) {
-																	
-																	// Otherwise
-																	#else
-																	
-																		// Check if sending connection request failed
-																		if(send(socket, connectionRequest, sizeof(connectionRequest), MSG_NOSIGNAL) != static_cast<decltype(function(send))::result_type>(sizeof(connectionRequest))) {
-																	#endif
+																	// Otherwise check if stopping read and write or closing
+																	else if(stopReadAndWrite.load() || Common::isClosing()) {
 																	
 																		// Set invalid server
 																		invalidServer = true;
 																	}
 																	
-																	// Otherwise check if closing
-																	else if(Common::isClosing()) {
+																	// Otherwise check if not resolved
+																	else if(resolveResponse[1]) {
 																	
+																		// Check if no more servers exist
+																		if(!server->ai_next) {
+																		
+																			// Set retry to true
+																			dontRetry = true;
+																		}
+																		
+																		// Set invalid server
+																		invalidServer = true;
+																	}
+																	
+																	// Otherwise
+																	else {
+																		
+																		// Check resolve response's address type
+																		switch(resolveResponse[3]) {
+																		
+																			// IPv4
+																			case 0x01:
+																			
+																				// Check if resolve response is valid
+																				if(resolveResponseSize == sizeof("\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00") - sizeof('\0')) {
+																				
+																					// Get IPv4 info for the current server
+																					sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(&currentServer);
+																					memcpy(&ipv4Info->sin_addr, &resolveResponse[4], sizeof(ipv4Info->sin_addr));
+																					ipv4Info->sin_port = portAsNumber;
+																					
+																					// Set server address's family to IPv4
+																					serverAddress.family = NetworkAddress::Family::IPV4;
+																					
+																					// Set server address's address to the address
+																					serverAddress.address = &ipv4Info->sin_addr;
+																					
+																					// Set server address's address length to the address length
+																					serverAddress.addressLength = sizeof(ipv4Info->sin_addr);
+																					
+																					// Set server address's port to the port
+																					serverAddress.port = ipv4Info->sin_port;
+																					
+																					// Check if getting the current server's IP string was successful
+																					char ipString[INET_ADDRSTRLEN];
+																					
+																					if(inet_ntop(AF_INET, &ipv4Info->sin_addr, ipString, sizeof(ipString))) {
+																					
+																						// Set server identifier to the IP string with the port
+																						serverIdentifier = string(ipString) + ':' + to_string(ntohs(ipv4Info->sin_port));
+																					}
+																				}
+																				
+																				// Break
+																				break;
+																			
+																			// IPv6
+																			case 0x04:
+																			
+																				// Check if resolve response is valid
+																				if(resolveResponseSize == sizeof(resolveResponse)) {
+																				
+																					// Get IPv6 info for the server
+																					sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(&currentServer);
+																					memcpy(&ipv6Info->sin6_addr, &resolveResponse[4], sizeof(ipv6Info->sin6_addr));
+																					ipv6Info->sin6_port = portAsNumber;
+																					
+																					// Set server address's family to IPv6
+																					serverAddress.family = NetworkAddress::Family::IPV6;
+																					
+																					// Set server address's address to the address
+																					serverAddress.address = &ipv6Info->sin6_addr;
+																					
+																					// Set server address's address length to the address length
+																					serverAddress.addressLength = sizeof(ipv6Info->sin6_addr);
+																					
+																					// Set server address's port to the port
+																					serverAddress.port = ipv6Info->sin6_port;
+																					
+																					// Check if getting the current server's IP string was successful
+																					char ipString[INET6_ADDRSTRLEN];
+																					
+																					if(inet_ntop(AF_INET6, &ipv6Info->sin6_addr, ipString, sizeof(ipString))) {
+																					
+																						// Set server identifier to the IP string with the port
+																						serverIdentifier = '[' + string(ipString) + "]:" + to_string(ntohs(ipv6Info->sin6_port));
+																					}
+																				}
+																				
+																				// Break
+																				break;
+																		}
+																		
+																		// Check if getting server identifier was successful
+																		if(!serverIdentifier.empty()) {
+																		
+																			{
+																				// Lock node for reading
+																				shared_lock nodeReadLock(node.getLock());
+																				
+																				// Check if server is banned
+																				if(node.isPeerBanned(serverIdentifier)) {
+																				
+																					// Unlock node read lock
+																					nodeReadLock.unlock();
+																					
+																					// Set banned to true
+																					banned = true;
+																				
+																					// Set invalid server
+																					invalidServer = true;
+																				}
+																			}
+																			
+																			// Check if server is valid
+																			if(!invalidServer) {
+																			
+																				{
+																				
+																					// Lock node for writing
+																					unique_lock nodeWriteLock(node.getLock());
+																					
+																					// Check if server was recently connected
+																					if(node.isPeerCandidateRecentlyAttempted(serverIdentifier)) {
+																					
+																						// Unlock node write lock
+																						nodeWriteLock.unlock();
+																					
+																						// Set recently attempted to true
+																						recentlyAttempted = true;
+																					
+																						// Set invalid server
+																						invalidServer = true;
+																					}
+																					
+																					// Otherwise check if server is currently used
+																					else if(node.getCurrentlyUsedPeerCandidates().contains(serverIdentifier)) {
+																					
+																						// Unlock node write lock
+																						nodeWriteLock.unlock();
+																					
+																						// Set currently used to true
+																						currentlyUsed = true;
+																					
+																						// Set invalid server
+																						invalidServer = true;
+																					}
+																					
+																					// Otherwise
+																					else {
+																					
+																						// Add server to node's recently attempted peer candidates
+																						node.addRecentlyAttemptedPeerCandidate(serverIdentifier);
+																						
+																						// Add server to the node's list of currently used peer candidates
+																						node.getCurrentlyUsedPeerCandidates().insert(serverIdentifier);
+																					}
+																				}
+																				
+																				// Check if server is valid
+																				if(!invalidServer) {
+																				
+																					// Set identifier to server identifier
+																					identifier = move(serverIdentifier);
+																					
+																					// Check if Windows
+																					#ifdef _WIN32
+																					
+																						// Shutdown socket receive and send
+																						shutdown(socket, SD_BOTH);
+																						
+																						// Check if closing socket failed
+																						if(closesocket(socket)) {
+																						
+																							// Close socket
+																							closesocket(socket);
+																							
+																							// Set socket to invalid
+																							socket = INVALID_SOCKET;
+																							
+																							// Set invalid server
+																							invalidServer = true;
+																						}
+																						
+																						// Otherwise
+																						else {
+																						
+																					// Otherwise
+																					#else
+																					
+																						// Shutdown socket receive and send
+																						shutdown(socket, SHUT_RDWR);
+																						
+																						// Check if closing socket failed
+																						if(close(socket)) {
+																						
+																							// Close socket
+																							close(socket);
+																							
+																							// Set socket to invalid
+																							socket = -1;
+																							
+																							// Set invalid server
+																							invalidServer = true;
+																						}
+																						
+																						// Otherwise
+																						else {
+																					#endif
+																						
+																						// Create socket
+																						socket = ::socket(server->ai_family, server->ai_socktype, server->ai_protocol);
+																						
+																						// Check if Windows
+																						#ifdef _WIN32
+																						
+																							// Check if creating socket was successful
+																							if(socket != INVALID_SOCKET) {
+																						
+																						// Otherwise
+																						#else
+																						
+																							// Check if creating socket was successful
+																							if(socket != -1) {
+																						#endif
+																							
+																							// Check if Windows
+																							#ifdef _WIN32
+																							
+																								// Check if true
+																								if(true) {
+																							
+																							// Otherwise
+																							#else
+																						
+																								// Check if getting the socket's flags was successful 
+																								socketFlags = fcntl(socket, F_GETFL);
+																								
+																								if(socketFlags != -1) {
+																							#endif
+																							
+																								// Check if Windows
+																								#ifdef _WIN32
+																							
+																									// Check if setting the socket as non-blocking was successful
+																									nonBlocking = true;
+																									if(!ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+																								
+																								// Otherwise
+																								#else
+																						
+																									// Check if setting the socket as non-blocking was successful
+																									if(fcntl(socket, F_SETFL, socketFlags | O_NONBLOCK) != -1) {
+																								#endif
+																								
+																									// Set connected to false
+																									connected = false;
+																								
+																									// Connect to server
+																									connectStatus = ::connect(socket, server->ai_addr, server->ai_addrlen);
+																									
+																									// Check if Windows
+																									#ifdef _WIN32
+																									
+																										// Check if connecting to server was successful started
+																										if(connectStatus == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK) {
+																									
+																									// Otherwise
+																									#else
+																									
+																										// Check if connecting to server was successful started
+																										if(connectStatus == -1 && errno == EINPROGRESS) {
+																									#endif
+																									
+																										// Check if Windows
+																										#ifdef _WIN32
+																										
+																											// Set sockets to monitor socket
+																											WSAPOLLFD sockets = {
+																											
+																												// Socket
+																												.fd = socket,
+																												
+																												// Events
+																												.events = POLLOUT
+																											};
+																											
+																											// Check if connecting to the server successfully finished
+																											if(WSAPoll(&sockets, 1, CONNECT_TIMEOUT) > 0) {
+																										
+																										// Otherwise
+																										#else
+																										
+																											// Set sockets to monitor socket
+																											pollfd sockets = {
+																											
+																												// Socket
+																												.fd = socket,
+																												
+																												// Events
+																												.events = POLLOUT
+																											};
+																											
+																											// Check if connecting to the server successfully finished
+																											if(poll(&sockets, 1, CONNECT_TIMEOUT) > 0) {
+																										#endif
+																										
+																											// Check if not stopping read and write and not closing
+																											if(!stopReadAndWrite.load() && !Common::isClosing()) {
+																										
+																												// Set connected to true
+																												connected = true;
+																											}
+																										}
+																									}
+																									
+																									// Otherwise check if connection was finished
+																									else if(!connectStatus) {
+																									
+																										// Set connected to true
+																										connected = true;
+																									}
+																									
+																									// Check if connected
+																									if(connected) {
+																									
+																										// Check if getting socket's error status was successful
+																										errorStatusLength = sizeof(errorStatus);
+																										if(!getsockopt(socket, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&errorStatus), &errorStatusLength)) {
+																										
+																											// Check if socket doesn't have any errors
+																											if(!errorStatus) {
+																											
+																												// Check if Windows
+																												#ifdef _WIN32
+																											
+																													// Check if setting the socket as blocking failed
+																													nonBlocking = false;
+																													if(ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+																												
+																												// Otherwise
+																												#else
+																										
+																													// Check if setting the socket as blocking failed
+																													if(fcntl(socket, F_SETFL, socketFlags & ~O_NONBLOCK) == -1) {
+																												#endif
+																												
+																													// Set invalid server
+																													invalidServer = true;
+																												}
+																												
+																												// Otherwise check if setting socket's read and write timeouts failed
+																												else if(setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&readTimeout), sizeof(readTimeout)) || setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&writeTimeout), sizeof(writeTimeout))) {
+																												
+																													// Set invalid server
+																													invalidServer = true;
+																												}
+																												
+																												// Check if Windows
+																												#ifdef _WIN32
+																												
+																													// Otherwise check if sending authenticate request failed
+																													else if(send(socket, reinterpret_cast<const char *>(authenticateRequest), sizeof(authenticateRequest), 0) != sizeof(authenticateRequest)) {
+																												
+																												// Otherwise
+																												#else
+																												
+																													// Otherwise check if sending authenticate request failed
+																													else if(send(socket, authenticateRequest, sizeof(authenticateRequest), MSG_NOSIGNAL) != sizeof(authenticateRequest)) {
+																												#endif
+																												
+																													// Check if no more servers exist
+																													if(!server->ai_next) {
+																													
+																														// Set retry to true
+																														dontRetry = true;
+																													}
+																													
+																													// Set invalid server
+																													invalidServer = true;
+																												}
+																												
+																												// Otherwise check if stopping read and write or closing
+																												else if(stopReadAndWrite.load() || Common::isClosing()) {
+																												
+																													// Set invalid server
+																													invalidServer = true;
+																												}
+																												
+																												// Otherwise check if getting authenticate response failed
+																												else if(recv(socket, reinterpret_cast<char *>(authenticateResponse), sizeof(authenticateResponse), 0) != sizeof(authenticateResponse)) {
+																												
+																													// Check if no more servers exist
+																													if(!server->ai_next) {
+																													
+																														// Set retry to true
+																														dontRetry = true;
+																													}
+																													
+																													// Set invalid server
+																													invalidServer = true;
+																												}
+																												
+																												// Otherwise check if stopping read and write or closing
+																												else if(stopReadAndWrite.load() || Common::isClosing()) {
+																												
+																													// Set invalid server
+																													invalidServer = true;
+																												}
+																												
+																												// Otherwise check if not authenticated
+																												else if(authenticateResponse[1]) {
+																												
+																													// Check if no more servers exist
+																													if(!server->ai_next) {
+																													
+																														// Set retry to true
+																														dontRetry = true;
+																													}
+																													
+																													// Set invalid server
+																													invalidServer = true;
+																												}
+																											}
+																											
+																											// Otherwise
+																											else {
+																											
+																												// Check if no more servers exist
+																												if(!server->ai_next) {
+																												
+																													// Set retry to true
+																													dontRetry = true;
+																												}
+																												
+																												// Set invalid server
+																												invalidServer = true;
+																											}
+																										}
+																										
+																										// Otherwise
+																										else {
+																										
+																											// Set invalid server
+																											invalidServer = true;
+																										}
+																									}
+																									
+																									// Otherwise
+																									else {
+																									
+																										// Check if no more servers exist
+																										if(!server->ai_next) {
+																										
+																											// Set retry to true
+																											dontRetry = true;
+																										}
+																										
+																										// Set invalid server
+																										invalidServer = true;
+																									}
+																								}
+																								
+																								// Otherwise
+																								else {
+																								
+																									// Set invalid server
+																									invalidServer = true;
+																								}
+																							}
+																							
+																							// Otherwise
+																							else {
+																							
+																								// Set invalid server
+																								invalidServer = true;
+																							}
+																						}
+																						
+																						// Otherwise
+																						else {
+																						
+																							// Set invalid server
+																							invalidServer = true;
+																						}
+																					}
+																				}
+																			}
+																		}
+																		
+																		// Otherwise
+																		else {
+																		
+																			// Check if no more servers exist
+																			if(!server->ai_next) {
+																			
+																				// Set retry to true
+																				dontRetry = true;
+																			}
+																			
+																			// Set invalid server
+																			invalidServer = true;
+																		}
+																	}
+																}
+															}
+															
+															// Check if server is valid
+															if(!invalidServer) {
+															
+																// Initialize connect request
+																uint8_t *connectRequest = resolveRequest;
+																connectRequest[1] = 0x01;
+																
+																// Check if Windows
+																#ifdef _WIN32
+																
+																	// Check if sending connect request failed
+																	if(send(socket, reinterpret_cast<char *>(connectRequest), sizeof(resolveRequest), 0) != static_cast<decltype(function(send))::result_type>(sizeof(resolveRequest))) {
+																
+																// Otherwise
+																#else
+																
+																	// Check if sending connect request failed
+																	if(send(socket, connectRequest, sizeof(resolveRequest), MSG_NOSIGNAL) != static_cast<decltype(function(send))::result_type>(sizeof(resolveRequest))) {
+																#endif
+																
+																	// Check if no more servers exist
+																	if(!server->ai_next) {
+																	
+																		// Set retry to true
+																		dontRetry = true;
+																	}
+																	
+																	// Set invalid server
+																	invalidServer = true;
+																}
+																
+																// Otherwise check if stopping read and write or closing
+																else if(stopReadAndWrite.load() || Common::isClosing()) {
+																
+																	// Set invalid server
+																	invalidServer = true;
+																}
+																
+																// Otherwise
+																else {
+																
+																	// Initialize connect response
+																	uint8_t connectResponse[sizeof("\x05\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00") - sizeof('\0')];
+																	
+																	// Check if getting connect response failed
+																	const decltype(function(recv))::result_type connectResponseSize = recv(socket, reinterpret_cast<char *>(connectResponse), sizeof(connectResponse), 0);
+																	if(connectResponseSize != sizeof("\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00") - sizeof('\0') && connectResponseSize != sizeof(connectResponse)) {
+																	
+																		// Check if no more servers exist
+																		if(!server->ai_next) {
+																		
+																			// Set retry to true
+																			dontRetry = true;
+																		}
+																		
+																		// Set invalid server
+																		invalidServer = true;
+																	}
+																	
+																	// Otherwise check if stopping read and write or closing
+																	else if(stopReadAndWrite.load() || Common::isClosing()) {
+																	
+																		// Set invalid server
+																		invalidServer = true;
+																	}
+																	
+																	// Otherwise check if not connected
+																	else if(connectResponse[1]) {
+																	
+																		// Check if no more servers exist
+																		if(!server->ai_next) {
+																		
+																			// Set retry to true
+																			dontRetry = true;
+																		}
+																		
 																		// Set invalid server
 																		invalidServer = true;
 																	}
@@ -1260,50 +1874,22 @@ void Peer::connect(const string &address) {
 																	// Otherwise
 																	else {
 																	
-																		// Initialize connection response
-																		uint8_t connectionResponse[sizeof("\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00") - sizeof('\0')];
-																		
-																		// Check if getting connection response failed
-																		if(recv(socket, reinterpret_cast<char *>(connectionResponse), sizeof(connectionResponse), 0) != sizeof(connectionResponse)) {
-																		
-																			// Set invalid server
-																			invalidServer = true;
-																		}
-																		
-																		// Otherwise check if closing
-																		else if(Common::isClosing()) {
-																		
-																			// Set invalid server
-																			invalidServer = true;
-																		}
-																		
-																		// Otherwise check if not connected
-																		else if(connectionResponse[1]) {
-																		
-																			// Set invalid server
-																			invalidServer = true;
-																		}
+																		// Check if Windows
+																		#ifdef _WIN32
+																	
+																			// Check if setting the socket as non-blocking failed
+																			nonBlocking = true;
+																			if(ioctlsocket(socket, FIONBIO, &nonBlocking)) {
 																		
 																		// Otherwise
-																		else {
+																		#else
+																
+																			// Check if setting the socket as non-blocking failed
+																			if(fcntl(socket, F_SETFL, socketFlags | O_NONBLOCK) == -1) {
+																		#endif
 																		
-																			// Check if Windows
-																			#ifdef _WIN32
-																		
-																				// Check if setting the socket as non-blocking failed
-																				u_long nonBlocking = true;
-																				if(ioctlsocket(socket, FIONBIO, &nonBlocking)) {
-																			
-																			// Otherwise
-																			#else
-																	
-																				// Check if setting the socket as non-blocking failed
-																				if(fcntl(socket, F_SETFL, socketFlags | O_NONBLOCK) == -1) {
-																			#endif
-																			
-																				// Set invalid server
-																				invalidServer = true;
-																			}
+																			// Set invalid server
+																			invalidServer = true;
 																		}
 																	}
 																}
@@ -1311,101 +1897,119 @@ void Peer::connect(const string &address) {
 														}
 													}
 												}
-											#endif
+											}
+										#endif
+										
+										// Check if server is valid
+										if(!invalidServer) {
+										
+											// Check if getting client info was successful
+											sockaddr_storage clientInfo;
+											socklen_t clientInfoLength = sizeof(clientInfo);
 											
-											// Check if server is valid
-											if(!invalidServer) {
+											if(!getsockname(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
 											
-												// Check if getting client info was successful
-												sockaddr_storage clientInfo;
-												socklen_t clientInfoLength = sizeof(clientInfo);
+												// Set invalid client to false
+												bool invalidClient = false;
+											
+												// Check client info's family
+												switch(clientInfo.ss_family) {
 												
-												if(!getsockname(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
-												
-													// Set invalid client to false
-													bool invalidClient = false;
-												
-													// Check client info's family
-													switch(clientInfo.ss_family) {
+													// IPv4
+													case AF_INET:
 													
-														// IPv4
-														case AF_INET:
-														
-															{
-																// Get IPv4 info for the client
-																const sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(&clientInfo);
-																
-																// Set client address's family to IPv4
-																clientAddress.family = NetworkAddress::Family::IPV4;
-																
-																// Set client address's address to loopback address
-																clientAddress.address = &inaddr_loopback;
-																
-																// Set client address's address length to the loopback address length
-																clientAddress.addressLength = sizeof(inaddr_loopback);
-																
-																// Set client address's port to the port
-																clientAddress.port = ipv4Info->sin_port;
-															}
+														{
+															// Get IPv4 info for the client
+															const sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(&clientInfo);
 															
-															// Break
-															break;
-														
-														// IPv6
-														case AF_INET6:
-														
-															{
-																// Get IPv6 info for the client
-																const sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(&clientInfo);
-																
-																// Set client address's family to IPv6
-																clientAddress.family = NetworkAddress::Family::IPV6;
-																
-																// Set client address's address to loopback address
-																clientAddress.address = &in6addr_loopback;
-																
-																// Set client address's address length to the loopback address length
-																clientAddress.addressLength = sizeof(in6addr_loopback);
-																
-																// Set client address's port to the port
-																clientAddress.port = ipv6Info->sin6_port;
-															}
-														
-															// Break
-															break;
-														
-														// Default
-														default:
-														
-															// Set invalid client
-															invalidClient = true;
-														
-															// Break
-															break;
-													}
-													
-													// Check if client is valid
-													if(!invalidClient) {
-													
-														// Display text
-														Common::displayText("Connected to peer: " + identifier);
-													
-														// Set peer connected to true
-														peerConnected = true;
+															// Set client address's family to IPv4
+															clientAddress.family = NetworkAddress::Family::IPV4;
+															
+															// Set client address's address to loopback address
+															clientAddress.address = &inaddr_loopback;
+															
+															// Set client address's address length to the loopback address length
+															clientAddress.addressLength = sizeof(inaddr_loopback);
+															
+															// Set client address's port to the port
+															clientAddress.port = ipv4Info->sin_port;
+														}
 														
 														// Break
 														break;
-													}
+													
+													// IPv6
+													case AF_INET6:
+													
+														{
+															// Get IPv6 info for the client
+															const sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(&clientInfo);
+															
+															// Set client address's family to IPv6
+															clientAddress.family = NetworkAddress::Family::IPV6;
+															
+															// Set client address's address to loopback address
+															clientAddress.address = &in6addr_loopback;
+															
+															// Set client address's address length to the loopback address length
+															clientAddress.addressLength = sizeof(in6addr_loopback);
+															
+															// Set client address's port to the port
+															clientAddress.port = ipv6Info->sin6_port;
+														}
+													
+														// Break
+														break;
+													
+													// Default
+													default:
+													
+														// Set invalid client
+														invalidClient = true;
+													
+														// Break
+														break;
+												}
+												
+												// Check if client is valid
+												if(!invalidClient) {
+												
+													// Let node know that a peer connected
+													node.peerConnected(identifier);
+												
+													// Set peer connected to true
+													peerConnected = true;
+													
+													// Break
+													break;
 												}
 											}
 										}
 									}
+									
+									// Otherwise check if no more servers exist
+									else if(!server->ai_next) {
+									
+										// Set retry to true
+										dontRetry = true;
+									}
 								}
 							}
+							
+							// Otherwise check if no more servers exist
+							else if(!server->ai_next) {
+							
+								// Set retry to true
+								dontRetry = true;
+							}
 						}
+					}
+				
+					// Check if Windows
+					#ifdef _WIN32
 					
-						// Check if Windows
-						#ifdef _WIN32
+						// Check if socket exists
+						if(socket != INVALID_SOCKET) {
 						
 							// Shutdown socket receive and send
 							shutdown(socket, SD_BOTH);
@@ -1415,9 +2019,13 @@ void Peer::connect(const string &address) {
 							
 							// Set socket to invalid
 							socket = INVALID_SOCKET;
-							
-						// Otherwise
-						#else
+						}
+						
+					// Otherwise
+					#else
+					
+						// Check if socket exists
+						if(socket != -1) {
 						
 							// Shutdown socket receive and send
 							shutdown(socket, SHUT_RDWR);
@@ -1427,9 +2035,13 @@ void Peer::connect(const string &address) {
 							
 							// Set socket to invalid
 							socket = -1;
-						#endif
-					}
-					
+						}
+					#endif
+				}
+				
+				// Check if identifier exists
+				if(!identifier.empty()) {
+				
 					// Try
 					try {
 					
@@ -1555,8 +2167,8 @@ void Peer::connect(const string &address) {
 					connectionState = ConnectionState::DISCONNECTED;
 				}
 				
-				// Check if address isn't a DNS seed or it's not banned, not recently attempted, and not currently used
-				if(!Node::DNS_SEEDS.contains(address) || (!banned && !recentlyAttempted && !currentlyUsed)) {
+				// Check if address isn't a DNS seed or it's not banned, not recently attempted, not currently used, and can be retried
+				if(!node.getDnsSeeds().contains(address) || (!banned && !recentlyAttempted && !currentlyUsed && !dontRetry)) {
 				
 					// Notify peers that event occurred
 					eventOccurred.notify_one();
@@ -1584,7 +2196,7 @@ void Peer::connect(const string &address) {
 			// Set closing
 			Common::setClosing();
 		}
-	
+		
 		// Notify peers that event occurred
 		eventOccurred.notify_one();
 	}
@@ -2352,14 +2964,6 @@ void Peer::readAndWrite() {
 			// Check if not communicating
 			if(chrono::steady_clock::now() - lastReadTime >= COMMUNICATION_REQUIRED_TIMEOUT) {
 			
-				{
-					// Lock node for writing
-					lock_guard nodeWriteLock(node.getLock());
-					
-					// Add self to node's list of banned peers
-					node.addBannedPeer(identifier);
-				}
-				
 				// Disconnect
 				disconnect();
 				
@@ -2386,7 +2990,7 @@ void Peer::readAndWrite() {
 		try {
 	
 			// Wait for worker operation to finish
-			workerOperation.wait();
+			workerOperation.get();
 		}
 		
 		// Catch errors
@@ -2404,6 +3008,40 @@ void Peer::readAndWrite() {
 // Disconnect
 void Peer::disconnect() {
 
+	// Check if worker operation exists
+	if(workerOperation.valid()) {
+	
+		// Try
+		try {
+	
+			// Check if performing work operation failed
+			if(!workerOperation.get()) {
+			
+				// Try
+				try {
+			
+					// Lock node for writing
+					lock_guard nodeWriteLock(node.getLock());
+					
+					// Add self to node's list of banned peers
+					node.addBannedPeer(identifier);
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+				}
+			}
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Set closing
+			Common::setClosing();
+		}
+	}
+	
 	// Set closed to false
 	bool closed = false;
 
@@ -2578,7 +3216,7 @@ void Peer::disconnect() {
 }
 
 // Process requests and/or responses
-const bool Peer::processRequestsAndOrResponses() {
+bool Peer::processRequestsAndOrResponses() {
 
 	// Go through all requests and responses
 	while(true) {
@@ -2936,7 +3574,7 @@ const bool Peer::processRequestsAndOrResponses() {
 							// Check if peer is healthy
 							if(node.isPeerHealthy(healthyPeer.first)) {
 						
-								// Check if Tor is enabled
+								// Check if tor is enabled
 								#ifdef TOR_ENABLE
 							
 									// Check if healthy peer has the desired capabilities
@@ -3040,23 +3678,23 @@ const bool Peer::processRequestsAndOrResponses() {
 										}
 									}
 									
-									// Check if Tor is enabled
+									// Check if tor is enabled
 									#ifdef TOR_ENABLE
 								
-										// Otherwise check if capabilities includes Tor address
+										// Otherwise check if capabilities includes tor address
 										else if(capabilities & Node::Capabilities::TOR_ADDRESS) {
 										
-											// Append Tor address to list and get it
+											// Append tor address to list and get it
 											addresses.emplace_back(healthyPeer.first);
 											const string &torAddress = get<string>(addresses.back());
 										
 											// Set network address's family to Onion service
 											networkAddress.family = NetworkAddress::Family::ONION_SERVICE;
 											
-											// Set network address's address to the Tor address
+											// Set network address's address to the tor address
 											networkAddress.address = torAddress.c_str();
 											
-											// Set network address's address length to the Tor address length
+											// Set network address's address length to the tor address length
 											networkAddress.addressLength = torAddress.size();
 										}
 									#endif
@@ -3209,7 +3847,7 @@ const bool Peer::processRequestsAndOrResponses() {
 								// Break
 								break;
 							
-							// Check if Tor is enabled
+							// Check if tor is enabled
 							#ifdef TOR_ENABLE
 							
 								// Onion service
@@ -3266,7 +3904,7 @@ const bool Peer::processRequestsAndOrResponses() {
 							node.addHealthyPeer(identifier, capabilities);
 						}
 						
-						// Check if Tor is enabled
+						// Check if tor is enabled
 						#ifdef TOR_ENABLE
 						
 							// Check if capabilities isn't a full node
@@ -3447,23 +4085,24 @@ const bool Peer::processRequestsAndOrResponses() {
 						// Otherwise
 						else {
 						
-							{
-								// Lock for reading
-								shared_lock readLock(lock);
+							// Lock for reading
+							readLock.lock();
+							
+							// Check if peer didn't send all its headers
+							if(this->headers.back().getTotalDifficulty() < totalDifficulty) {
+							
+								// Unlock read lock
+								readLock.unlock();
 								
-								// Check if peer didn't send all its headers
-								if(this->headers.back().getTotalDifficulty() < totalDifficulty) {
+								// Set ban to true
+								ban = true;
 								
-									// Unlock read lock
-									readLock.unlock();
-								
-									// Set ban to true
-									ban = true;
-									
-									// Break
-									break;
-								}
+								// Break
+								break;
 							}
+							
+							// Unlock read lock
+							readLock.unlock();
 						
 							{
 								// Lock node for reading
@@ -3474,7 +4113,7 @@ const bool Peer::processRequestsAndOrResponses() {
 								
 									// Unlock node read lock
 									nodeReadLock.unlock();
-								
+									
 									// Set ban to true
 									ban = true;
 									
@@ -4106,7 +4745,7 @@ const bool Peer::processRequestsAndOrResponses() {
 }
 
 // Get locator headers block hashes
-const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> Peer::getLocatorHeadersBlockHashes() const {
+list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> Peer::getLocatorHeadersBlockHashes() const {
 
 	// Initialize locator headers block hashes
 	list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> locatorHeadersBlockHashes;
@@ -4138,7 +4777,7 @@ const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> Peer::getLocatorHeadersB
 }
 
 // Process headers
-const bool Peer::processHeaders(list<Header> &&headers) {
+bool Peer::processHeaders(list<Header> &&headers) {
 	
 	// Set first header to true
 	bool firstHeader = true;
@@ -4511,7 +5150,7 @@ const bool Peer::processHeaders(list<Header> &&headers) {
 }
 
 // Process transaction hash set archive
-const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentIndex, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentLength, const Header *transactionHashSetArchiveHeader) {
+bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentIndex, const vector<uint8_t>::size_type transactionHashSetArchiveAttachmentLength, const Header *transactionHashSetArchiveHeader) {
 
 	// Check if creating source from the transaction hash set archive attactment failed
 	unique_ptr<zip_source_t, decltype(&zip_source_free)> source(zip_source_buffer_create(&buffer[transactionHashSetArchiveAttachmentIndex], transactionHashSetArchiveAttachmentLength, 0, nullptr), zip_source_free);
@@ -4553,7 +5192,7 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 	try {
 	
 		// Read kernels from the ZIP archive
-		kernels = MerkleMountainRange<Kernel>::createFromZip(zip.get(), "kernel/pmmr_data.bin", "kernel/pmmr_hash.bin");
+		kernels = MerkleMountainRange<Kernel>::createFromZip(zip.get(), protocolVersion, "kernel/pmmr_data.bin", "kernel/pmmr_hash.bin");
 		
 		// Check if stopping read and write or is closing
 		if(stopReadAndWrite.load() || Common::isClosing()) {
@@ -4564,6 +5203,8 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 		
 		// Rewind kernels to the transaction hash set archive header
 		kernels.rewindToSize(transactionHashSetArchiveHeader->getKernelMerkleMountainRangeSize());
+		
+		// mwc-node doesn't check existing kernels' lock height and NRD header version
 	}
 	
 	// Catch errors
@@ -4613,60 +5254,6 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 	
 	// TODO NRD check for floonet
 	
-	// Go through all kernels while not stopping read and write and not closing
-	for(MerkleMountainRange<Kernel>::const_iterator i = kernels.cbegin(); i != kernels.cend() && !stopReadAndWrite.load() && !Common::isClosing();) {
-	
-		// Get kernel
-		const pair<uint64_t, Kernel> &kernel = *i;
-		
-		// Go to next kernel
-		++i;
-		
-		// Prune kernel
-		kernels.pruneLeaf(kernel.first);
-	}
-	
-	// Check if stopping read and write or is closing
-	if(stopReadAndWrite.load() || Common::isClosing()) {
-	
-		// Return true
-		return true;
-	}
-	
-	// Set kernels minimum size to the transaction hash set archive header
-	kernels.setMinimumSize(transactionHashSetArchiveHeader->getKernelMerkleMountainRangeSize());
-	
-	// Check if stopping read and write or is closing
-	if(stopReadAndWrite.load() || Common::isClosing()) {
-	
-		// Return true
-		return true;
-	}
-	
-	// Loop while headers can be pruned, not stopping read and write, and not closing
-	while(transactionHashSetArchiveHeader->getHeight() - headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && transactionHashSetArchiveHeader->getHeight() - headers.front().getHeight() >= Consensus::COINBASE_MATURITY && !stopReadAndWrite.load() && !Common::isClosing()) {
-	
-		// Prune oldest header
-		headers.pruneLeaf(headers.front().getHeight());
-	}
-	
-	// Check if stopping read and write or is closing
-	if(stopReadAndWrite.load() || Common::isClosing()) {
-	
-		// Return true
-		return true;
-	}
-	
-	// Set headers minimum size to the transaction hash set archive header
-	headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(transactionHashSetArchiveHeader->getHeight() + 1));
-	
-	// Check if stopping read and write or is closing
-	if(stopReadAndWrite.load() || Common::isClosing()) {
-	
-		// Return true
-		return true;
-	}
-	
 	// Get short block hash from the transaction hash set archive header's block hash
 	const string shortBlockHash = Common::toHexString(transactionHashSetArchiveHeader->getBlockHash().data(), SHORT_BLOCK_HASH_LENGTH);
 
@@ -4678,7 +5265,7 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 	try {
 	
 		// Read outputs from the ZIP archive
-		outputs = MerkleMountainRange<Output>::createFromZip(zip.get(), "output/pmmr_data.bin", "output/pmmr_hash.bin", "output/pmmr_prun.bin", ("output/pmmr_leaf.bin." + shortBlockHash).c_str());
+		outputs = MerkleMountainRange<Output>::createFromZip(zip.get(), protocolVersion, "output/pmmr_data.bin", "output/pmmr_hash.bin", "output/pmmr_prun.bin", ("output/pmmr_leaf.bin." + shortBlockHash).c_str());
 		
 		// Check if stopping read and write or is closing
 		if(stopReadAndWrite.load() || Common::isClosing()) {
@@ -4698,7 +5285,7 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 		}
 		
 		// Read rangeproofs from the ZIP archive
-		rangeproofs = MerkleMountainRange<Rangeproof>::createFromZip(zip.get(), "rangeproof/pmmr_data.bin", "rangeproof/pmmr_hash.bin", "rangeproof/pmmr_prun.bin", ("rangeproof/pmmr_leaf.bin." + shortBlockHash).c_str());
+		rangeproofs = MerkleMountainRange<Rangeproof>::createFromZip(zip.get(), protocolVersion, "rangeproof/pmmr_data.bin", "rangeproof/pmmr_hash.bin", "rangeproof/pmmr_prun.bin", ("rangeproof/pmmr_leaf.bin." + shortBlockHash).c_str());
 		
 		// Check if stopping read and write or is closing
 		if(stopReadAndWrite.load() || Common::isClosing()) {
@@ -4841,7 +5428,7 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 		if(connectionState != ConnectionState::DISCONNECTED) {
 		
 			// Set node's sync state
-			node.setSyncState(move(headers), transactionHashSetArchiveHeader->getHeight(), move(kernels), move(outputs), move(rangeproofs));
+			node.setSyncState(move(headers), *transactionHashSetArchiveHeader, move(kernels), move(outputs), move(rangeproofs));
 			
 			// Set syncing state to not syncing
 			syncingState = SyncingState::NOT_SYNCING;
@@ -4862,7 +5449,7 @@ const bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, cons
 }
 
 // Process block
-const bool Peer::processBlock(vector<uint8_t > &&buffer) {
+bool Peer::processBlock(vector<uint8_t > &&buffer) {
 
 	// Initialize block components
 	optional<tuple<Header, Block>> blockComponents;
@@ -5139,13 +5726,8 @@ const bool Peer::processBlock(vector<uint8_t > &&buffer) {
 	// Initialize block kernel offset commitment
 	secp256k1_pedersen_commitment blockKernelOffsetCommitment;
 	
-	// Check if header's total kernel offset isn't the same as the previous header's total kernel offset and header's total kernel offset isn't zero
-	if(memcmp(header.getTotalKernelOffset(), previousHeader.value().getTotalKernelOffset(), Crypto::SECP256K1_PRIVATE_KEY_LENGTH) && any_of(header.getTotalKernelOffset(), header.getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
-	
-		// Return if value isn't zero
-		return value;
-	
-	})) {
+	// Check if header's total kernel offset isn't the same as the previous header's total kernel offset
+	if(memcmp(header.getTotalKernelOffset(), previousHeader.value().getTotalKernelOffset(), Crypto::SECP256K1_PRIVATE_KEY_LENGTH)) {
 	
 		// Check if stopping read and write or is closing
 		if(stopReadAndWrite.load() || Common::isClosing()) {
@@ -5153,67 +5735,138 @@ const bool Peer::processBlock(vector<uint8_t > &&buffer) {
 			// Return true
 			return true;
 		}
-	
-		// Set total kernel offsets
-		const uint8_t *totalKernelOffsets[] = {
 		
-			// Header's total kernel offset
-			header.getTotalKernelOffset(),
-			
-			// Previous header's total kernel offset
-			previousHeader.value().getTotalKernelOffset()
-		};
-		
-		// Check if getting block kernel offset failed
-		uint8_t blockKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH];
-		if(!secp256k1_pedersen_blind_sum(secp256k1_context_no_precomp, blockKernelOffset, totalKernelOffsets, any_of(previousHeader.value().getTotalKernelOffset(), previousHeader.value().getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
+		// Check if header's total kernel offset isn't zero
+		if(any_of(header.getTotalKernelOffset(), header.getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
 	
 			// Return if value isn't zero
 			return value;
 		
-		}) ? 2 : 1, 1)) {
+		})) {
+	
+			// Set total kernel offsets
+			const uint8_t *totalKernelOffsets[] = {
+			
+				// Header's total kernel offset
+				header.getTotalKernelOffset(),
+				
+				// Previous header's total kernel offset
+				previousHeader.value().getTotalKernelOffset()
+			};
+			
+			// Check if getting block kernel offset failed
+			uint8_t blockKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH];
+			if(!secp256k1_pedersen_blind_sum(secp256k1_context_no_precomp, blockKernelOffset, totalKernelOffsets, any_of(previousHeader.value().getTotalKernelOffset(), previousHeader.value().getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
 		
-			// Return false
-			return false;
+				// Return if value isn't zero
+				return value;
+			
+			}) ? 2 : 1, 1)) {
+			
+				// Return false
+				return false;
+			}
+			
+			// Check if stopping read and write or is closing
+			if(stopReadAndWrite.load() || Common::isClosing()) {
+			
+				// Return true
+				return true;
+			}
+			
+			// Check if block kernel offset is invalid
+			if(!secp256k1_ec_seckey_verify(secp256k1_context_no_precomp, blockKernelOffset)) {
+			
+				// Return false
+				return false;
+			}
+			
+			// Check if stopping read and write or is closing
+			if(stopReadAndWrite.load() || Common::isClosing()) {
+			
+				// Return true
+				return true;
+			}
+			
+			// Check if getting commitment for the block kernel offset failed
+			if(!secp256k1_pedersen_commit(secp256k1_context_no_precomp, &blockKernelOffsetCommitment, blockKernelOffset, 0, &secp256k1_generator_const_h, &secp256k1_generator_const_g)) {
+			
+				// Return false
+				return false;
+			}
+			
+			// Check if stopping read and write or is closing
+			if(stopReadAndWrite.load() || Common::isClosing()) {
+			
+				// Return true
+				return true;
+			}
+			
+			// Append block kernel offset commitment to the list of kernel excesses
+			kernelExcesses.push_back(&blockKernelOffsetCommitment);
 		}
 		
-		// Check if stopping read and write or is closing
-		if(stopReadAndWrite.load() || Common::isClosing()) {
+		// Otherwise check if the previous header's total kernel offset isn't zero
+		else if(any_of(previousHeader.value().getTotalKernelOffset(), previousHeader.value().getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
 		
-			// Return true
-			return true;
+			// Return if value isn't zero
+			return value;
+		
+		})) {
+		
+			// Set total kernel offsets
+			const uint8_t *totalKernelOffsets[] = {
+				
+				// Previous header's total kernel offset
+				previousHeader.value().getTotalKernelOffset()
+			};
+			
+			// Check if getting block kernel offset failed
+			uint8_t blockKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH];
+			if(!secp256k1_pedersen_blind_sum(secp256k1_context_no_precomp, blockKernelOffset, totalKernelOffsets, 1, 0)) {
+			
+				// Return false
+				return false;
+			}
+			
+			// Check if stopping read and write or is closing
+			if(stopReadAndWrite.load() || Common::isClosing()) {
+			
+				// Return true
+				return true;
+			}
+			
+			// Check if block kernel offset is invalid
+			if(!secp256k1_ec_seckey_verify(secp256k1_context_no_precomp, blockKernelOffset)) {
+			
+				// Return false
+				return false;
+			}
+			
+			// Check if stopping read and write or is closing
+			if(stopReadAndWrite.load() || Common::isClosing()) {
+			
+				// Return true
+				return true;
+			}
+			
+			// Check if getting commitment for the block kernel offset failed
+			if(!secp256k1_pedersen_commit(secp256k1_context_no_precomp, &blockKernelOffsetCommitment, blockKernelOffset, 0, &secp256k1_generator_const_h, &secp256k1_generator_const_g)) {
+			
+				// Return false
+				return false;
+			}
+			
+			// Check if stopping read and write or is closing
+			if(stopReadAndWrite.load() || Common::isClosing()) {
+			
+				// Return true
+				return true;
+			}
+			
+			// Append block kernel offset commitment to the list of kernel excesses
+			kernelExcesses.push_back(&blockKernelOffsetCommitment);
 		}
-		
-		// Check if block kernel offset is invalid
-		if(!secp256k1_ec_seckey_verify(secp256k1_context_no_precomp, blockKernelOffset)) {
-		
-			// Return false
-			return false;
-		}
-		
-		// Check if stopping read and write or is closing
-		if(stopReadAndWrite.load() || Common::isClosing()) {
-		
-			// Return true
-			return true;
-		}
-		
-		// Check if getting commitment for the block kernel offset failed
-		if(!secp256k1_pedersen_commit(secp256k1_context_no_precomp, &blockKernelOffsetCommitment, blockKernelOffset, 0, &secp256k1_generator_const_h, &secp256k1_generator_const_g)) {
-		
-			// Return false
-			return false;
-		}
-		
-		// Check if stopping read and write or is closing
-		if(stopReadAndWrite.load() || Common::isClosing()) {
-		
-			// Return true
-			return true;
-		}
-		
-		// Append block kernel offset commitment to the list of kernel excesses
-		kernelExcesses.push_back(&blockKernelOffsetCommitment);
 	}
 	
 	// Check if stopping read and write or is closing
@@ -5260,7 +5913,6 @@ const bool Peer::processBlock(vector<uint8_t > &&buffer) {
 	if(coinbaseReward) {
 	
 		// Check if getting commitment for the coinbase reward failed
-		const uint8_t zeroBlindingFactor[Crypto::SECP256K1_PRIVATE_KEY_LENGTH] = {};
 		if(!secp256k1_pedersen_commit(secp256k1_context_no_precomp, &coinbaseRewardCommitment, zeroBlindingFactor, coinbaseReward, &secp256k1_generator_const_h, &secp256k1_generator_const_g)) {
 		
 			// Return false
@@ -5336,7 +5988,7 @@ const bool Peer::processBlock(vector<uint8_t > &&buffer) {
 			if(useNodeHeaders) {
 			
 				// Check if updating node's sync state failed
-				if(!node.updateSyncState(syncedHeaderIndex + 1, move(block))) {
+				if(!node.updateSyncState(syncedHeaderIndex + 1, block)) {
 				
 					// Return false
 					return false;
@@ -5347,7 +5999,7 @@ const bool Peer::processBlock(vector<uint8_t > &&buffer) {
 			else {
 			
 				// Check if updating node's sync state failed
-				if(!node.updateSyncState(move(headers), syncedHeaderIndex + 1, move(block))) {
+				if(!node.updateSyncState(move(headers), syncedHeaderIndex + 1, block)) {
 				
 					// Return false
 					return false;

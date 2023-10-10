@@ -1,6 +1,6 @@
 // Header guard
-#ifndef KERNEL_H
-#define KERNEL_H
+#ifndef MWC_VALIDATION_NODE_KERNEL_H
+#define MWC_VALIDATION_NODE_KERNEL_H
 
 
 // Header files
@@ -11,10 +11,14 @@
 using namespace std;
 
 
+// Namespace
+namespace MwcValidationNode {
+
+
 // Classes
 
 // Kernel class
-class Kernel final : public MerkleMountainRangeLeaf<Kernel, sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH, secp256k1_pedersen_commitment> {
+class Kernel final : public MerkleMountainRangeLeaf<Kernel, sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH, secp256k1_pedersen_commitment, true> {
 
 	// Public
 	public:
@@ -42,7 +46,10 @@ class Kernel final : public MerkleMountainRangeLeaf<Kernel, sizeof(uint8_t) + si
 		explicit Kernel(const Features features, const uint64_t fee, const uint64_t lockHeight, const uint64_t relativeHeight, const uint8_t excess[Crypto::COMMITMENT_LENGTH], const uint8_t signature[Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH], const bool isGenesisBlockKernel = false);
 		
 		// Serialize
-		virtual const vector<uint8_t> serialize() const override final;
+		virtual vector<uint8_t> serialize() const override final;
+		
+		// Get lookup value
+		virtual optional<vector<uint8_t>> getLookupValue() const override final;
 		
 		// Add to sum
 		virtual void addToSum(secp256k1_pedersen_commitment &sum, const AdditionReason additionReason) const override final;
@@ -50,41 +57,59 @@ class Kernel final : public MerkleMountainRangeLeaf<Kernel, sizeof(uint8_t) + si
 		// Subtract from sum
 		virtual void subtractFromSum(secp256k1_pedersen_commitment &sum, const SubtractionReason subtractionReason) const override final;
 		
+		// Save
+		virtual void save(ofstream &file) const override final;
+		
 		// Equality operator
-		const bool operator==(const Kernel &other) const;
+		bool operator==(const Kernel &other) const;
 		
 		// Inequality operator
-		const bool operator!=(const Kernel &other) const;
+		bool operator!=(const Kernel &other) const;
 		
 		// Get features
-		const Features getFeatures() const;
+		Features getFeatures() const;
 		
 		// Get fee
-		const uint64_t getFee() const;
+		uint64_t getFee() const;
 		
 		// Get lock height
-		const uint64_t getLockHeight() const;
+		uint64_t getLockHeight() const;
 		
 		// Get relative height
-		const uint64_t getRelativeHeight() const;
+		uint64_t getRelativeHeight() const;
 		
 		// Get excess
 		const secp256k1_pedersen_commitment &getExcess() const;
 		
 		// Get signature
-		const secp256k1_ecdsa_signature &getSignature() const;
+		const uint8_t *getSignature() const;
+		
+		// Get serialized protocol version
+		static uint32_t getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedKernel, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedKernelLength, const uint32_t protocolVersion);
 		
 		// Unserialize
-		static const Kernel unserialize(const array<uint8_t, SERIALIZED_LENGTH> &serializedKernel, const bool isGenesisBlockKernel);
+		static pair<Kernel, array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type> unserialize(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedKernel, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedKernelLength, const uint32_t protocolVersion, const bool isGenesisBlockKernel);
+		
+		// Restore
+		static Kernel restore(ifstream &file);
+		
+		// Save sum
+		static void saveSum(const secp256k1_pedersen_commitment &sum, ofstream &file);
+		
+		// Restore sum
+		static void restoreSum(secp256k1_pedersen_commitment &sum, ifstream &file);
 	
 	// Private
 	private:
 	
+		// Constructor
+		explicit Kernel(ifstream &file);
+		
 		// Maximum relative height
 		static const uint64_t MAXIMUM_RELATIVE_HEIGHT;
 		
 		// Get message to sign
-		const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getMessageToSign() const;
+		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getMessageToSign() const;
 		
 		// Features
 		Features features;
@@ -102,8 +127,11 @@ class Kernel final : public MerkleMountainRangeLeaf<Kernel, sizeof(uint8_t) + si
 		secp256k1_pedersen_commitment excess;
 		
 		// Signature
-		secp256k1_ecdsa_signature signature;
+		uint8_t signature[Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH];
 };
+
+
+}
 
 
 #endif

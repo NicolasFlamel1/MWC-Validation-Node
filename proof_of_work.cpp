@@ -8,6 +8,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 // SipHash block bits
@@ -29,7 +33,7 @@ const uint8_t ProofOfWork::C29_SIPHASH_ROTATION = 25;
 // Supporting function implementation
 
 // Has valid proof of work
-const bool ProofOfWork::hasValidProofOfWork(const Header &header) {
+bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 
 	// Get hash from the header
 	const array hash = getProofOfWorkHash(header);
@@ -311,7 +315,7 @@ void ProofOfWork::SipHash24::hash(const uint64_t nonce, const uint8_t rotation) 
 }
 
 // SipHash-2-4 digest
-const uint64_t ProofOfWork::SipHash24::digest() const {
+uint64_t ProofOfWork::SipHash24::digest() const {
 
 	// Set digest to zero
 	uint64_t digest = 0;
@@ -355,7 +359,7 @@ void ProofOfWork::SipHash24::round(const uint8_t rotation) {
 }
 
 // Get proof of work hash
-const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> ProofOfWork::getProofOfWorkHash(const Header &header) {
+array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> ProofOfWork::getProofOfWorkHash(const Header &header) {
 
 	// Initialize data
 	vector<uint8_t> data;
@@ -416,7 +420,7 @@ const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> ProofOfWork::getProofOfWorkHas
 }
 
 // SipHash block
-const uint64_t ProofOfWork::sipHashBlock(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t nonce, const uint8_t rotation) {
+uint64_t ProofOfWork::sipHashBlock(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t nonce, const uint8_t rotation) {
 
 	// Set starting nonce
 	const uint64_t startingNonce = nonce & ~SIPHASH_BLOCK_MASK;
@@ -455,7 +459,7 @@ const uint64_t ProofOfWork::sipHashBlock(const uint64_t sipHashKeys[SIPHASH_KEYS
 }
 
 // SipNode
-const uint64_t ProofOfWork::sipNode(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t edge, const uint64_t uorv) {
+uint64_t ProofOfWork::sipNode(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t edge, const uint64_t uorv) {
 
 	// Create SipHash-2-4 from SipHash keys
 	SipHash24 sipHash24(sipHashKeys);

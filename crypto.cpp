@@ -11,6 +11,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 // Secp256k1 scratch space length
@@ -23,7 +27,7 @@ const size_t Crypto::SECP256k1_NUMBER_OF_GENERATORS = 256;
 const unique_ptr<secp256k1_context, decltype(&secp256k1_context_destroy)> Crypto::secp256k1Context(secp256k1_context_create(SECP256K1_CONTEXT_VERIFY), secp256k1_context_destroy);
 
 // Secp256k1 scratch space
-const unique_ptr<secp256k1_scratch_space, decltype(&secp256k1_scratch_space_destroy)> Crypto::secp256k1ScratchSpace(secp256k1_scratch_space_create(secp256k1Context.get(), SECP256K1_SCRATCH_SPACE_LENGTH), secp256k1_scratch_space_destroy);
+thread_local const unique_ptr<secp256k1_scratch_space, decltype(&secp256k1_scratch_space_destroy)> Crypto::secp256k1ScratchSpace(secp256k1_scratch_space_create(secp256k1Context.get(), SECP256K1_SCRATCH_SPACE_LENGTH), secp256k1_scratch_space_destroy);
 
 // Secp256k1 generators
 const unique_ptr<secp256k1_bulletproof_generators, void(*)(secp256k1_bulletproof_generators *)> Crypto::secp256k1Generators(secp256k1_bulletproof_generators_create(secp256k1Context.get(), &secp256k1_generator_const_g, SECP256k1_NUMBER_OF_GENERATORS), [](secp256k1_bulletproof_generators *secp256k1Generators) {
@@ -57,7 +61,7 @@ const secp256k1_bulletproof_generators *Crypto::getSecp256k1Generators() {
 }
 
 // Verify kernel sums
-const bool Crypto::verifyKernelSums(const Header &header, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs) {
+bool Crypto::verifyKernelSums(const Header &header, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs) {
 
 	// Initialize kernel excesses sum with total kernel offset
 	secp256k1_pedersen_commitment kernelExcessesSumWithTotalKernelOffset;

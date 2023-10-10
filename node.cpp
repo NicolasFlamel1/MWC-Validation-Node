@@ -9,6 +9,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Constants
 
 // Capabilities
@@ -17,12 +21,12 @@ const Node::Capabilities Node::CAPABILITIES = Node::Capabilities::PEER_LIST;
 // Check if floonet
 #ifdef FLOONET
 
-	// DNS seeds
-	const unordered_set<string> Node::DNS_SEEDS = {
+	// Default DNS seeds
+	const unordered_set<string> Node::DEFAULT_DNS_SEEDS = {
 		"seed1.mwc.mw:13414",
 		"seed2.mwc.mw:13414",
 		
-		// Check if Tor is enabled
+		// Check if tor is enabled
 		#ifdef TOR_ENABLE
 		
 			"wt635fgwmhokk25lv7y2jvrg63mokg7nfni5owrtzalz3nx22dgjytid.onion",
@@ -34,15 +38,15 @@ const Node::Capabilities Node::CAPABILITIES = Node::Capabilities::PEER_LIST;
 // Otherwise
 #else
 
-	// DNS seeds
-	const unordered_set<string> Node::DNS_SEEDS = {
+	// Default DNS seeds
+	const unordered_set<string> Node::DEFAULT_DNS_SEEDS = {
 		"mainnet.seed1.mwc.mw:3414",
 		"mainnet.seed2.mwc.mw:3414",
 		"greg1.mainnet.seed.mwc.mw:3414",
 		"greg2.mainnet.seed.mwc.mw:3414",
 		"mwcseed.ddns.net:3414",
 		
-		// Check if Tor is enabled
+		// Check if tor is enabled
 		#ifdef TOR_ENABLE
 		
 			"uukwrgtxogz6kkpcejssb7aenb7ey7pr3h5i4llhse445dfpbp63osyd.onion",
@@ -59,13 +63,13 @@ const Node::Capabilities Node::CAPABILITIES = Node::Capabilities::PEER_LIST;
 const list<Peer>::size_type Node::DESIRED_NUMBER_OF_PEERS = 8;
 
 // Minimum number of connected and healthy peers to start syncing
-const list<Peer>::size_type Node::MINIMUM_NUMBER_OF_CONNECTED_AND_HEALTHY_PEERS_TO_START_SYNCING = 3;
+const list<Peer>::size_type Node::MINIMUM_NUMBER_OF_CONNECTED_AND_HEALTHY_PEERS_TO_START_SYNCING = 4;
 
 // Delay before syncing duration
-const chrono::seconds Node::DELAY_BEFORE_SYNCING_DURATION = 30s;
+const chrono::seconds Node::DELAY_BEFORE_SYNCING_DURATION = 60s;
 
 // Peer event occurred timeout
-const chrono::milliseconds Node::PEER_EVENT_OCCURRED_TIMEOUT = 100ms;
+const chrono::seconds Node::PEER_EVENT_OCCURRED_TIMEOUT = 1s;
 
 // Unused peer candidate valid duration
 const chrono::minutes Node::UNUSED_PEER_CANDIDATE_VALID_DURATION = 30min;
@@ -98,8 +102,14 @@ const chrono::hours Node::REMOVE_RANDOM_PEER_INTERVAL = 6h;
 // Supporting function implementation
 
 // Constructor
-Node::Node() :
+Node::Node(const string &torProxyAddress, const string &torProxyPort) :
 
+	// Set tor proxy address
+	torProxyAddress(torProxyAddress),
+	
+	// Set tor proxy port
+	torProxyPort(torProxyPort),
+	
 	// Create random number generator with a random device
 	randomNumberGenerator(random_device()()),
 	
@@ -122,10 +132,7 @@ Node::Node() :
 	isSyncing(false),
 
 	// Set stop monitoring to false
-	stopMonitoring(false),
-	
-	// Create main thread
-	mainThread(&Node::monitor, this)
+	stopMonitoring(false)
 {
 }
 
@@ -154,6 +161,298 @@ Node::~Node() {
 	}
 }
 
+// Save
+void Node::save(ofstream &file) const {
+
+	// Write headers to file
+	headers.save(file);
+		
+	// Write synced header index to file
+	const uint64_t serializedSyncedHeaderIndex = Common::hostByteOrderToBigEndian(syncedHeaderIndex);
+	file.write(reinterpret_cast<const char *>(&serializedSyncedHeaderIndex), sizeof(serializedSyncedHeaderIndex));
+	
+	// Write kernels to file
+	kernels.save(file);
+	
+	// Write outputs to file
+	outputs.save(file);
+	
+	// Write rangeproofs to file
+	rangeproofs.save(file);
+	
+	// Write healthy peers size to file
+	const uint64_t serializedHealthyPeersSize = Common::hostByteOrderToBigEndian(healthyPeers.size());
+	file.write(reinterpret_cast<const char *>(&serializedHealthyPeersSize), sizeof(serializedHealthyPeersSize));
+	
+	// Go through all healthy peers
+	for(const pair<const string, pair<chrono::time_point<chrono::steady_clock>, Capabilities>> &healthyPeer : healthyPeers) {
+	
+		// Write identifier size to file
+		const uint64_t serializedIdentifierSize = Common::hostByteOrderToBigEndian(healthyPeer.first.size());
+		file.write(reinterpret_cast<const char *>(&serializedIdentifierSize), sizeof(serializedIdentifierSize));
+		
+		// Write identifier to file
+		file.write(healthyPeer.first.data(), healthyPeer.first.size());
+		
+		// Write capabilities to file
+		const uint32_t serializedCapabilities = htonl(static_cast<underlying_type_t<Capabilities>>(healthyPeer.second.second));
+		file.write(reinterpret_cast<const char *>(&serializedCapabilities), sizeof(serializedCapabilities)); 
+	}
+	
+	// Write banned peers size to file
+	const uint64_t serializedBannedPeersSize = Common::hostByteOrderToBigEndian(bannedPeers.size());
+	file.write(reinterpret_cast<const char *>(&serializedBannedPeersSize), sizeof(serializedBannedPeersSize));
+	
+	// Go through all banned peers
+	for(const pair<const string, chrono::time_point<chrono::steady_clock>> &bannedPeer : bannedPeers) {
+	
+		// Write identifier size to file
+		const uint64_t serializedIdentifierSize = Common::hostByteOrderToBigEndian(bannedPeer.first.size());
+		file.write(reinterpret_cast<const char *>(&serializedIdentifierSize), sizeof(serializedIdentifierSize));
+		
+		// Write identifier to file
+		file.write(bannedPeer.first.data(), bannedPeer.first.size());
+		
+		// Write timestamp to file
+		const int64_t timestamp = chrono::duration_cast<chrono::seconds>(bannedPeer.second.time_since_epoch()).count();
+		const uint64_t serializedTimestamp = Common::hostByteOrderToBigEndian(*reinterpret_cast<const uint64_t *>(&timestamp));
+		file.write(reinterpret_cast<const char *>(&serializedTimestamp), sizeof(serializedTimestamp));
+	}
+}
+
+// Restore
+void Node::restore(ifstream &file) {
+
+	// Read headers from file
+	headers = MerkleMountainRange<Header>::restore(file);
+	
+	// Read synced header index from file
+	uint64_t serializedSyncedHeaderIndex;
+	file.read(reinterpret_cast<char *>(&serializedSyncedHeaderIndex), sizeof(serializedSyncedHeaderIndex));
+	syncedHeaderIndex = Common::bigEndianToHostByteOrder(serializedSyncedHeaderIndex);
+	
+	// Read kernels from file
+	kernels = MerkleMountainRange<Kernel>::restore(file);
+	
+	// Read outputs from file
+	outputs = MerkleMountainRange<Output>::restore(file);
+	
+	// Read rangeproofs from file
+	rangeproofs = MerkleMountainRange<Rangeproof>::restore(file);
+	
+	// Read healthy peers size from file
+	uint64_t serializedHealthyPeersSize;
+	file.read(reinterpret_cast<char *>(&serializedHealthyPeersSize), sizeof(serializedHealthyPeersSize));
+	const uint64_t healthyPeersSize = Common::bigEndianToHostByteOrder(serializedHealthyPeersSize);
+	
+	// Go through all healthy peers
+	for(uint64_t i = 0; i < healthyPeersSize; ++i) {
+	
+		// Read identifier size from file
+		uint64_t serializedIdentifierSize;
+		file.read(reinterpret_cast<char *>(&serializedIdentifierSize), sizeof(serializedIdentifierSize));
+		
+		// Read identifier from file
+		string identifier(Common::bigEndianToHostByteOrder(serializedIdentifierSize), '\0');
+		file.read(identifier.data(), identifier.size());
+		
+		// Read capabilities from file
+		uint32_t serializedCapabilities;
+		file.read(reinterpret_cast<char *>(&serializedCapabilities), sizeof(serializedCapabilities));
+		
+		// Add healthy peer to healthy peers
+		healthyPeers.emplace(move(identifier), make_pair(chrono::steady_clock::now(), static_cast<Capabilities>(ntohl(serializedCapabilities))));
+	}
+	
+	// Read banned peers size from file
+	uint64_t serializedBannedPeersSize;
+	file.read(reinterpret_cast<char *>(&serializedBannedPeersSize), sizeof(serializedBannedPeersSize));
+	const uint64_t bannedPeersSize = Common::bigEndianToHostByteOrder(serializedBannedPeersSize);
+	
+	// Go through all banned peers
+	for(uint64_t i = 0; i < bannedPeersSize; ++i) {
+	
+		// Read identifier size from file
+		uint64_t serializedIdentifierSize;
+		file.read(reinterpret_cast<char *>(&serializedIdentifierSize), sizeof(serializedIdentifierSize));
+		
+		// Read identifier from file
+		string identifier(Common::bigEndianToHostByteOrder(serializedIdentifierSize), '\0');
+		file.read(identifier.data(), identifier.size());
+		
+		// Read timestamp from file
+		uint64_t serializedTimestamp;
+		file.read(reinterpret_cast<char *>(&serializedTimestamp), sizeof(serializedTimestamp));
+		serializedTimestamp = Common::bigEndianToHostByteOrder(serializedTimestamp);
+		
+		// Add banned peer to banned peers
+		bannedPeers.emplace(move(identifier), chrono::time_point<chrono::steady_clock>(chrono::seconds(*reinterpret_cast<const int64_t *>(&serializedTimestamp))));
+	}
+	
+	// Go through all healthy peers
+	for(const pair<const string, pair<chrono::time_point<chrono::steady_clock>, Capabilities>> &healthyPeer : healthyPeers) {
+	
+		// Add healthy peer to unused peer candidates
+		unusedPeerCandidates.emplace(healthyPeer.first, chrono::steady_clock::now());
+	}
+}
+
+// Set on start syncing callback
+void Node::setOnStartSyncingCallback(const function<void()> &onStartSyncingCallback) {
+
+	// Set on start syncing callback
+	this->onStartSyncingCallback = onStartSyncingCallback;
+}
+
+// Set on synced callback
+void Node::setOnSyncedCallback(const function<void()> &onSyncedCallback) {
+
+	// Set on synced callback
+	this->onSyncedCallback = onSyncedCallback;
+}
+
+// Set on error callback
+void Node::setOnErrorCallback(const function<void()> &onErrorCallback) {
+
+	// Set on error callback
+	this->onErrorCallback = onErrorCallback;
+}
+
+// Set on transaction hash set callback
+void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> &onTransactionHashSetCallback) {
+
+	// Set on transaction hash set callback
+	this->onTransactionHashSetCallback = onTransactionHashSetCallback;
+}
+
+// Set on reorg callback
+void Node::setOnReorgCallback(const function<bool(const uint64_t newHeight)> &onReorgCallback) {
+
+	// Set on reorg callback
+	this->onReorgCallback = onReorgCallback;
+}
+
+// Set on block callback
+void Node::setOnBlockCallback(const function<bool(const Header &header, const Block &block)> &onBlockCallback) {
+
+	// Set on block callback
+	this->onBlockCallback = onBlockCallback;
+}
+
+// Set on peer connect callback
+void Node::setOnPeerConnectCallback(const function<void(const string &peerIdentifier)> &onPeerConnectCallback) {
+
+	// Set on peer connect callback
+	this->onPeerConnectCallback = onPeerConnectCallback;
+}
+
+// Set on peer disconnect callback
+void Node::setOnPeerDisconnectCallback(const function<void(const string &peerIdentifier)> &onPeerDisconnectCallback) {
+
+	// Set on peer disconnect callback
+	this->onPeerDisconnectCallback = onPeerDisconnectCallback;
+}
+
+// Start
+void Node::start(const char *customDnsSeed) {
+
+	// Check if custom DNS seed exists
+	if(customDnsSeed) {
+	
+		// Set custom DNS seed
+		customDnsSeeds.emplace(customDnsSeed);
+	}
+	
+	// Create main thread
+	mainThread = thread(&Node::monitor, this);
+}
+
+// Stop
+void Node::stop() {
+
+	// Set stop monitoring to true
+	stopMonitoring.store(true);
+	
+	// Notify that an event occurred
+	peerEventOccurred.notify_one();
+}
+
+// Get peers
+list<Peer> &Node::getPeers() {
+
+	// Return peers
+	return peers;
+}
+
+// Disconnect
+void Node::disconnect() {
+
+	// Go through all peers
+	for(Peer &peer : peers) {
+		
+		// Stop peer
+		peer.stop();
+		
+		// Set error occurred to false
+		bool errorOccurred = false;
+		
+		// Check if peer's thread is running
+		if(peer.getThread().joinable()) {
+		
+			// Try
+			try {
+		
+				// Wait for peer's thread to finish
+				peer.getThread().join();
+			}
+		
+			// Catch errors
+			catch(...) {
+			
+				// Set error occurred to true
+				errorOccurred = true;
+			}
+		}
+		
+		// Check if peer's worker operation is running
+		if(peer.isWorkerOperationRunning()) {
+		
+			// Set error occurred
+			errorOccurred = true;
+		}
+		
+		// Check if error didn't occur
+		if(!errorOccurred) {
+		
+			// Check if peer was syncing
+			if(peer.getSyncingState() != Peer::SyncingState::NOT_SYNCING) {
+			
+				// Try
+				try {
+			
+					// Lock for writing
+					lock_guard writeLock(lock);
+				
+					// Check if performing initial sync and the peer obtained new headers
+					if(syncedHeaderIndex == Consensus::GENESIS_BLOCK_HEADER.getHeight() && !peer.getHeaders().empty() && peer.getHeaders().back().getHeight() > syncedHeaderIndex) {
+					
+						// Set headers to peer's headers
+						headers = move(peer.getHeaders());
+					}
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+				}
+			}
+		}
+	}
+	
+	// Disconnect from peers
+	peers.clear();
+}
+
 // Get thread
 thread &Node::getThread() {
 
@@ -169,14 +468,14 @@ shared_mutex &Node::getLock() {
 }
 
 // Get total difficulty
-const uint64_t Node::getTotalDifficulty() const {
+uint64_t Node::getTotalDifficulty() const {
 
 	// Return total difficulty of the synced header
 	return headers.getLeaf(syncedHeaderIndex)->getTotalDifficulty();
 }
 
 // Get height
-const uint64_t Node::getHeight() const {
+uint64_t Node::getHeight() const {
 
 	// Return height
 	return syncedHeaderIndex;
@@ -218,7 +517,7 @@ void Node::addUnusedPeerCandidate(string &&peerCandidate) {
 }
 
 // Is unused peer candidate valid
-const bool Node::isUnusedPeerCandidateValid(const string &peerCandidate) const {
+bool Node::isUnusedPeerCandidateValid(const string &peerCandidate) const {
 
 	// Return if unused peer candidate is valid
 	return unusedPeerCandidates.contains(peerCandidate) && chrono::steady_clock::now() - unusedPeerCandidates.at(peerCandidate) <= UNUSED_PEER_CANDIDATE_VALID_DURATION;
@@ -239,7 +538,7 @@ void Node::addRecentlyAttemptedPeerCandidate(const string &peerCandidate) {
 }
 
 // Is peer candidate recently attempted
-const bool Node::isPeerCandidateRecentlyAttempted(const string &peerCandidate) const {
+bool Node::isPeerCandidateRecentlyAttempted(const string &peerCandidate) const {
 
 	// Return if peer candidate was recently attempted
 	return recentlyAttemptedPeerCandidates.contains(peerCandidate) && chrono::steady_clock::now() - recentlyAttemptedPeerCandidates.at(peerCandidate) <= RECENTLY_ATTEMPTED_PEER_CANDIDATE_DURATION;
@@ -260,7 +559,7 @@ void Node::addHealthyPeer(const string &peer, const Capabilities capabilities) {
 }
 
 // Is peer healthy
-const bool Node::isPeerHealthy(const string &peer) const {
+bool Node::isPeerHealthy(const string &peer) const {
 
 	// Return if peer is healthy
 	return healthyPeers.contains(peer) && (currentlyUsedPeerCandidates.contains(peer) || chrono::steady_clock::now() - healthyPeers.at(peer).first <= HEALTHY_PEER_DURATION);
@@ -281,27 +580,99 @@ void Node::addBannedPeer(const string &peer) {
 }
 
 // Is peer banned
-const bool Node::isPeerBanned(const string &peer) const {
+bool Node::isPeerBanned(const string &peer) const {
 
 	// Return if peer is banned
 	return bannedPeers.contains(peer) && chrono::steady_clock::now() - bannedPeers.at(peer) <= BANNED_PEER_DURATION;
 }
 
 // Set sync state
-void Node::setSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, MerkleMountainRange<Kernel> &&kernels, MerkleMountainRange<Output> &&outputs, MerkleMountainRange<Rangeproof> &&rangeproofs) {
+void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &transactionHashSetArchiveHeader, MerkleMountainRange<Kernel> &&kernels, MerkleMountainRange<Output> &&outputs, MerkleMountainRange<Rangeproof> &&rangeproofs) {
 
-	// Check if a reorg occurred
-	if(this->syncedHeaderIndex >= syncedHeaderIndex) {
+	// Check if on transaction hash set callback exists
+	if(onTransactionHashSetCallback) {
 	
-		// Display text
-		Common::displayText("Reorg occurred with depth: " + to_string(this->syncedHeaderIndex - syncedHeaderIndex + 1));
+		// Check if running on transaction hash set callback failed
+		if(!onTransactionHashSetCallback(headers, transactionHashSetArchiveHeader, kernels, outputs, rangeproofs)) {
+		
+			// Set is syncing to false
+			isSyncing = false;
+			
+			// Return
+			return;
+		}
 	}
+	
+	// Check if pruning kernels
+	#ifdef PRUNE_KERNELS
+	
+		// Go through all kernels
+		for(MerkleMountainRange<Kernel>::const_iterator i = kernels.cbegin(); i != kernels.cend();) {
+		
+			// Get kernel
+			const pair<uint64_t, Kernel> &kernel = *i;
+			
+			// Go to next kernel
+			++i;
+			
+			// Prune kernel
+			kernels.pruneLeaf(kernel.first);
+		}
+	
+		// Set kernels minimum size to the transaction hash set archive header
+		kernels.setMinimumSize(transactionHashSetArchiveHeader.getKernelMerkleMountainRangeSize());
+	#endif
+	
+	// Check if pruning headers
+	#ifdef PRUNE_HEADERS
+	
+		// Loop while headers can be pruned
+		while(transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() >= Consensus::COINBASE_MATURITY) {
+		
+			// Prune oldest header
+			headers.pruneLeaf(headers.front().getHeight());
+		}
+	
+		// Set headers minimum size to the transaction hash set archive header
+		headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(transactionHashSetArchiveHeader.getHeight() + 1));
+	#endif
+	
+	// Check if headers minimum size can be updated
+	if(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1) > headers.getMinimumSize()) {
+	
+		// Set headers minimum size to the first header
+		headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1));
+	}
+	
+	// Check if kernels minimum size can be updated
+	if(headers.front().getKernelMerkleMountainRangeSize() > kernels.getMinimumSize()) {
+	
+		// Set kernels minimum size to the first header
+		kernels.setMinimumSize(headers.front().getKernelMerkleMountainRangeSize());
+	}
+	
+	// Check if outputs minimum size can be updated
+	if(headers.front().getOutputMerkleMountainRangeSize() > outputs.getMinimumSize()) {
+	
+		// Set outputs minimum size to the first header
+		outputs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
+	}
+	
+	// Check if rangeproofs minimum size can be updated
+	if(headers.front().getOutputMerkleMountainRangeSize() > rangeproofs.getMinimumSize()) {
+	
+		// Set rangeproofs minimum size to the first header
+		rangeproofs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
+	}
+	
+	// Free memory
+	Common::freeMemory();
 	
 	// Set headers to headers
 	this->headers = move(headers);
 	
-	// Set synced header index to synced header index
-	this->syncedHeaderIndex = syncedHeaderIndex;
+	// Set synced header index to the transaction hash set archive header's height
+	this->syncedHeaderIndex = transactionHashSetArchiveHeader.getHeight();
 	
 	// Set kernels to kernels
 	this->kernels = move(kernels);
@@ -314,47 +685,126 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const uint64_t sy
 	
 	// Set is syncing to false
 	isSyncing = false;
-	
-	// Display text
-	Common::displayText("Block height: " + to_string(this->headers.getLeaf(this->syncedHeaderIndex)->getHeight()) + " at " + to_string(chrono::duration_cast<chrono::seconds>(this->headers.getLeaf(this->syncedHeaderIndex)->getTimestamp().time_since_epoch()).count()));
 }
 
 // Update sync state
-const bool Node::updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, Block &&block) {
-
-	// Set headers to headers
-	this->headers = move(headers);
-	
-	// Return updating sync state
-	return updateSyncState(syncedHeaderIndex, move(block));
-}
-
-// Update sync state
-const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block) {
+bool Node::updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, const Block &block) {
 
 	// Check if a reorg occurred
 	if(this->syncedHeaderIndex >= syncedHeaderIndex) {
 	
-		// Display text
-		Common::displayText("Reorg occurred with depth: " + to_string(this->syncedHeaderIndex - syncedHeaderIndex + 1));
+		// Check if on reorg callback exists
+		if(onReorgCallback) {
+		
+			// Check if running on reorg callback failed
+			if(!onReorgCallback(syncedHeaderIndex)) {
+			
+				// Set is syncing to false
+				isSyncing = false;
+				
+				// Return true
+				return true;
+			}
+		}
 	}
+	
+	// Set headers to headers
+	this->headers = move(headers);
+	
+	// Return applying block to sync state
+	return applyBlockToSyncState(syncedHeaderIndex, block);
+}
+
+// Update sync state
+bool Node::updateSyncState(const uint64_t syncedHeaderIndex, const Block &block) {
+
+	// Check if a reorg occurred
+	if(this->syncedHeaderIndex >= syncedHeaderIndex) {
+	
+		// Check if on reorg callback exists
+		if(onReorgCallback) {
+		
+			// Check if running on reorg callback failed
+			if(!onReorgCallback(syncedHeaderIndex)) {
+			
+				// Set is syncing to false
+				isSyncing = false;
+				
+				// Return true
+				return true;
+			}
+		}
+	}
+	
+	// Return applying block to sync state
+	return applyBlockToSyncState(syncedHeaderIndex, block);
+}
+
+// Peer connected
+void Node::peerConnected(const string &peerIdentifier) {
+
+	// Check if on peer connect callback exists
+	if(onPeerConnectCallback) {
+	
+		// Run on peer connect callback
+		onPeerConnectCallback(peerIdentifier);
+	}
+}
+
+// Get tor proxy address
+const string &Node::getTorProxyAddress() const {
+
+	// Return tor proxy address
+	return torProxyAddress;
+}
+
+// Get tor proxy port
+const string &Node::getTorProxyPort() const {
+
+	// Return tor proxy port
+	return torProxyPort;
+}
+
+// Get DNS seeds
+const unordered_set<string> &Node::getDnsSeeds() const {
+
+	// Check if uisng custom DNS seeds
+	if(!customDnsSeeds.empty()) {
+	
+		// Return custom DNS seeds
+		return customDnsSeeds;
+	}
+	
+	// Otherwise
+	else {
+	
+		// Return default DNS seeds
+		return DEFAULT_DNS_SEEDS;
+	}
+}
+
+// Apply block to sync state
+bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &block) {
 	
 	// Set synced header index to synced header index
 	this->syncedHeaderIndex = syncedHeaderIndex;
 	
 	// Set result to true
 	bool result = true;
+	
+	// Set callback failed to false
+	bool callbackFailed = false;
 
 	// Try
 	try {
 		
 		// Rewind kernels, outputs, and rangeproofs to the previous synced header
-		kernels.rewindToSize(this->headers.getLeaf(this->syncedHeaderIndex - 1)->getKernelMerkleMountainRangeSize());
-		outputs.rewindToSize(this->headers.getLeaf(this->syncedHeaderIndex - 1)->getOutputMerkleMountainRangeSize());
-		rangeproofs.rewindToSize(this->headers.getLeaf(this->syncedHeaderIndex - 1)->getOutputMerkleMountainRangeSize());
+		kernels.rewindToSize(headers.getLeaf(syncedHeaderIndex - 1)->getKernelMerkleMountainRangeSize());
+		outputs.rewindToSize(headers.getLeaf(syncedHeaderIndex - 1)->getOutputMerkleMountainRangeSize());
+		rangeproofs.rewindToSize(headers.getLeaf(syncedHeaderIndex - 1)->getOutputMerkleMountainRangeSize());
 
 		// Go through all of the block's outputs
-		for(Output &output : block.getOutputs()) {
+		for(const Output &output : block.getOutputs()) {
 		
 			// Check if output already exists
 			if(outputs.getLeafByLookupValue(output.getLookupValue().value())) {
@@ -367,14 +817,14 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 			}
 		
 			// Append output to outputs
-			outputs.appendLeaf(move(output));
+			outputs.appendLeaf(output);
 		}
 		
 		// Get header at the synced header index
-		const Header *header = this->headers.getLeaf(this->syncedHeaderIndex);
+		const Header *header = headers.getLeaf(syncedHeaderIndex);
 		
 		// Get unspendable coinbase outputs starting index
-		const uint64_t unspendableCoinbaseOutputsStartingIndex = MerkleMountainRange<Header>::getNumberOfLeavesAtSize(this->headers.getLeaf(SaturateMath::subtract(header->getHeight(), Consensus::COINBASE_MATURITY))->getOutputMerkleMountainRangeSize());
+		const uint64_t unspendableCoinbaseOutputsStartingIndex = MerkleMountainRange<Header>::getNumberOfLeavesAtSize(headers.getLeaf(SaturateMath::subtract(header->getHeight(), Consensus::COINBASE_MATURITY))->getOutputMerkleMountainRangeSize());
 		
 		// Go through all of the block's inputs
 		for(const Input &input : block.getInputs()) {
@@ -449,10 +899,10 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 		}
 		
 		// Go through all of the block's rangeproofs
-		for(Rangeproof &rangeproof : block.getRangeproofs()) {
+		for(const Rangeproof &rangeproof : block.getRangeproofs()) {
 		
 			// Append rangeproof to rangeproofs
-			rangeproofs.appendLeaf(move(rangeproof));
+			rangeproofs.appendLeaf(rangeproof);
 			
 			// Check if pruning rangeproofs
 			#ifdef PRUNE_RANGEPROOFS
@@ -483,15 +933,19 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 		}
 		
 		// Go through all of the block's kernels
-		for(Kernel &kernel : block.getKernels()) {
+		for(const Kernel &kernel : block.getKernels()) {
 		
 			// TODO NRD check for floonet
 		
 			// Append kernel to kernels
-			kernels.appendLeaf(move(kernel));
+			kernels.appendLeaf(kernel);
 			
-			// Prune kernel
-			kernels.pruneLeaf(kernels.getNumberOfLeaves() - 1);
+			// Check if pruning kernels
+			#ifdef PRUNE_KERNELS
+			
+				// Prune kernel
+				kernels.pruneLeaf(kernels.getNumberOfLeaves() - 1);
+			#endif
 		}
 		
 		// Check if kernels size doesn't match the header's kernel Merkle mountain range size
@@ -530,34 +984,45 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 			throw runtime_error("Verifying kernel sums failed");
 		}
 		
-		// Display text
-		Common::displayText("Block height: " + to_string(this->headers.getLeaf(this->syncedHeaderIndex)->getHeight()) + " at " + to_string(chrono::duration_cast<chrono::seconds>(this->headers.getLeaf(this->syncedHeaderIndex)->getTimestamp().time_since_epoch()).count()));
+		// Check if on block callback exists
+		if(onBlockCallback) {
+		
+			// Check if running on block callback failed
+			if(!onBlockCallback(*headers.getLeaf(syncedHeaderIndex), block)) {
+			
+				// Set callback failed to true
+				callbackFailed = true;
+				
+				// Throw exception
+				throw runtime_error("Running on block callback failed");
+			}
+		}
 	}
 	
 	// Catch errors
 	catch(...) {
 	
-		// Check if updating sync state failed
-		if(!result) {
+		// Check if updating sync state failed or callback failed
+		if(!result || callbackFailed) {
 	
 			// Decrement synced header index
 			--this->syncedHeaderIndex;
 			
 			// Rewind kernels, outputs, and rangeproofs to the synced header
-			kernels.rewindToSize(this->headers.getLeaf(this->syncedHeaderIndex)->getKernelMerkleMountainRangeSize());
-			outputs.rewindToSize(this->headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
-			rangeproofs.rewindToSize(this->headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
+			kernels.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getKernelMerkleMountainRangeSize());
+			outputs.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
+			rangeproofs.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
 		}
 		
 		// Otherwise
 		else {
 		
 			// Set headers to include the genesis block header
-			this->headers.clear();
-			this->headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
+			headers.clear();
+			headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
 			
 			// Set synced header index to the newest known height
-			this->syncedHeaderIndex = this->headers.back().getHeight();
+			this->syncedHeaderIndex = headers.back().getHeight();
 			
 			// Set kernels to include the genesis block kernel
 			kernels.clear();
@@ -579,39 +1044,43 @@ const bool Node::updateSyncState(const uint64_t syncedHeaderIndex, Block &&block
 		}
 	}
 	
-	// Loop while headers can be pruned
-	while(this->syncedHeaderIndex - this->headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && this->syncedHeaderIndex - this->headers.front().getHeight() >= Consensus::COINBASE_MATURITY && this->syncedHeaderIndex - this->headers.front().getHeight() > Consensus::CUT_THROUGH_HORIZON) {
+	// Check if pruning headers
+	#ifdef PRUNE_HEADERS
 	
-		// Prune oldest header
-		this->headers.pruneLeaf(this->headers.front().getHeight());
-	}
+		// Loop while headers can be pruned
+		while(this->syncedHeaderIndex - headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && this->syncedHeaderIndex - headers.front().getHeight() >= Consensus::COINBASE_MATURITY && this->syncedHeaderIndex - headers.front().getHeight() > Consensus::CUT_THROUGH_HORIZON) {
+		
+			// Prune oldest header
+			headers.pruneLeaf(headers.front().getHeight());
+		}
+	#endif
 	
 	// Check if headers minimum size can be updated
-	if(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(this->headers.front().getHeight() + 1) > this->headers.getMinimumSize()) {
+	if(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1) > headers.getMinimumSize()) {
 	
 		// Set headers minimum size to the first header
-		this->headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(this->headers.front().getHeight() + 1));
+		headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1));
 	}
 	
 	// Check if kernels minimum size can be updated
-	if(this->headers.front().getKernelMerkleMountainRangeSize() > kernels.getMinimumSize()) {
+	if(headers.front().getKernelMerkleMountainRangeSize() > kernels.getMinimumSize()) {
 	
 		// Set kernels minimum size to the first header
-		kernels.setMinimumSize(this->headers.front().getKernelMerkleMountainRangeSize());
+		kernels.setMinimumSize(headers.front().getKernelMerkleMountainRangeSize());
 	}
 	
 	// Check if outputs minimum size can be updated
-	if(this->headers.front().getOutputMerkleMountainRangeSize() > outputs.getMinimumSize()) {
+	if(headers.front().getOutputMerkleMountainRangeSize() > outputs.getMinimumSize()) {
 	
 		// Set outputs minimum size to the first header
-		outputs.setMinimumSize(this->headers.front().getOutputMerkleMountainRangeSize());
+		outputs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
 	}
 	
 	// Check if rangeproofs minimum size can be updated
-	if(this->headers.front().getOutputMerkleMountainRangeSize() > rangeproofs.getMinimumSize()) {
+	if(headers.front().getOutputMerkleMountainRangeSize() > rangeproofs.getMinimumSize()) {
 	
 		// Set rangeproofs minimum size to the first header
-		rangeproofs.setMinimumSize(this->headers.front().getOutputMerkleMountainRangeSize());
+		rangeproofs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
 	}
 	
 	// Free memory
@@ -772,11 +1241,25 @@ void Node::monitor() {
 		// Set closing
 		Common::setClosing();
 	}
+	
+	// Check if an error occurred
+	if(Common::errorOccurred()) {
+	
+		// Check if on error callback exists
+		if(onErrorCallback) {
+		
+			// Run on error callback
+			onErrorCallback();
+		}
+	}
 }
 
 // Remove disconnected peers
 void Node::removeDisconnectedPeers() {
 
+	// Set peers disconnected to false
+	bool peersDisconnected = false;
+	
 	// Go through all peers
 	for(list<Peer>::iterator i = peers.begin(); i != peers.end();) {
 	
@@ -795,6 +1278,9 @@ void Node::removeDisconnectedPeers() {
 			// Check if peer is disconnected
 			if(peer.getConnectionState() == Peer::ConnectionState::DISCONNECTED) {
 			
+				// Set peers disconnected to true
+				peersDisconnected = true;
+			
 				// Check if peer was syncing
 				if(peer.getSyncingState() != Peer::SyncingState::NOT_SYNCING) {
 				
@@ -808,8 +1294,12 @@ void Node::removeDisconnectedPeers() {
 				// Check if peer has an identifier
 				if(!peer.getIdentifier().empty()) {
 				
-					// Display text
-					Common::displayText("Disconnected from peer: " + peer.getIdentifier());
+					// Check if on peer disconnect callback exists
+					if(onPeerDisconnectCallback) {
+					
+						// Run on peer disconnect callback
+						onPeerDisconnectCallback(peer.getIdentifier());
+					}
 				}
 			}
 			
@@ -854,19 +1344,65 @@ void Node::removeDisconnectedPeers() {
 		// Check if syncing peer was disconnected
 		if(syncingPeerDisconnected) {
 		
+			// Stop peer
+			peer.stop();
+			
+			// Set error occurred to false
+			bool errorOccurred = false;
+			
+			// Check if peer's thread is running
+			if(peer.getThread().joinable()) {
+			
+				// Try
+				try {
+			
+					// Wait for peer's thread to finish
+					peer.getThread().join();
+				}
+			
+				// Catch errors
+				catch(...) {
+				
+					// Set error occurred to true
+					errorOccurred = true;
+				}
+			}
+			
+			// Check if peer's worker operation is running
+			if(peer.isWorkerOperationRunning()) {
+			
+				// Set error occurred
+				errorOccurred = true;
+			}
+		
 			// Lock for writing
 			lock_guard writeLock(lock);
+			
+			// Check if error didn't occur
+			if(!errorOccurred) {
+			
+				// Check if performing initial sync and the peer obtained new headers
+				if(syncedHeaderIndex == Consensus::GENESIS_BLOCK_HEADER.getHeight() && !peer.getHeaders().empty() && peer.getHeaders().back().getHeight() > syncedHeaderIndex) {
+				
+					// Set headers to peer's headers
+					headers = move(peer.getHeaders());
+				}
+			}
 			
 			// Set is syncing to false
 			isSyncing = false;
 		}
-	
+		
 		// Remove peer and go to next peer
 		i = peers.erase(i);
 	}
 	
-	// Free memory
-	Common::freeMemory();
+	// Check if peers were disconnected
+	if(peersDisconnected) {
+	
+		// Free memory
+		Common::freeMemory();
+	}
 }
 
 // Remove random peer
@@ -892,7 +1428,7 @@ void Node::removeRandomPeer() {
 			// Lock peer for reading
 			shared_lock peerReadLock(peer->getLock());
 			
-			// Check if peer is disconnected or perr is connected and healthy and not syncing
+			// Check if peer is disconnected or peer is connected and healthy and not syncing
 			if(peer->getConnectionState() == Peer::ConnectionState::DISCONNECTED || (peer->getConnectionState() == Peer::ConnectionState::CONNECTED_AND_HEALTHY && peer->getSyncingState() == Peer::SyncingState::NOT_SYNCING)) {
 			
 				// Check if peer was syncing
@@ -908,8 +1444,12 @@ void Node::removeRandomPeer() {
 				// Check if peer has an identifier
 				if(!peer->getIdentifier().empty()) {
 				
-					// Display text
-					Common::displayText("Disconnected from peer: " + peer->getIdentifier());
+					// Check if on peer disconnect callback exists
+					if(onPeerDisconnectCallback) {
+					
+						// Run on peer disconnect callback
+						onPeerDisconnectCallback(peer->getIdentifier());
+					}
 				}
 			}
 			
@@ -945,8 +1485,50 @@ void Node::removeRandomPeer() {
 		// Check if syncing peer was disconnected
 		if(syncingPeerDisconnected) {
 		
+			// Stop peer
+			peer->stop();
+			
+			// Set error occurred to false
+			bool errorOccurred = false;
+			
+			// Check if peer's thread is running
+			if(peer->getThread().joinable()) {
+			
+				// Try
+				try {
+			
+					// Wait for peer's thread to finish
+					peer->getThread().join();
+				}
+			
+				// Catch errors
+				catch(...) {
+				
+					// Set error occurred to true
+					errorOccurred = true;
+				}
+			}
+			
+			// Check if peer's worker operation is running
+			if(peer->isWorkerOperationRunning()) {
+			
+				// Set error occurred
+				errorOccurred = true;
+			}
+		
 			// Lock for writing
 			lock_guard writeLock(lock);
+			
+			// Check if error didn't occur
+			if(!errorOccurred) {
+			
+				// Check if performing initial sync and the peer obtained new headers
+				if(syncedHeaderIndex == Consensus::GENESIS_BLOCK_HEADER.getHeight() && !peer->getHeaders().empty() && peer->getHeaders().back().getHeight() > syncedHeaderIndex) {
+				
+					// Set headers to peer's headers
+					headers = move(peer->getHeaders());
+				}
+			}
 			
 			// Set is syncing to false
 			isSyncing = false;
@@ -973,7 +1555,7 @@ void Node::connectToMorePeers() {
 	if(SaturateMath::add(peers.size(), unusedPeerCandidates.size()) < DESIRED_NUMBER_OF_PEERS) {
 	
 		// Go through all DNS seeds
-		for(const string &dnsSeed : DNS_SEEDS) {
+		for(const string &dnsSeed : getDnsSeeds()) {
 	
 			// Add DNS seed to unused peer candidates
 			addUnusedPeerCandidate(string(dnsSeed));
@@ -1014,9 +1596,6 @@ void Node::connectToMorePeers() {
 
 // Sync
 void Node::sync() {
-
-	// Set first sync to true
-	static bool firstSync = true;
 
 	// Lock for writing
 	lock_guard writeLock(lock);
@@ -1059,7 +1638,7 @@ void Node::sync() {
 			vector<Peer *> syncablePeers;
 		
 			// Go through all peers
-			list<Peer>::size_type peerIndex = 0;
+			peerIndex = 0;
 			for(list<Peer>::iterator i = peers.begin(); i != peers.end(); ++i, ++peerIndex) {
 			
 				// Get peer
@@ -1103,16 +1682,26 @@ void Node::sync() {
 				// Set is syncing to true
 				isSyncing = true;
 				
-				// Check if first sync
-				if(firstSync) {
+				// Check if on start syncing callback exists
+				if(onStartSyncingCallback) {
 				
-					// Set first sync to false
-					firstSync = false;
-				
-					// Display text
-					Common::displayText("Syncing");
+					// Run on start syncing callback
+					onStartSyncingCallback();
+					
+					// Remove on start syncing callback
+					onStartSyncingCallback = nullptr;
 				}
 			}
+		}
+		
+		// Otherwise check if on synced callback exists
+		else if(onSyncedCallback) {
+		
+			// Run on synced callback
+			onSyncedCallback();
+			
+			// Remove on synced callback
+			onSyncedCallback = nullptr;
 		}
 	}
 }

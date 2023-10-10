@@ -1,7 +1,6 @@
 // Header files
 #include "./common.h"
 #include <iomanip>
-#include <iostream>
 #include <signal.h>
 #include <sstream>
 #include "./saturate_math.h"
@@ -21,6 +20,10 @@
 #endif
 
 using namespace std;
+
+
+// Namespace
+using namespace MwcValidationNode;
 
 
 // Definitions
@@ -55,11 +58,8 @@ const int Common::BITS_IN_A_BYTE = 8;
 // Bytes in a kilobyte
 const int Common::BYTES_IN_A_KILOBYTE = 1024;
 
-// Tor proxy address
-const char *Common::TOR_PROXY_ADDRESS = "localhost";
-
-// Tor proxy port
-const char *Common::TOR_PROXY_PORT = "9050";
+// HTTP port
+const uint16_t Common::HTTP_PORT = 80;
 
 
 // Global variables
@@ -70,9 +70,6 @@ atomic_bool Common::closing(false);
 // Set signal occurred to false
 atomic_bool Common::signalOccurred(false);
 
-// Display lock
-mutex Common::displayLock;
-
 // Memory lock
 mutex Common::memoryLock;
 
@@ -80,39 +77,43 @@ mutex Common::memoryLock;
 // Supporting function implementation
 
 // Initialize
-const bool Common::initialize() {
+bool Common::initialize() {
 
-	// Check if setting signal handler failed
-	if(signal(SIGINT, [](const int signal) {
+	// Check if not disabling signal handler
+	#ifndef DISABLE_SIGNAL_HANDLER
 	
-		// Check signal
-		switch(signal) {
+		// Check if setting signal handler failed
+		if(signal(SIGINT, [](const int signal) {
 		
-			// Interrupt
-			case SIGINT:
+			// Check signal
+			switch(signal) {
 			
-				// Check if atomic bool isn't always lock free
-				#if ATOMIC_BOOL_LOCK_FREE != ALWAYS_LOCK_FREE
+				// Interrupt
+				case SIGINT:
 				
-					// Throw error
-					#error "Atomic bool isn't always lock free"
-				#endif
+					// Check if atomic bool isn't always lock free
+					#if ATOMIC_BOOL_LOCK_FREE != ALWAYS_LOCK_FREE
+					
+						// Throw error
+						#error "Atomic bool isn't always lock free"
+					#endif
+				
+					// Set closing to true
+					closing.store(true);
+					
+					// Set signal occurred to true
+					signalOccurred.store(true);
+					
+					// Break
+					break;
+			}
 			
-				// Set closing to true
-				closing.store(true);
-				
-				// Set signal occurred to true
-				signalOccurred.store(true);
-				
-				// Break
-				break;
+		}) == SIG_ERR) {
+		
+			// Return false
+			return false;
 		}
-		
-	}) == SIG_ERR) {
-	
-		// Return false
-		return false;
-	}
+	#endif
 	
 	// Return true
 	return true;
@@ -126,34 +127,34 @@ void Common::setClosing() {
 }
 
 // Is closing
-const bool Common::isClosing() {
+bool Common::isClosing() {
 
 	// Return if closing
 	return closing.load();
 }
 
 // Error occurred
-const bool Common::errorOccurred() {
+bool Common::errorOccurred() {
 
 	// Return if closing and a signal didn't occur
 	return closing.load() && !signalOccurred.load();
 }
 
 // Is UTF-8
-const bool Common::isUtf8(const char *text, const size_t length) {
+bool Common::isUtf8(const char *text, const size_t length) {
 
 	// Go through all UTF-8 code points in the text
 	for(size_t i = 0; i < length;) {
 	
 		// Check if UTF-8 code point is an ASCII character
-		if(text[i] >= '\0' && text[i] <= '~') {
+		if(text[i] <= 0x7F) {
 		
 			// Go to next UTF-8 code point
 			++i;
 		}
 		
 		// Otherwise check if UTF-8 code point is a non-overlong two byte character
-		else if(length >= 1 && i < length - 1 && text[i] >= 0xC2 && text[i] <= 0xDF && text[i + 1] <= 0x80 && text[i + 1] <= 0xBF) {
+		else if(length >= 1 && i < length - 1 && text[i] >= 0xC2 && text[i] <= 0xDF && text[i + 1] >= 0x80 && text[i + 1] <= 0xBF) {
 		
 			// Go to next UTF-8 code point
 			i += 2;
@@ -195,7 +196,7 @@ const bool Common::isUtf8(const char *text, const size_t length) {
 		}
 		
 		// Otherwise check if UTF-8 code point is a plane sixteen character
-		else if(length >= 3 && i < length - 3 && text[i] == 0xF4 && text[i + 1] >= 0x80 && text[i + 1] <= 0xBF && text[i + 2] >= 0x80 && text[i + 2] <= 0xBF && text[i + 3] >= 0x80 && text[i + 3] <= 0xBF) {
+		else if(length >= 3 && i < length - 3 && text[i] == 0xF4 && text[i + 1] >= 0x80 && text[i + 1] <= 0x8F && text[i + 2] >= 0x80 && text[i + 2] <= 0xBF && text[i + 3] >= 0x80 && text[i + 3] <= 0xBF) {
 		
 			// Go to next UTF-8 code point
 			i += 4;
@@ -214,28 +215,28 @@ const bool Common::isUtf8(const char *text, const size_t length) {
 }
 
 // Number of bytes required
-const uint64_t Common::numberOfBytesRequired(const uint64_t numberOfBits) {
+uint64_t Common::numberOfBytesRequired(const uint64_t numberOfBits) {
 
 	// Return number of bytes required to store the provided number of bits
 	return SaturateMath::add(numberOfBits, BITS_IN_A_BYTE - 1) / BITS_IN_A_BYTE;
 }
 
 // Clamp
-const uint64_t Common::clamp(const uint64_t value, const uint64_t goal, const uint64_t clampFactor) {
+uint64_t Common::clamp(const uint64_t value, const uint64_t goal, const uint64_t clampFactor) {
 
 	// Return clamped value
 	return max(goal / clampFactor, min(value, goal * clampFactor));
 }
 
 // Damp
-const uint64_t Common::damp(const uint64_t value, const uint64_t goal, const uint64_t dampFactor) {
+uint64_t Common::damp(const uint64_t value, const uint64_t goal, const uint64_t dampFactor) {
 
 	// Return damped value
 	return (value + (dampFactor - 1) * goal) / dampFactor;
 }
 
 // Number of leading zeros
-const int Common::numberOfLeadingZeros(const uint64_t value) {
+int Common::numberOfLeadingZeros(const uint64_t value) {
 
 	// Set number of leading zeros to the maximum number of leading zeros
 	int numberOfLeadingZeros = sizeof(value) * Common::BITS_IN_A_BYTE;
@@ -252,7 +253,7 @@ const int Common::numberOfLeadingZeros(const uint64_t value) {
 }
 
 // Number of ones
-const int Common::numberOfOnes(const uint64_t value) {
+int Common::numberOfOnes(const uint64_t value) {
 
 	// Set number of ones to zero
 	int numberOfOnes = 0;
@@ -273,7 +274,7 @@ const int Common::numberOfOnes(const uint64_t value) {
 }
 
 // To hex string
-const string Common::toHexString(const uint8_t *data, const size_t length) {
+string Common::toHexString(const uint8_t *data, const size_t length) {
 
 	// Initialize hex string
 	stringstream hexString;
@@ -290,7 +291,7 @@ const string Common::toHexString(const uint8_t *data, const size_t length) {
 }
 
 // Host byte order to big endian
-const uint64_t Common::hostByteOrderToBigEndian(const uint64_t value) {
+uint64_t Common::hostByteOrderToBigEndian(const uint64_t value) {
 
 	// Check if Windows
 	#ifdef _WIN32
@@ -323,7 +324,7 @@ const uint64_t Common::hostByteOrderToBigEndian(const uint64_t value) {
 }
 
 // Big endian to host byte order
-const uint64_t Common::bigEndianToHostByteOrder(const uint64_t value) {
+uint64_t Common::bigEndianToHostByteOrder(const uint64_t value) {
 
 	// Check if Windows
 	#ifdef _WIN32
@@ -356,7 +357,7 @@ const uint64_t Common::bigEndianToHostByteOrder(const uint64_t value) {
 }
 
 // Host byte order to little endian
-const uint64_t Common::hostByteOrderToLittleEndian(const uint64_t value) {
+uint64_t Common::hostByteOrderToLittleEndian(const uint64_t value) {
 
 	// Check if Windows
 	#ifdef _WIN32
@@ -389,7 +390,7 @@ const uint64_t Common::hostByteOrderToLittleEndian(const uint64_t value) {
 }
 
 // Little endian to host byte order
-const uint64_t Common::littleEndianToHostByteOrder(const uint64_t value) {
+uint64_t Common::littleEndianToHostByteOrder(const uint64_t value) {
 
 	// Check if Windows
 	#ifdef _WIN32
@@ -461,27 +462,8 @@ void Common::writeUint64(vector<uint8_t> &buffer, const uint64_t value) {
 // Write int64
 void Common::writeInt64(vector<uint8_t> &buffer, const int64_t value) {
 
-	// Return write uint64
-	return writeUint64(buffer, value);
-}
-
-// Display text
-void Common::displayText(const string &text) {
-
-	// Try
-	try {
-
-		// Lock display lock
-		lock_guard lock(displayLock);
-		
-		// Print text
-		cout << text << endl;
-	}
-	
-	// Catch errors
-	catch(...) {
-	
-	}
+	// Return write int64 as a uint64
+	return writeUint64(buffer, *reinterpret_cast<const uint64_t *>(&value));
 }
 
 // Free memory

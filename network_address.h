@@ -1,6 +1,6 @@
 // Header guard
-#ifndef NETWORK_ADDRESS_H
-#define NETWORK_ADDRESS_H
+#ifndef MWC_VALIDATION_NODE_NETWORK_ADDRESS_H
+#define MWC_VALIDATION_NODE_NETWORK_ADDRESS_H
 
 
 // Header files
@@ -14,6 +14,10 @@
 #endif
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Structures
@@ -49,6 +53,9 @@ struct NetworkAddress final {
 	// Port
 	decltype(sockaddr_in::sin_port) port;
 };
+
+
+}
 
 
 #endif

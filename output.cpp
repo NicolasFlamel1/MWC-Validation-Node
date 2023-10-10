@@ -8,6 +8,10 @@
 using namespace std;
 
 
+// Namespace
+using namespace MwcValidationNode;
+
+
 // Supporting function implementation
 
 // Constructor
@@ -40,7 +44,7 @@ Output::Output(const Features features, const uint8_t commitment[Crypto::COMMITM
 }
 
 // Serialize
-const vector<uint8_t> Output::serialize() const {
+vector<uint8_t> Output::serialize() const {
 
 	// Initialize serialized output
 	vector<uint8_t> serializedOutput;
@@ -64,7 +68,7 @@ const vector<uint8_t> Output::serialize() const {
 }
 
 // Get lookup value
-const optional<vector<uint8_t>> Output::getLookupValue() const {
+optional<vector<uint8_t>> Output::getLookupValue() const {
 
 	// Check if serializing commitment failed
 	vector<uint8_t> serializedCommitment(Crypto::COMMITMENT_LENGTH);
@@ -127,31 +131,15 @@ void Output::subtractFromSum(secp256k1_pedersen_commitment &sum, const Subtracti
 	// Check if subtracting because pruned or rewinded
 	if(subtractionReason == SubtractionReason::PRUNED || subtractionReason == SubtractionReason::REWINDED) {
 	
-		// Check if serializing sum and/or commitment failed
-		uint8_t serializedSum[Crypto::COMMITMENT_LENGTH];
-		uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
-		if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedSum, &sum) || !secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &commitment)) {
+		// Check if sum is zero
+		if(all_of(reinterpret_cast<uint8_t *>(&sum), reinterpret_cast<uint8_t *>(&sum) + sizeof(sum), [](const uint8_t value) {
 		
-			// Throw exception
-			throw runtime_error("Serializing sum and/or commitment failed");
-		}
-		
-		// Check if serialized sum and serialized commitment are equal
-		if(!memcmp(serializedSum, serializedCommitment, sizeof(serializedCommitment))) {
-		
-			// Set sum to zero
-			memset(&sum, 0, sizeof(sum));
-		}
-		
-		// Otherwise
-		else {
+			// Return if value is zero
+			return !value;
+		})) {
 		
 			// Set positive commitments
-			const secp256k1_pedersen_commitment *positiveCommitments[] = {
-			
-				// Sum
-				&sum
-			};
+			const secp256k1_pedersen_commitment *positiveCommitments[] = {};
 			
 			// Set negative commitments
 			const secp256k1_pedersen_commitment *negativeCommitments[] = {
@@ -162,7 +150,7 @@ void Output::subtractFromSum(secp256k1_pedersen_commitment &sum, const Subtracti
 
 			// Check if adding to positive and negative commitments failed
 			secp256k1_pedersen_commitment result;
-			if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &result, positiveCommitments, 1, negativeCommitments, 1)) {
+			if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &result, positiveCommitments, 0, negativeCommitments, 1)) {
 			
 				// Throw exception
 				throw runtime_error("Adding to positive and negative commitments failed");
@@ -171,11 +159,78 @@ void Output::subtractFromSum(secp256k1_pedersen_commitment &sum, const Subtracti
 			// Set sum to the result
 			sum = result;
 		}
+		
+		// Otherwise
+		else {
+	
+			// Check if serializing sum and/or commitment failed
+			uint8_t serializedSum[Crypto::COMMITMENT_LENGTH];
+			uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
+			if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedSum, &sum) || !secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &commitment)) {
+			
+				// Throw exception
+				throw runtime_error("Serializing sum and/or commitment failed");
+			}
+			
+			// Check if serialized sum and serialized commitment are equal
+			if(!memcmp(serializedSum, serializedCommitment, sizeof(serializedCommitment))) {
+			
+				// Set sum to zero
+				memset(&sum, 0, sizeof(sum));
+			}
+			
+			// Otherwise
+			else {
+			
+				// Set positive commitments
+				const secp256k1_pedersen_commitment *positiveCommitments[] = {
+				
+					// Sum
+					&sum
+				};
+				
+				// Set negative commitments
+				const secp256k1_pedersen_commitment *negativeCommitments[] = {
+				
+					// Commitment
+					&commitment
+				};
+
+				// Check if adding to positive and negative commitments failed
+				secp256k1_pedersen_commitment result;
+				if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &result, positiveCommitments, 1, negativeCommitments, 1)) {
+				
+					// Throw exception
+					throw runtime_error("Adding to positive and negative commitments failed");
+				}
+				
+				// Set sum to the result
+				sum = result;
+			}
+		}
 	}
 }
 
+// Save
+void Output::save(ofstream &file) const {
+
+	// Write features to file
+	file.write(reinterpret_cast<const char *>(&features), sizeof(features));
+	
+	// Check if serializing commitment failed
+	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &commitment)) {
+	
+		// Throw exception
+		throw runtime_error("Serializing commitment failed");
+	}
+	
+	// Write commitment to file
+	file.write(reinterpret_cast<const char *>(serializedCommitment), sizeof(serializedCommitment));
+}
+
 // Equality operator
-const bool Output::operator==(const Output &other) const {
+bool Output::operator==(const Output &other) const {
 
 	// Check if features differ
 	if(features != other.features) {
@@ -205,14 +260,14 @@ const bool Output::operator==(const Output &other) const {
 }
 
 // Inequality operator
-const bool Output::operator!=(const Output &other) const {
+bool Output::operator!=(const Output &other) const {
 
 	// Return if outputs aren't equal
 	return !(*this == other);
 }
 
 // Get features
-const Output::Features Output::getFeatures() const {
+Output::Features Output::getFeatures() const {
 
 	// Return features
 	return features;
@@ -225,9 +280,23 @@ const secp256k1_pedersen_commitment &Output::getCommitment() const {
 	return commitment;
 }
 
-// Unserialize
-const Output Output::unserialize(const array<uint8_t, SERIALIZED_LENGTH> &serializedOutput, const bool isGenesisBlockOutput) {
+// Get serialized protocol version
+uint32_t Output::getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedOutput, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedOutputLength, const uint32_t protocolVersion) {
 
+	// Return protocol version
+	return protocolVersion;
+}
+
+// Unserialize
+pair<Output, array<uint8_t, Output::MAXIMUM_SERIALIZED_LENGTH>::size_type> Output::unserialize(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedOutput, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedOutputLength, const uint32_t protocolVersion, const bool isGenesisBlockOutput) {
+
+	// Check if serialized output doesn't contain features and a commitment
+	if(serializedOutputLength < MAXIMUM_SERIALIZED_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Serialized output doesn't contain features and a commitment");
+	}
+	
 	// Get features from serialized output
 	const Features features = (Common::readUint8(serializedOutput, 0) < static_cast<underlying_type_t<Features>>(Features::UNKNOWN)) ? static_cast<Features>(Common::readUint8(serializedOutput, 0)) : Features::UNKNOWN;
 	
@@ -235,5 +304,83 @@ const Output Output::unserialize(const array<uint8_t, SERIALIZED_LENGTH> &serial
 	const uint8_t *commitment = &serializedOutput[sizeof(features)];
 	
 	// Return output
-	return Output(features, commitment, isGenesisBlockOutput);
+	return {Output(features, commitment, isGenesisBlockOutput), MAXIMUM_SERIALIZED_LENGTH};
+}
+
+// Restore
+Output Output::restore(ifstream &file) {
+
+	// Return output created from file
+	return Output(file);
+}
+
+// Save sum
+void Output::saveSum(const secp256k1_pedersen_commitment &sum, ofstream &file) {
+
+	// Check if sum isn't zero
+	uint8_t serializedSum[Crypto::COMMITMENT_LENGTH] = {};
+	if(any_of(reinterpret_cast<const uint8_t *>(&sum), reinterpret_cast<const uint8_t *>(&sum) + sizeof(sum), [](const uint8_t value) {
+	
+		// Return if value isn't zero
+		return value;
+	})) {
+	
+		// Check if serializing sum failed
+		if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedSum, &sum)) {
+		
+			// Throw exception
+			throw runtime_error("Serializing sum failed");
+		}
+	}
+	
+	// Write sum to file
+	file.write(reinterpret_cast<const char *>(serializedSum), sizeof(serializedSum));
+}
+
+// Restore sum
+void Output::restoreSum(secp256k1_pedersen_commitment &sum, ifstream &file) {
+
+	// Read sum from file
+	uint8_t serializedSum[Crypto::COMMITMENT_LENGTH];
+	file.read(reinterpret_cast<char *>(serializedSum), sizeof(serializedSum));
+	
+	// Check if sum is zero
+	if(all_of(serializedSum, serializedSum + sizeof(serializedSum), [](const uint8_t value) {
+	
+		// Return if value is zero
+		return !value;
+	})) {
+	
+		// Set sum to zero
+		memset(&sum, 0, sizeof(sum));
+	}
+	
+	// Otherwise
+	else {
+	
+		// Check if parsing sum failed
+		if(!secp256k1_pedersen_commitment_parse(secp256k1_context_no_precomp, &sum, serializedSum)) {
+	
+			// Throw exception
+			throw runtime_error("Parsing sum failed");
+		}
+	}
+}
+
+// Constructor
+Output::Output(ifstream &file) {
+
+	// Read features from file
+	file.read(reinterpret_cast<char *>(&features), sizeof(features));
+	
+	// Read commitment from file
+	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
+	file.read(reinterpret_cast<char *>(serializedCommitment), sizeof(serializedCommitment));
+	
+	// Check if parsing commitment failed
+	if(!secp256k1_pedersen_commitment_parse(secp256k1_context_no_precomp, &commitment, serializedCommitment)) {
+	
+		// Throw exception
+		throw runtime_error("Parsing commitment failed");
+	}
 }

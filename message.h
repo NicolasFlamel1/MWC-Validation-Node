@@ -1,6 +1,6 @@
 // Header guard
-#ifndef MESSAGE_H
-#define MESSAGE_H
+#ifndef MWC_VALIDATION_NODE_MESSAGE_H
+#define MWC_VALIDATION_NODE_MESSAGE_H
 
 
 // Header files
@@ -10,6 +10,10 @@
 #include "./node.h"
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Message class
@@ -107,61 +111,61 @@ class Message final {
 		Message() = delete;
 		
 		// Create hand message
-		static const vector<uint8_t> createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress);
+		static vector<uint8_t> createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress);
 		
 		// Create ping message
-		static const vector<uint8_t> createPingMessage(const uint64_t totalDifficulty, const uint64_t height);
+		static vector<uint8_t> createPingMessage(const uint64_t totalDifficulty, const uint64_t height);
 		
 		// Create pong message
-		static const vector<uint8_t> createPongMessage(const uint64_t totalDifficulty, const uint64_t height);
+		static vector<uint8_t> createPongMessage(const uint64_t totalDifficulty, const uint64_t height);
 		
 		// Create get peer addresses message
-		static const vector<uint8_t> createGetPeerAddressesMessage(const Node::Capabilities capabilities);
+		static vector<uint8_t> createGetPeerAddressesMessage(const Node::Capabilities capabilities);
 		
 		// Create peer addresses message
-		static const vector<uint8_t> createPeerAddressesMessage(const vector<NetworkAddress> &peerAddresses);
+		static vector<uint8_t> createPeerAddressesMessage(const vector<NetworkAddress> &peerAddresses);
 		
 		// Create get headers message
-		static const vector<uint8_t> createGetHeadersMessage(const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> &blockHashes);
+		static vector<uint8_t> createGetHeadersMessage(const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> &blockHashes);
 		
 		// Create get block message
-		static const vector<uint8_t> createGetBlockMessage(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
+		static vector<uint8_t> createGetBlockMessage(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
 		
 		// Create get transaction hash set message
-		static const vector<uint8_t> createGetTransactionHashSetMessage(const uint64_t height, const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
+		static vector<uint8_t> createGetTransactionHashSetMessage(const uint64_t height, const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
 		
 		// Create error message
-		static const vector<uint8_t> createErrorMessage();
+		static vector<uint8_t> createErrorMessage();
 		
 		// Read message header
-		static const tuple<Type, vector<uint8_t>::size_type> readMessageHeader(const vector<uint8_t> &messageHeader);
+		static tuple<Type, vector<uint8_t>::size_type> readMessageHeader(const vector<uint8_t> &messageHeader);
 		
 		// Read shake message
-		static const tuple<Node::Capabilities, uint64_t, string, uint32_t> readShakeMessage(const vector<uint8_t> &shakeMessage);
+		static tuple<Node::Capabilities, uint64_t, string, uint32_t> readShakeMessage(const vector<uint8_t> &shakeMessage);
 		
 		// Read ping message
-		static const uint64_t readPingMessage(const vector<uint8_t> &pingMessage);
+		static uint64_t readPingMessage(const vector<uint8_t> &pingMessage);
 		
 		// Read pong message
-		static const uint64_t readPongMessage(const vector<uint8_t> &pongMessage);
+		static uint64_t readPongMessage(const vector<uint8_t> &pongMessage);
 		
 		// Read get peer addresses message
-		static const Node::Capabilities readGetPeerAddressesMessage(const vector<uint8_t> &getPeerAddressesMessage);
+		static Node::Capabilities readGetPeerAddressesMessage(const vector<uint8_t> &getPeerAddressesMessage);
 		
 		// Read peer addresses message
-		static const list<NetworkAddress> readPeerAddressesMessage(const vector<uint8_t> &peerAddressesMessage);
+		static list<NetworkAddress> readPeerAddressesMessage(const vector<uint8_t> &peerAddressesMessage);
 		
 		// Read header message
-		static const Header readHeaderMessage(const vector<uint8_t> &headerMessage);
+		static Header readHeaderMessage(const vector<uint8_t> &headerMessage);
 		
 		// Read headers message
-		static const list<Header> readHeadersMessage(const vector<uint8_t> &headersMessage);
+		static list<Header> readHeadersMessage(const vector<uint8_t> &headersMessage);
 		
 		// Read block message
-		static const tuple<Header, Block> readBlockMessage(const vector<uint8_t> &blockMessage, const uint32_t protocolVersion);
+		static tuple<Header, Block> readBlockMessage(const vector<uint8_t> &blockMessage, const uint32_t protocolVersion);
 		
 		// Read transaction hash set archive message
-		static const tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::size_type> readTransactionHashSetArchiveMessage(const vector<uint8_t> &transactionHashSetArchiveMessage);
+		static tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::size_type> readTransactionHashSetArchiveMessage(const vector<uint8_t> &transactionHashSetArchiveMessage);
 	
 	// Private
 	private:
@@ -191,32 +195,35 @@ class Message final {
 		static const size_t MAXIMUM_KERNELS_LENGTH;
 		
 		// Get maximum payload length
-		static const vector<uint8_t>::size_type getMaximumPayloadLength(const Type type);
+		static vector<uint8_t>::size_type getMaximumPayloadLength(const Type type);
 		
 		// Create message header
-		static const vector<uint8_t> createMessageHeader(const Type type, const vector<uint8_t>::size_type payloadLength);
+		static vector<uint8_t> createMessageHeader(const Type type, const vector<uint8_t>::size_type payloadLength);
 		
 		// Write network address
 		static void writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress &networkAddress);
 		
 		// Read network address
-		static const NetworkAddress readNetworkAddress(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
+		static NetworkAddress readNetworkAddress(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
 		
 		// Read header
-		static const Header readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
+		static Header readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
 		
 		// Read input
-		static const Input readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion);
+		static Input readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion);
 		
 		// Read output
-		static const Output readOutput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
+		static Output readOutput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
 		
 		// Read rangeproof
-		static const Rangeproof readRangeproof(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
+		static Rangeproof readRangeproof(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
 		
 		// Read kernel
-		static const Kernel readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
+		static Kernel readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion);
 };
+
+
+}
 
 
 #endif

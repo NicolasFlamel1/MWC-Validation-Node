@@ -1,11 +1,12 @@
 // Header guard
-#ifndef NODE_H
-#define NODE_H
+#ifndef MWC_VALIDATION_NODE_NODE_H
+#define MWC_VALIDATION_NODE_NODE_H
 
 
 // Header files
 #include "./common.h"
 #include <condition_variable>
+#include <functional>
 #include <list>
 #include <random>
 #include <shared_mutex>
@@ -17,6 +18,10 @@
 #include "./merkle_mountain_range.h"
 
 using namespace std;
+
+
+// Namespace
+namespace MwcValidationNode {
 
 
 // Classes
@@ -48,7 +53,7 @@ class Node final {
 			// Transaction kernel hash
 			TRANSACTION_KERNEL_HASH = 1 << 3,
 			
-			// Check if Tor is enabled
+			// Check if tor is enabled
 			#ifdef TOR_ENABLE
 			
 				// Tor address
@@ -71,14 +76,56 @@ class Node final {
 		// User agent
 		static constexpr const char USER_AGENT[] = TOSTRING(PROGRAM_NAME) " " TOSTRING(PROGRAM_VERSION);
 	
-		// DNS seeds
-		static const unordered_set<string> DNS_SEEDS;
-	
 		// Constructor
-		Node();
+		explicit Node(const string &torProxyAddress = "localhost", const string &torProxyPort = "9050");
 		
 		// Destructor
 		~Node();
+		
+		// Save
+		void save(ofstream &file) const;
+		
+		// Restore
+		void restore(ifstream &file);
+		
+		// Set on start syncing callback
+		void setOnStartSyncingCallback(const function<void()> &onStartSyncingCallback);
+		
+		// Set on synced callback
+		void setOnSyncedCallback(const function<void()> &onSyncedCallback);
+		
+		// Set on error callback
+		void setOnErrorCallback(const function<void()> &onErrorCallback);
+		
+		// Set on transaction hash set callback
+		void setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> &onTransactionHashSetCallback);
+		
+		// Set on reorg callback
+		void setOnReorgCallback(const function<bool(const uint64_t newHeight)> &onReorgCallback);
+		
+		// Set on block callback
+		void setOnBlockCallback(const function<bool(const Header &header, const Block &block)> &onBlockCallback);
+		
+		// Set on peer connect callback
+		void setOnPeerConnectCallback(const function<void(const string &peerIdentifier)> &onPeerConnectCallback);
+		
+		// Set on peer disconnect callback
+		void setOnPeerDisconnectCallback(const function<void(const string &peerIdentifier)> &onPeerDisconnectCallback);
+		
+		// Start
+		void start(const char *customDnsSeed = nullptr);
+		
+		// Stop
+		void stop();
+		
+		// Get is synced
+		bool getIsSynced() const;
+		
+		// Get peers
+		list<Peer> &getPeers();
+		
+		// Disconnect
+		void disconnect();
 		
 		// Get thread
 		thread &getThread();
@@ -87,10 +134,10 @@ class Node final {
 		shared_mutex &getLock();
 	
 		// Get total difficulty
-		const uint64_t getTotalDifficulty() const;
+		uint64_t getTotalDifficulty() const;
 		
 		// Get height
-		const uint64_t getHeight() const;
+		uint64_t getHeight() const;
 		
 		// Get headers
 		const MerkleMountainRange<Header> &getHeaders() const;
@@ -108,7 +155,7 @@ class Node final {
 		void addUnusedPeerCandidate(string &&peerCandidate);
 		
 		// Is unused peer candidate valid
-		const bool isUnusedPeerCandidateValid(const string &peerCandidate) const;
+		bool isUnusedPeerCandidateValid(const string &peerCandidate) const;
 		
 		// Get currently used peer candidates
 		unordered_set<string> &getCurrentlyUsedPeerCandidates();
@@ -117,7 +164,7 @@ class Node final {
 		void addRecentlyAttemptedPeerCandidate(const string &peerCandidate);
 		
 		// Is peer candidate recently attempted
-		const bool isPeerCandidateRecentlyAttempted(const string &peerCandidate) const;
+		bool isPeerCandidateRecentlyAttempted(const string &peerCandidate) const;
 		
 		// Get healthy peers
 		unordered_map<string, pair<chrono::time_point<chrono::steady_clock>, Capabilities>> &getHealthyPeers();
@@ -126,25 +173,40 @@ class Node final {
 		void addHealthyPeer(const string &peer, const Capabilities capabilities);
 		
 		// Is peer healthy
-		const bool isPeerHealthy(const string &peer) const;
+		bool isPeerHealthy(const string &peer) const;
 		
 		// Add banned peer
 		void addBannedPeer(const string &peer);
 		
 		// Is peer banned
-		const bool isPeerBanned(const string &peer) const;
+		bool isPeerBanned(const string &peer) const;
 		
 		// Set sync state
-		void setSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, MerkleMountainRange<Kernel> &&kernels, MerkleMountainRange<Output> &&outputs, MerkleMountainRange<Rangeproof> &&rangeproofs);
+		void setSyncState(MerkleMountainRange<Header> &&headers, const Header &transactionHashSetArchiveHeader, MerkleMountainRange<Kernel> &&kernels, MerkleMountainRange<Output> &&outputs, MerkleMountainRange<Rangeproof> &&rangeproofs);
 		
 		// Update sync state
-		const bool updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, Block &&block);
+		bool updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, const Block &block);
 		
 		// Update sync state
-		const bool updateSyncState(const uint64_t syncedHeaderIndex, Block &&block);
+		bool updateSyncState(const uint64_t syncedHeaderIndex, const Block &block);
+		
+		// Peer connected
+		void peerConnected(const string &peerIdentifier);
+		
+		// Get tor proxy address
+		const string &getTorProxyAddress() const;
+		
+		// Get tor proxy port
+		const string &getTorProxyPort() const;
+		
+		// Get DNS seeds
+		const unordered_set<string> &getDnsSeeds() const;
 		
 	// Private
 	private:
+		
+		// Default DNS seeds
+		static const unordered_set<string> DEFAULT_DNS_SEEDS;
 		
 		// Desired number of peers
 		static const list<Peer>::size_type DESIRED_NUMBER_OF_PEERS;
@@ -156,7 +218,7 @@ class Node final {
 		static const chrono::seconds DELAY_BEFORE_SYNCING_DURATION;
 		
 		// Peer event occurred timeout
-		static const chrono::milliseconds PEER_EVENT_OCCURRED_TIMEOUT;
+		static const chrono::seconds PEER_EVENT_OCCURRED_TIMEOUT;
 		
 		// Unused peer candidate valid duration
 		static const chrono::minutes UNUSED_PEER_CANDIDATE_VALID_DURATION;
@@ -185,6 +247,9 @@ class Node final {
 		// Remove random peer interval
 		static const chrono::hours REMOVE_RANDOM_PEER_INTERVAL;
 		
+		// Apply block to sync state
+		bool applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &block);
+		
 		// Monitor
 		void monitor();
 		
@@ -211,7 +276,40 @@ class Node final {
 		
 		// Remove unbanned peers
 		void removeUnbannedPeers();
-	
+		
+		// On start syncing callback
+		function<void()> onStartSyncingCallback;
+		
+		// On synced callback
+		function<void()> onSyncedCallback;
+		
+		// On error callback
+		function<void()> onErrorCallback;
+		
+		// On transaction hash set callback
+		function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> onTransactionHashSetCallback;
+		
+		// On reorg callback
+		function<bool(const uint64_t newHeight)> onReorgCallback;
+		
+		// On block callback
+		function<bool(const Header &header, const Block &block)> onBlockCallback;
+		
+		// On peer connect callback
+		function<void(const string &peerIdentifier)> onPeerConnectCallback;
+		
+		// On peer disconnect callback
+		function<void(const string &peerIdentifier)> onPeerDisconnectCallback;
+		
+		// Tor proxy address
+		const string torProxyAddress;
+		
+		// Tor proxy port
+		const string torProxyPort;
+		
+		// Custom DNS seeds
+		unordered_set<string> customDnsSeeds;
+		
 		// Random number generator
 		mt19937_64 randomNumberGenerator;
 		
@@ -263,6 +361,9 @@ class Node final {
 		// Main thread
 		thread mainThread;
 };
+
+
+}
 
 
 #endif
