@@ -582,7 +582,7 @@ void Peer::connect(const string &address) {
 		// Check if is Onion service
 		if(isOnionService) {
 		
-			// Check if tor is enabled
+			// Check if Tor is enabled
 			#ifdef TOR_ENABLE
 			
 				// Set current address to the address
@@ -647,10 +647,10 @@ void Peer::connect(const string &address) {
 		// Initialize address info
 		addrinfo *addressInfo;
 		
-		// Check if tor is enabled
+		// Check if Tor is enabled
 		#ifdef TOR_ENABLE
 		
-			// Check if getting address info for the node's tor proxy failed
+			// Check if getting address info for the node's Tor proxy failed
 			if(getaddrinfo(node.getTorProxyAddress().c_str(), node.getTorProxyPort().c_str(), &hints, &addressInfo)) {
 		
 		// Otherwise
@@ -724,7 +724,7 @@ void Peer::connect(const string &address) {
 				#endif
 			};
 			
-			// Check if tor is enabled
+			// Check if Tor is enabled
 			#ifdef TOR_ENABLE
 			
 				// Initialize current server
@@ -756,7 +756,7 @@ void Peer::connect(const string &address) {
 				// Otherwise
 				else {
 				
-					// Check if tor is disabled
+					// Check if Tor is disabled
 					#ifndef TOR_ENABLE
 			
 						// Check server family
@@ -895,7 +895,7 @@ void Peer::connect(const string &address) {
 				// Otherwise
 				else {
 				
-					// Check if tor is disabled
+					// Check if Tor is disabled
 					#ifndef TOR_ENABLE
 					
 						// Check if no more servers exist
@@ -1037,7 +1037,7 @@ void Peer::connect(const string &address) {
 										// Set invalid server to false
 										bool invalidServer = false;
 									
-										// Check if tor is enabled
+										// Check if Tor is enabled
 										#ifdef TOR_ENABLE
 										
 											// Check if Windows
@@ -3574,7 +3574,7 @@ bool Peer::processRequestsAndOrResponses() {
 							// Check if peer is healthy
 							if(node.isPeerHealthy(healthyPeer.first)) {
 						
-								// Check if tor is enabled
+								// Check if Tor is enabled
 								#ifdef TOR_ENABLE
 							
 									// Check if healthy peer has the desired capabilities
@@ -3678,23 +3678,23 @@ bool Peer::processRequestsAndOrResponses() {
 										}
 									}
 									
-									// Check if tor is enabled
+									// Check if Tor is enabled
 									#ifdef TOR_ENABLE
 								
-										// Otherwise check if capabilities includes tor address
+										// Otherwise check if capabilities includes Tor address
 										else if(capabilities & Node::Capabilities::TOR_ADDRESS) {
 										
-											// Append tor address to list and get it
+											// Append Tor address to list and get it
 											addresses.emplace_back(healthyPeer.first);
 											const string &torAddress = get<string>(addresses.back());
 										
 											// Set network address's family to Onion service
 											networkAddress.family = NetworkAddress::Family::ONION_SERVICE;
 											
-											// Set network address's address to the tor address
+											// Set network address's address to the Tor address
 											networkAddress.address = torAddress.c_str();
 											
-											// Set network address's address length to the tor address length
+											// Set network address's address length to the Tor address length
 											networkAddress.addressLength = torAddress.size();
 										}
 									#endif
@@ -3847,7 +3847,7 @@ bool Peer::processRequestsAndOrResponses() {
 								// Break
 								break;
 							
-							// Check if tor is enabled
+							// Check if Tor is enabled
 							#ifdef TOR_ENABLE
 							
 								// Onion service
@@ -3904,7 +3904,7 @@ bool Peer::processRequestsAndOrResponses() {
 							node.addHealthyPeer(identifier, capabilities);
 						}
 						
-						// Check if tor is enabled
+						// Check if Tor is enabled
 						#ifdef TOR_ENABLE
 						
 							// Check if capabilities isn't a full node

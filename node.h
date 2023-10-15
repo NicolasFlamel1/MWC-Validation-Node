@@ -53,7 +53,7 @@ class Node final {
 			// Transaction kernel hash
 			TRANSACTION_KERNEL_HASH = 1 << 3,
 			
-			// Check if tor is enabled
+			// Check if Tor is enabled
 			#ifdef TOR_ENABLE
 			
 				// Tor address
@@ -193,10 +193,10 @@ class Node final {
 		// Peer connected
 		void peerConnected(const string &peerIdentifier);
 		
-		// Get tor proxy address
+		// Get Tor proxy address
 		const string &getTorProxyAddress() const;
 		
-		// Get tor proxy port
+		// Get Tor proxy port
 		const string &getTorProxyPort() const;
 		
 		// Get DNS seeds

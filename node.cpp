@@ -26,7 +26,7 @@ const Node::Capabilities Node::CAPABILITIES = Node::Capabilities::PEER_LIST;
 		"seed1.mwc.mw:13414",
 		"seed2.mwc.mw:13414",
 		
-		// Check if tor is enabled
+		// Check if Tor is enabled
 		#ifdef TOR_ENABLE
 		
 			"wt635fgwmhokk25lv7y2jvrg63mokg7nfni5owrtzalz3nx22dgjytid.onion",
@@ -46,7 +46,7 @@ const Node::Capabilities Node::CAPABILITIES = Node::Capabilities::PEER_LIST;
 		"greg2.mainnet.seed.mwc.mw:3414",
 		"mwcseed.ddns.net:3414",
 		
-		// Check if tor is enabled
+		// Check if Tor is enabled
 		#ifdef TOR_ENABLE
 		
 			"uukwrgtxogz6kkpcejssb7aenb7ey7pr3h5i4llhse445dfpbp63osyd.onion",
@@ -104,10 +104,10 @@ const chrono::hours Node::REMOVE_RANDOM_PEER_INTERVAL = 6h;
 // Constructor
 Node::Node(const string &torProxyAddress, const string &torProxyPort) :
 
-	// Set tor proxy address
+	// Set Tor proxy address
 	torProxyAddress(torProxyAddress),
 	
-	// Set tor proxy port
+	// Set Tor proxy port
 	torProxyPort(torProxyPort),
 	
 	// Create random number generator with a random device
@@ -751,17 +751,17 @@ void Node::peerConnected(const string &peerIdentifier) {
 	}
 }
 
-// Get tor proxy address
+// Get Tor proxy address
 const string &Node::getTorProxyAddress() const {
 
-	// Return tor proxy address
+	// Return Tor proxy address
 	return torProxyAddress;
 }
 
-// Get tor proxy port
+// Get Tor proxy port
 const string &Node::getTorProxyPort() const {
 
-	// Return tor proxy port
+	// Return Tor proxy port
 	return torProxyPort;
 }
 

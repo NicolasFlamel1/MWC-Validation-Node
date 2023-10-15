@@ -10,7 +10,7 @@ make dependencies
 make
 ```
 
-The optional arguments `FLOONET` and `TOR` can be used when compiling this program to compile for floonet and tor respectively. For example:
+The optional arguments `FLOONET` and `TOR` can be used when compiling this program to compile for floonet and Tor respectively. For example:
 ```
 make FLOONET=1 TOR=1
 ```
