@@ -52,7 +52,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		void appendLeaf(MerkleMountainRangeLeafDerivedClass &&leaf);
 		
 		// Prune leaf
-		void pruneLeaf(const uint64_t leafIndex);
+		void pruneLeaf(const uint64_t leafIndex, const bool permanent = false);
 		
 		// Get size
 		uint64_t getSize() const;
@@ -274,7 +274,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 }
 
 // Prune leaf
-template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::pruneLeaf(const uint64_t leafIndex) {
+template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::pruneLeaf(const uint64_t leafIndex, const bool permanent) {
 
 	// Check if leaf index is invalid
 	if(leafIndex >= numberOfLeaves) {
@@ -308,11 +308,25 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 	// Subtract from sum
 	unprunedLeaves.at(leafIndex).subtractFromSum(sum, MerkleMountainRangeLeafDerivedClass::SubtractionReason::PRUNED);
 	
-	// Add prune event to the prune history
-	pruneHistory[numberOfLeaves].insert(leafIndex);
+	// Check if permanent
+	if(permanent) {
 	
-	// Move leaf to the prune list
-	pruneList.emplace(leafIndex, move(unprunedLeaves.extract(leafIndex).mapped()));
+		// Remove leaf
+		unprunedLeaves.erase(leafIndex);
+		
+		// Prune leaf's hash
+		pruneHash(leafIndex);
+	}
+	
+	// Otherwise
+	else {
+	
+		// Add prune event to the prune history
+		pruneHistory[numberOfLeaves].insert(leafIndex);
+		
+		// Move leaf to the prune list
+		pruneList.emplace(leafIndex, move(unprunedLeaves.extract(leafIndex).mapped()));
+	}
 }
 
 // Get size

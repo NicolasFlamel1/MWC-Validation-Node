@@ -198,26 +198,6 @@ void Node::save(ofstream &file) const {
 		const uint32_t serializedCapabilities = htonl(static_cast<underlying_type_t<Capabilities>>(healthyPeer.second.second));
 		file.write(reinterpret_cast<const char *>(&serializedCapabilities), sizeof(serializedCapabilities)); 
 	}
-	
-	// Write banned peers size to file
-	const uint64_t serializedBannedPeersSize = Common::hostByteOrderToBigEndian(bannedPeers.size());
-	file.write(reinterpret_cast<const char *>(&serializedBannedPeersSize), sizeof(serializedBannedPeersSize));
-	
-	// Go through all banned peers
-	for(const pair<const string, chrono::time_point<chrono::steady_clock>> &bannedPeer : bannedPeers) {
-	
-		// Write identifier size to file
-		const uint64_t serializedIdentifierSize = Common::hostByteOrderToBigEndian(bannedPeer.first.size());
-		file.write(reinterpret_cast<const char *>(&serializedIdentifierSize), sizeof(serializedIdentifierSize));
-		
-		// Write identifier to file
-		file.write(bannedPeer.first.data(), bannedPeer.first.size());
-		
-		// Write timestamp to file
-		const int64_t timestamp = chrono::duration_cast<chrono::seconds>(bannedPeer.second.time_since_epoch()).count();
-		const uint64_t serializedTimestamp = Common::hostByteOrderToBigEndian(*reinterpret_cast<const uint64_t *>(&timestamp));
-		file.write(reinterpret_cast<const char *>(&serializedTimestamp), sizeof(serializedTimestamp));
-	}
 }
 
 // Restore
@@ -262,31 +242,6 @@ void Node::restore(ifstream &file) {
 		
 		// Add healthy peer to healthy peers
 		healthyPeers.emplace(move(identifier), make_pair(chrono::steady_clock::now(), static_cast<Capabilities>(ntohl(serializedCapabilities))));
-	}
-	
-	// Read banned peers size from file
-	uint64_t serializedBannedPeersSize;
-	file.read(reinterpret_cast<char *>(&serializedBannedPeersSize), sizeof(serializedBannedPeersSize));
-	const uint64_t bannedPeersSize = Common::bigEndianToHostByteOrder(serializedBannedPeersSize);
-	
-	// Go through all banned peers
-	for(uint64_t i = 0; i < bannedPeersSize; ++i) {
-	
-		// Read identifier size from file
-		uint64_t serializedIdentifierSize;
-		file.read(reinterpret_cast<char *>(&serializedIdentifierSize), sizeof(serializedIdentifierSize));
-		
-		// Read identifier from file
-		string identifier(Common::bigEndianToHostByteOrder(serializedIdentifierSize), '\0');
-		file.read(identifier.data(), identifier.size());
-		
-		// Read timestamp from file
-		uint64_t serializedTimestamp;
-		file.read(reinterpret_cast<char *>(&serializedTimestamp), sizeof(serializedTimestamp));
-		serializedTimestamp = Common::bigEndianToHostByteOrder(serializedTimestamp);
-		
-		// Add banned peer to banned peers
-		bannedPeers.emplace(move(identifier), chrono::time_point<chrono::steady_clock>(chrono::seconds(*reinterpret_cast<const int64_t *>(&serializedTimestamp))));
 	}
 	
 	// Go through all healthy peers
@@ -603,6 +558,23 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 		}
 	}
 	
+	// Check if pruning rangeproofs
+	#ifdef PRUNE_RANGEPROOFS
+	
+		// Go through all rangeproofs
+		for(MerkleMountainRange<Rangeproof>::const_iterator i = rangeproofs.cbegin(); i != rangeproofs.cend();) {
+		
+			// Get rangeproof
+			const pair<uint64_t, Rangeproof> &rangeproof = *i;
+			
+			// Go to next rangeproof
+			++i;
+			
+			// Prune rangeproof
+			rangeproofs.pruneLeaf(rangeproof.first, true);
+		}
+	#endif
+	
 	// Check if pruning kernels
 	#ifdef PRUNE_KERNELS
 	
@@ -616,7 +588,7 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 			++i;
 			
 			// Prune kernel
-			kernels.pruneLeaf(kernel.first);
+			kernels.pruneLeaf(kernel.first, true);
 		}
 	
 		// Set kernels minimum size to the transaction hash set archive header
@@ -630,7 +602,7 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 		while(transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() >= Consensus::COINBASE_MATURITY) {
 		
 			// Prune oldest header
-			headers.pruneLeaf(headers.front().getHeight());
+			headers.pruneLeaf(headers.front().getHeight(), true);
 		}
 	
 		// Set headers minimum size to the transaction hash set archive header
@@ -802,7 +774,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 		kernels.rewindToSize(headers.getLeaf(syncedHeaderIndex - 1)->getKernelMerkleMountainRangeSize());
 		outputs.rewindToSize(headers.getLeaf(syncedHeaderIndex - 1)->getOutputMerkleMountainRangeSize());
 		rangeproofs.rewindToSize(headers.getLeaf(syncedHeaderIndex - 1)->getOutputMerkleMountainRangeSize());
-
+		
 		// Go through all of the block's outputs
 		for(const Output &output : block.getOutputs()) {
 		
@@ -818,6 +790,20 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 		
 			// Append output to outputs
 			outputs.appendLeaf(output);
+		}
+		
+		// Go through all of the block's rangeproofs
+		for(const Rangeproof &rangeproof : block.getRangeproofs()) {
+		
+			// Append rangeproof to rangeproofs
+			rangeproofs.appendLeaf(rangeproof);
+			
+			// Check if pruning rangeproofs
+			#ifdef PRUNE_RANGEPROOFS
+			
+				// Prune rangeproof
+				rangeproofs.pruneLeaf(rangeproofs.getNumberOfLeaves() - 1);
+			#endif
 		}
 		
 		// Get header at the synced header index
@@ -898,20 +884,6 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			throw runtime_error("Outputs root doesn't match the header's output root");
 		}
 		
-		// Go through all of the block's rangeproofs
-		for(const Rangeproof &rangeproof : block.getRangeproofs()) {
-		
-			// Append rangeproof to rangeproofs
-			rangeproofs.appendLeaf(rangeproof);
-			
-			// Check if pruning rangeproofs
-			#ifdef PRUNE_RANGEPROOFS
-			
-				// Prune rangeproof
-				rangeproofs.pruneLeaf(rangeproofs.getNumberOfLeaves() - 1);
-			#endif
-		}
-		
 		// Check if rangeproofs size doesn't match the header's output Merkle mountain range size
 		if(rangeproofs.getSize() != header->getOutputMerkleMountainRangeSize()) {
 		
@@ -988,7 +960,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 		if(onBlockCallback) {
 		
 			// Check if running on block callback failed
-			if(!onBlockCallback(*headers.getLeaf(syncedHeaderIndex), block)) {
+			if(!onBlockCallback(*header, block)) {
 			
 				// Set callback failed to true
 				callbackFailed = true;
@@ -1051,7 +1023,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 		while(this->syncedHeaderIndex - headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && this->syncedHeaderIndex - headers.front().getHeight() >= Consensus::COINBASE_MATURITY && this->syncedHeaderIndex - headers.front().getHeight() > Consensus::CUT_THROUGH_HORIZON) {
 		
 			// Prune oldest header
-			headers.pruneLeaf(headers.front().getHeight());
+			headers.pruneLeaf(headers.front().getHeight(), true);
 		}
 	#endif
 	

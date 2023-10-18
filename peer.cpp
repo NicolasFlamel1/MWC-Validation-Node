@@ -5365,13 +5365,6 @@ bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vect
 				// Return false
 				return false;
 			}
-			
-			// Check if pruning rangeproofs
-			#ifdef PRUNE_RANGEPROOFS
-			
-				// Prune rangeproof
-				rangeproofs.pruneLeaf(i);
-			#endif
 		}
 	}
 	
