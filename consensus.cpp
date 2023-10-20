@@ -379,7 +379,7 @@ bool Consensus::isBlockHashBanned(const uint8_t blockHash[Crypto::BLAKE2B_HASH_L
 		
 			// Return true
 			return true;
-		} 
+		}
 	}
 	
 	// Return false

@@ -235,7 +235,7 @@ Peer::~Peer() {
 					// Otherwise
 					#else
 				
-						// Check if getting the socket's flags was successful 
+						// Check if getting the socket's flags was successful
 						const int socketFlags = fcntl(socket, F_GETFL);
 						
 						if(socketFlags != -1) {
@@ -328,7 +328,7 @@ Peer::~Peer() {
 				// Otherwise
 				#else
 			
-					// Check if getting the socket's flags was successful 
+					// Check if getting the socket's flags was successful
 					const int socketFlags = fcntl(socket, F_GETFL);
 					
 					if(socketFlags != -1) {
@@ -934,7 +934,7 @@ void Peer::connect(const string &address) {
 					// Otherwise
 					#else
 				
-						// Check if getting the socket's flags was successful 
+						// Check if getting the socket's flags was successful
 						int socketFlags = fcntl(socket, F_GETFL);
 						
 						if(socketFlags != -1) {
@@ -1211,7 +1211,7 @@ void Peer::connect(const string &address) {
 															uint8_t resolveRequest[sizeof("\x05\xF0\x00\x03") - sizeof('\0') + sizeof(uint8_t) + currentAddress.size() + sizeof(portAsNumber)];
 															
 															// Set resolve request's header
-															memcpy(resolveRequest, "\x05\xF0\x00\x03", sizeof("\x05\xF0\x00\x03") - sizeof('\0')); 
+															memcpy(resolveRequest, "\x05\xF0\x00\x03", sizeof("\x05\xF0\x00\x03") - sizeof('\0'));
 															
 															// Set resolve request's address length to the current address length
 															resolveRequest[sizeof("\x05\xF0\x00\x03") - sizeof('\0')] = currentAddress.size();
@@ -1519,7 +1519,7 @@ void Peer::connect(const string &address) {
 																							// Otherwise
 																							#else
 																						
-																								// Check if getting the socket's flags was successful 
+																								// Check if getting the socket's flags was successful
 																								socketFlags = fcntl(socket, F_GETFL);
 																								
 																								if(socketFlags != -1) {
@@ -3059,7 +3059,7 @@ void Peer::disconnect() {
 			// Otherwise
 			#else
 		
-				// Check if getting the socket's flags was successful 
+				// Check if getting the socket's flags was successful
 				const int socketFlags = fcntl(socket, F_GETFL);
 				
 				if(socketFlags != -1) {
@@ -5041,7 +5041,7 @@ bool Peer::processHeaders(list<Header> &&headers) {
 		const uint64_t c29HeadersAdjustment = Common::clamp(Common::damp(numberOfC29Headers * 100, targetNumberOfC29Headers, Consensus::C29_HEADERS_ADJUSTMENT_DAMP_FACTOR), targetNumberOfC29Headers, Consensus::C29_HEADERS_ADJUSTMENT_CLAMP_FACTOR);
 		
 		// Get target secondary scaling
-		const uint32_t targetSecondaryScaling = max(secondaryScalingSum * targetC29Ratio / max(static_cast<uint64_t>(1), c29HeadersAdjustment), static_cast<uint64_t>(Consensus::MINIMUM_SECONDARY_SCALING)); 
+		const uint32_t targetSecondaryScaling = max(secondaryScalingSum * targetC29Ratio / max(static_cast<uint64_t>(1), c29HeadersAdjustment), static_cast<uint64_t>(Consensus::MINIMUM_SECONDARY_SCALING));
 		
 		// Check if secondary scaling isn't correct
 		if(header.getSecondaryScaling() != targetSecondaryScaling) {

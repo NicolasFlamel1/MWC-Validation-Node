@@ -196,7 +196,7 @@ void Node::save(ofstream &file) const {
 		
 		// Write capabilities to file
 		const uint32_t serializedCapabilities = htonl(static_cast<underlying_type_t<Capabilities>>(healthyPeer.second.second));
-		file.write(reinterpret_cast<const char *>(&serializedCapabilities), sizeof(serializedCapabilities)); 
+		file.write(reinterpret_cast<const char *>(&serializedCapabilities), sizeof(serializedCapabilities));
 	}
 }
 

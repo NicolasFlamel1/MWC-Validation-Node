@@ -283,7 +283,7 @@ string Common::toHexString(const uint8_t *data, const size_t length) {
 	for(size_t i = 0; i < length; ++i) {
 	
 		// Append byte as a string to the hex string
-		hexString << hex << nouppercase << setw(sizeof("FF") - sizeof('\0')) << setfill('0') << static_cast<uint16_t>(data[i]); 
+		hexString << hex << nouppercase << setw(sizeof("FF") - sizeof('\0')) << setfill('0') << static_cast<uint16_t>(data[i]);
 	}
 	
 	// Return hex string
