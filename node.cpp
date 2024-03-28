@@ -15,8 +15,18 @@ using namespace MwcValidationNode;
 
 // Constants
 
-// Capabilities
-const Node::Capabilities Node::CAPABILITIES = Node::Capabilities::PEER_LIST;
+// Check if Tor is enabled
+#ifdef TOR_ENABLE
+
+	// Capabilities
+	const Node::Capabilities Node::CAPABILITIES = static_cast<MwcValidationNode::Node::Capabilities>(Node::Capabilities::PEER_LIST | Node::Capabilities::TOR_ADDRESS);
+
+// Otherwise
+#else
+
+	// Capabilities
+	const Node::Capabilities Node::CAPABILITIES = Node::Capabilities::PEER_LIST;
+#endif
 
 // Check if floonet
 #ifdef FLOONET

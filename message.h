@@ -88,6 +88,12 @@ class Message final {
 			// Transaction kernel
 			TRANSACTION_KERNEL,
 			
+			// Unused
+			UNUSED1,
+			
+			// Unused
+			UNUSED2,
+			
 			// Tor address
 			TOR_ADDRESS,
 			
@@ -164,8 +170,17 @@ class Message final {
 		// Read block message
 		static tuple<Header, Block> readBlockMessage(const vector<uint8_t> &blockMessage, const uint32_t protocolVersion);
 		
+		// Read compact block message
+		static Header readCompactBlockMessage(const vector<uint8_t> &compactBlockMessage);
+		
 		// Read transaction hash set archive message
 		static tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::size_type> readTransactionHashSetArchiveMessage(const vector<uint8_t> &transactionHashSetArchiveMessage);
+		
+		// Read transaction kernel message
+		static void readTransactionKernelMessage(const vector<uint8_t> &transactionKernelMessage);
+		
+		// Read Tor address message
+		static void readTorAddressMessage(const vector<uint8_t> &torAddressMessage);
 	
 	// Private
 	private:

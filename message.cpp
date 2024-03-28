@@ -971,6 +971,18 @@ tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &blockMessa
 	return {header, block};
 }
 
+// Read compact block message
+Header Message::readCompactBlockMessage(const vector<uint8_t> &compactBlockMessage) {
+
+	// Read header from compact block message
+	const Header header = readHeader(compactBlockMessage, MESSAGE_HEADER_LENGTH);
+	
+	// TODO Verify compact block message's nonce and body
+	
+	// Return header
+	return header;
+}
+
 // Read transaction hash set archive message
 tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::size_type> Message::readTransactionHashSetArchiveMessage(const vector<uint8_t> &transactionHashSetArchiveMessage) {
 
@@ -1014,6 +1026,62 @@ tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::si
 	
 	// Return block hash, height, and attachment length
 	return {blockHash, height, attachmentLength};
+}
+
+// Read transaction kernel message
+void Message::readTransactionKernelMessage(const vector<uint8_t> &transactionKernelMessage) {
+
+	// Check if transaction kernel message doesn't contain a transaction kernel hash
+	if(transactionKernelMessage.size() < MESSAGE_HEADER_LENGTH + Crypto::BLAKE2B_HASH_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Transaction kernel message doesn't contain a transaction kernel hash");
+	}
+}
+
+// Read Tor address message
+void Message::readTorAddressMessage(const vector<uint8_t> &torAddressMessage) {
+
+	// Check if Tor address message doesn't contain a Tor address length
+	if(torAddressMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Tor address message doesn't contain a Tor address length");
+	}
+	
+	// Get Tor address length from Tor address message
+	const uint64_t torAddressLength = Common::readUint64(torAddressMessage, MESSAGE_HEADER_LENGTH);
+	
+	// Check if Tor address length is invalid
+	if(!torAddressLength) {
+	
+		// Throw exception
+		throw runtime_error("Tor address length is invalid");
+	}
+	
+	// Check if Tor address length is too big
+	if(torAddressLength > MAXIMUM_ADDRESS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Tor address length is too big");
+	}
+	
+	// Check if Tor address message doesn't contain a Tor address
+	if(torAddressMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(torAddressLength) + torAddressLength) {
+	
+		// Throw exception
+		throw runtime_error("Tor address message doesn't contain a Tor address");
+	}
+	
+	// Get Tor address from Tor address message
+	const uint8_t *torAddress = &torAddressMessage[MESSAGE_HEADER_LENGTH + sizeof(torAddressLength)];
+	
+	// Check if Tor address is invalid
+	if(torAddressLength <= sizeof(".onion") - sizeof('\0') || memcmp(&torAddress[torAddressLength - (sizeof(".onion") - sizeof('\0'))], ".onion", sizeof(".onion") - sizeof('\0')) || memchr(torAddress, '[', torAddressLength) || memchr(torAddress, ']', torAddressLength) || memchr(torAddress, ':', torAddressLength) || !Common::isUtf8(reinterpret_cast<const char *>(torAddress), torAddressLength)) {
+	
+		// Throw exception
+		throw runtime_error("Tor address is invalid");
+	}
 }
 
 // Get maximum payload length

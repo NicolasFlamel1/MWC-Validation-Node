@@ -4005,7 +4005,32 @@ bool Peer::processRequestsAndOrResponses() {
 						break;
 					}
 					
-					// TODO
+					// Initialize total difficulty changed
+					bool totalDifficultyChanged;
+					
+					{
+						// Lock for writing
+						unique_lock writeLock(lock);
+						
+						// Set total difficulty changed to if the total difficulty changed
+						totalDifficultyChanged = totalDifficulty != header.value().getTotalDifficulty();
+				
+						// Set total difficulty to the header's total difficulty
+						totalDifficulty = header.value().getTotalDifficulty();
+					}
+					
+					// Set last ping time to now
+					lastPingTime = chrono::steady_clock::now();
+					
+					// Check if total difficulty changed
+					if(totalDifficultyChanged) {
+					
+						// Set total difficulty last changed time to now
+						totalDifficultyLastChangedTime = chrono::steady_clock::now();
+					
+						// Notify peers that event occurred
+						eventOccurred.notify_one();
+					}
 				}
 				
 				// Otherwise
@@ -4363,8 +4388,53 @@ bool Peer::processRequestsAndOrResponses() {
 			
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
+				
+					// Initialize header
+					optional<Header> header;
 					
-					// TODO
+					// Try
+					try {
+					
+						// Read compact block message
+						header = Message::readCompactBlockMessage(readBuffer);
+					}
+		
+					// Catch errors
+					catch(...) {
+					
+						// Set ban to true
+						ban = true;
+						
+						// Break
+						break;
+					}
+					
+					// Initialize total difficulty changed
+					bool totalDifficultyChanged;
+					
+					{
+						// Lock for writing
+						unique_lock writeLock(lock);
+						
+						// Set total difficulty changed to if the total difficulty changed
+						totalDifficultyChanged = totalDifficulty != header.value().getTotalDifficulty();
+				
+						// Set total difficulty to the header's total difficulty
+						totalDifficulty = header.value().getTotalDifficulty();
+					}
+					
+					// Set last ping time to now
+					lastPingTime = chrono::steady_clock::now();
+					
+					// Check if total difficulty changed
+					if(totalDifficultyChanged) {
+					
+						// Set total difficulty last changed time to now
+						totalDifficultyLastChangedTime = chrono::steady_clock::now();
+					
+						// Notify peers that event occurred
+						eventOccurred.notify_one();
+					}
 				}
 				
 				// Otherwise
@@ -4382,7 +4452,7 @@ bool Peer::processRequestsAndOrResponses() {
 			
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
-					
+				
 					// TODO
 				}
 				
@@ -4401,7 +4471,7 @@ bool Peer::processRequestsAndOrResponses() {
 			
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
-					
+				
 					// TODO
 				}
 				
@@ -4649,8 +4719,20 @@ bool Peer::processRequestsAndOrResponses() {
 			
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
+				
+					// Try
+					try {
 					
-					// TODO
+						// Read transaction kernel message
+						Message::readTransactionKernelMessage(readBuffer);
+					}
+		
+					// Catch errors
+					catch(...) {
+					
+						// Set ban to true
+						ban = true;
+					}
 				}
 				
 				// Otherwise
@@ -4668,8 +4750,20 @@ bool Peer::processRequestsAndOrResponses() {
 			
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
+				
+					// Try
+					try {
 					
-					// TODO
+						// Read Tor address message
+						Message::readTorAddressMessage(readBuffer);
+					}
+		
+					// Catch errors
+					catch(...) {
+					
+						// Set ban to true
+						ban = true;
+					}
 				}
 				
 				// Otherwise

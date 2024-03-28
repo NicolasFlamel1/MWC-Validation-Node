@@ -42,6 +42,9 @@ using namespace MwcValidationNode;
 
 // Constants
 
+// State file name
+static const char *STATE_FILE_NAME = "state";
+
 // Check if Windows
 #ifdef _WIN32
 
@@ -75,6 +78,28 @@ int main() {
 		
 		// Create node
 		Node node;
+		
+		// Try
+		try {
+		
+			// Set state file to throw exception on error
+			ifstream stateFile;
+			stateFile.exceptions(ios::badbit | ios::failbit);
+			
+			// Open state file
+			stateFile.open(STATE_FILE_NAME, ios::binary);
+			
+			// Restore node from state file
+			node.restore(stateFile);
+			
+			// Close state file
+			stateFile.close();
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+		}
 		
 		// Create message lock
 		mutex messageLock;
@@ -204,6 +229,33 @@ int main() {
 		
 		// Wait for node to finish
 		node.getThread().join();
+		
+		// Disconnect node
+		node.disconnect();
+		
+		// Try
+		try {
+		
+			// Set state file to throw exception on error
+			ofstream stateFile;
+			stateFile.exceptions(ios::badbit | ios::failbit);
+			
+			// Open state file
+			stateFile.open(STATE_FILE_NAME, ios::binary | ios::trunc);
+			
+			// Save node to state file
+			node.save(stateFile);
+			
+			// Close state file
+			stateFile.close();
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Return failure
+			return EXIT_FAILURE;
+		}
 		
 		// Check if an error occurred
 		if(Common::errorOccurred()) {
