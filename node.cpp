@@ -765,6 +765,15 @@ const unordered_set<string> &Node::getDnsSeeds() const {
 	}
 }
 
+// Add to mempool
+void Node::addToMempool(Transaction &&transaction) {
+
+	// Lock for writing
+	lock_guard writeLock(lock);
+	
+	// TODO
+}
+
 // Apply block to sync state
 bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &block) {
 	
@@ -1676,14 +1685,28 @@ void Node::sync() {
 			}
 		}
 		
-		// Otherwise check if on synced callback exists
-		else if(onSyncedCallback) {
+		// Otherwise
+		else {
 		
-			// Run on synced callback
-			onSyncedCallback();
+			// Check if on start syncing callback exists
+			if(onStartSyncingCallback) {
 			
-			// Remove on synced callback
-			onSyncedCallback = nullptr;
+				// Run on start syncing callback
+				onStartSyncingCallback();
+				
+				// Remove on start syncing callback
+				onStartSyncingCallback = nullptr;
+			}
+			
+			// Check if on synced callback exists
+			if(onSyncedCallback) {
+			
+				// Run on synced callback
+				onSyncedCallback();
+				
+				// Remove on synced callback
+				onSyncedCallback = nullptr;
+			}
 		}
 	}
 }

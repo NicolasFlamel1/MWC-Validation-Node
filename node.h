@@ -15,7 +15,9 @@
 #include <unordered_set>
 #include "./block.h"
 #include "./header.h"
+#include "./mempool.h"
 #include "./merkle_mountain_range.h"
+#include "./transaction.h"
 
 using namespace std;
 
@@ -118,9 +120,6 @@ class Node final {
 		// Stop
 		void stop();
 		
-		// Get is synced
-		bool getIsSynced() const;
-		
 		// Get peers
 		list<Peer> &getPeers();
 		
@@ -201,6 +200,9 @@ class Node final {
 		
 		// Get DNS seeds
 		const unordered_set<string> &getDnsSeeds() const;
+		
+		// Add to mempool
+		void addToMempool(Transaction &&transaction);
 		
 	// Private
 	private:
@@ -354,6 +356,9 @@ class Node final {
 	
 		// Peers
 		list<Peer> peers;
+		
+		// Mempool
+		Mempool mempool;
 		
 		// Stop monitoring
 		atomic_bool stopMonitoring;

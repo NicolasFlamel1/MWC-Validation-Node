@@ -144,24 +144,24 @@ bool Crypto::verifyKernelSums(const Header &header, const MerkleMountainRange<Ke
 		&totalNumberOfCoinbaseRewardsCommitment
 	};
 	
-	// Check if getting UXTO commitments sum failed
-	secp256k1_pedersen_commitment uxtoCommitmentsSum;
-	if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &uxtoCommitmentsSum, positiveCommitments, 1, negativeCommitments, 1)) {
+	// Check if getting UTXO commitments sum failed
+	secp256k1_pedersen_commitment utxoCommitmentsSum;
+	if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &utxoCommitmentsSum, positiveCommitments, 1, negativeCommitments, 1)) {
 	
 		// Return false
 		return false;
 	}
 	
-	// Check if serializing the UXTO commitments sum failed
-	uint8_t serializedUxtoCommitmentsSum[Crypto::COMMITMENT_LENGTH];
-	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedUxtoCommitmentsSum, &uxtoCommitmentsSum)) {
+	// Check if serializing the UTXO commitments sum failed
+	uint8_t serializedUtxoCommitmentsSum[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedUtxoCommitmentsSum, &utxoCommitmentsSum)) {
 	
 		// Return false
 		return false;
 	}
 	
-	// Check if serialized UXTO commitments sum doesn't equal the serialized kernel excesses sum with total kernel offset
-	if(memcmp(serializedUxtoCommitmentsSum, serializedKernelExcessesSumWithTotalKernelOffset, sizeof(serializedKernelExcessesSumWithTotalKernelOffset))) {
+	// Check if serialized UTXO commitments sum doesn't equal the serialized kernel excesses sum with total kernel offset
+	if(memcmp(serializedUtxoCommitmentsSum, serializedKernelExcessesSumWithTotalKernelOffset, sizeof(serializedKernelExcessesSumWithTotalKernelOffset))) {
 	
 		// Return false
 		return false;

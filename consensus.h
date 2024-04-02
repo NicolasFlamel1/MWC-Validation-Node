@@ -76,6 +76,9 @@ class Consensus final {
 		// Block kernel weight
 		static const uint64_t BLOCK_KERNEL_WEIGHT;
 		
+		// Coinbase weight
+		static const uint64_t COINBASE_WEIGHT;
+		
 		// Block output length
 		static const size_t BLOCK_OUTPUT_LENGTH;
 		

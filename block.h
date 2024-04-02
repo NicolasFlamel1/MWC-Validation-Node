@@ -18,16 +18,16 @@ using namespace std;
 namespace MwcValidationNode {
 
 
-// Structures
+// Classes
 
-// Block structure
-struct Block final {
+// Block class
+class Block final {
 
 	// Public
 	public:
 	
 		// Constructor
-		explicit Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels);
+		explicit Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction);
 		
 		// Get inputs
 		const list<Input> &getInputs() const;
@@ -57,7 +57,7 @@ struct Block final {
 		bool isSortedAndUnique() const;
 		
 		// Has valid weight
-		bool hasValidWeight() const;
+		bool hasValidWeight(const bool isTransaction) const;
 		
 		// Has unique no recent duplicate kernel excesses
 		bool hasUniqueNoRecentDuplicateKernelExcesses() const;

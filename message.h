@@ -173,6 +173,12 @@ class Message final {
 		// Read compact block message
 		static Header readCompactBlockMessage(const vector<uint8_t> &compactBlockMessage);
 		
+		// Read stem transaction message
+		static vector<uint8_t> readStemTransactionMessage(const vector<uint8_t> &stemTransactionMessage, const uint32_t protocolVersion);
+		
+		// Read transaction message
+		static Transaction readTransactionMessage(const vector<uint8_t> &transactionMessage, const uint32_t protocolVersion);
+		
 		// Read transaction hash set archive message
 		static tuple<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>, uint64_t, vector<uint8_t>::size_type> readTransactionHashSetArchiveMessage(const vector<uint8_t> &transactionHashSetArchiveMessage);
 		
@@ -235,6 +241,9 @@ class Message final {
 		
 		// Read kernel
 		static Kernel readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion);
+		
+		// Read transaction body
+		static tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> readTransactionBody(const vector<uint8_t> &buffer, vector<uint8_t>::size_type offset, const uint32_t protocolVersion, const bool isTransaction, const uint64_t headerHeight = 0, const uint16_t headerVersion = Consensus::getHeaderVersion(0));
 };
 
 

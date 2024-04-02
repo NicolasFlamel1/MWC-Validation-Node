@@ -721,251 +721,11 @@ tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &blockMessa
 	// Set header size
 	const size_t headerSize = sizeof(header.getVersion()) + sizeof(header.getHeight()) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(header.getTotalDifficulty()) + sizeof(header.getSecondaryScaling()) + sizeof(header.getNonce()) + sizeof(header.getEdgeBits()) + numberOfProofNoncesBytes;
 	
-	// Check if block message doesn't contain the number of inputs
-	if(blockMessage.size() < MESSAGE_HEADER_LENGTH + headerSize + sizeof(uint64_t)) {
-	
-		// Throw exception
-		throw runtime_error("Headers message doesn't contain the number of inputs");
-	}
-	
-	// Get number of inputs from block message
-	const uint64_t numberOfInputs = Common::readUint64(blockMessage, MESSAGE_HEADER_LENGTH + headerSize);
-	
-	// Check if number of inputs is invalid
-	if(numberOfInputs > MAXIMUM_INPUTS_LENGTH) {
-	
-		// Throw exception
-		throw runtime_error("Number of inputs is invalid");
-	}
-	
-	// Check if block message doesn't contain the number of outputs
-	if(blockMessage.size() < MESSAGE_HEADER_LENGTH + headerSize + sizeof(numberOfInputs) + sizeof(uint64_t)) {
-	
-		// Throw exception
-		throw runtime_error("Headers message doesn't contain the number of outputs");
-	}
-	
-	// Get number of outputs from block message
-	const uint64_t numberOfOutputs = Common::readUint64(blockMessage, MESSAGE_HEADER_LENGTH + headerSize + sizeof(numberOfInputs));
-	
-	// Check if number of outputs is invalid
-	if(numberOfOutputs > MAXIMUM_INPUTS_LENGTH) {
-	
-		// Throw exception
-		throw runtime_error("Number of outputs is invalid");
-	}
-	
-	// Check if block message doesn't contain the number of kernels
-	if(blockMessage.size() < MESSAGE_HEADER_LENGTH + headerSize + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(uint64_t)) {
-	
-		// Throw exception
-		throw runtime_error("Headers message doesn't contain the number of kernels");
-	}
-	
-	// Get number of kernels from block message
-	const uint64_t numberOfKernels = Common::readUint64(blockMessage, MESSAGE_HEADER_LENGTH + headerSize + sizeof(numberOfInputs) + sizeof(numberOfOutputs));
-	
-	// Check if number of kernels is invalid
-	if(numberOfKernels > MAXIMUM_KERNELS_LENGTH) {
-	
-		// Throw exception
-		throw runtime_error("Number of kernels is invalid");
-	}
-	
-	// Set offset
-	vector<uint8_t>::size_type offset = MESSAGE_HEADER_LENGTH + headerSize + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(numberOfKernels);
-	
-	// Initialize inputs
-	list<Input> inputs;
-	
-	// Go through all inputs
-	for(uint64_t i = 0; i < numberOfInputs; ++i) {
-	
-		// Read input from block message
-		Input input = readInput(blockMessage, offset, protocolVersion);
-		
-		// Check protocol version
-		switch(protocolVersion) {
-		
-			// Zero, one, or two
-			case 0:
-			case 1:
-			case 2:
-			
-				// Update offset
-				offset += sizeof(input.getFeatures()) + Crypto::COMMITMENT_LENGTH;
-			
-				// Break
-				break;
-			
-			// Three
-			case 3:
-			
-				// Update offset
-				offset += Crypto::COMMITMENT_LENGTH;
-			
-				// Break
-				break;
-		}
-		
-		// Append input to list
-		inputs.push_back(move(input));
-	}
-	
-	// Initialize outputs and rangeproofs
-	list<Output> outputs;
-	list<Rangeproof> rangeproofs;
-	
-	// Go through all outputs
-	for(uint64_t i = 0; i < numberOfOutputs; ++i) {
-	
-		// Read output from block message
-		Output output = readOutput(blockMessage, offset);
-		
-		// Update offset
-		offset += sizeof(output.getFeatures()) + Crypto::COMMITMENT_LENGTH;
-		
-		// Read rangeproof from block message
-		Rangeproof rangeproof = readRangeproof(blockMessage, offset);
-		
-		// Update offset
-		offset += sizeof(rangeproof.getLength()) + rangeproof.getLength();
-		
-		// Check if rangeproof is invalid
-		if(!secp256k1_bulletproof_rangeproof_verify(Crypto::getSecp256k1Context(), Crypto::getSecp256k1ScratchSpace(), Crypto::getSecp256k1Generators(), rangeproof.getProof(), rangeproof.getLength(), nullptr, &output.getCommitment(), 1, sizeof(uint64_t) * Common::BITS_IN_A_BYTE, &secp256k1_generator_const_h, nullptr, 0)) {
-		
-			// Throw exception
-			throw runtime_error("Rangeproof is invalid");
-		}
-		
-		// Append output to list
-		outputs.push_back(move(output));
-		
-		// Append rangeproof to list
-		rangeproofs.push_back(move(rangeproof));
-	}
-	
-	// Initialize kernels
-	list<Kernel> kernels;
-	
-	// Go through all kernels
-	for(uint64_t i = 0; i < numberOfKernels; ++i) {
-	
-		// Read kernel from block message
-		Kernel kernel = readKernel(blockMessage, offset, protocolVersion);
-		
-		// Check kernel's features
-		switch(kernel.getFeatures()) {
-		
-			// Height locked
-			case Kernel::Features::HEIGHT_LOCKED:
-			
-				// Check if kernel's lock height is greater than the header's height
-				if(kernel.getLockHeight() > header.getHeight()) {
-				
-					// Throw exception
-					throw runtime_error("Kernel's lock height is greater than the header's height");
-				}
-				
-				// Break
-				break;
-			
-			// No recent duplicate
-			case Kernel::Features::NO_RECENT_DUPLICATE:
-			
-				// Check if header version is less than four
-				if(header.getVersion() < 4) {
-				
-					// Throw exception
-					throw runtime_error("Header version is less than four");
-				}
-				
-				// Break
-				break;
-			
-			// Default
-			default:
-			
-				// Break
-				break;
-		}
-		
-		// Check protocol version
-		switch(protocolVersion) {
-		
-			// Zero or one
-			case 0:
-			case 1:
-			
-				// Update offset
-				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-				
-				// Break
-				break;
-			
-			// Two or three
-			case 2:
-			case 3:
-		
-				// Check kernel's features
-				switch(kernel.getFeatures()) {
-				
-					// Plain
-					case Kernel::Features::PLAIN:
-					
-						// Update offset
-						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-					
-						// Break
-						break;
-					
-					// Coinbase
-					case Kernel::Features::COINBASE:
-					
-						// Update offset
-						offset += sizeof(kernel.getFeatures()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-					
-						// Break
-						break;
-				
-					// Height locked
-					case Kernel::Features::HEIGHT_LOCKED:
-					
-						// Update offset
-						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(kernel.getLockHeight()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-						
-						// Break
-						break;
-					
-					// No recent duplicate
-					case Kernel::Features::NO_RECENT_DUPLICATE:
-					
-						// Update offset
-						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
-					
-						// Break
-						break;
-					
-					// Default
-					default:
-					
-						// Throw exception
-						throw runtime_error("Unknown features");
-					
-						// Break
-						break;
-				}
-				
-				// Break
-				break;
-		}
-		
-		// Append kernel to list
-		kernels.push_back(move(kernel));
-	}
+	// Read transaction body from block message
+	tuple transactionBody = readTransactionBody(blockMessage, MESSAGE_HEADER_LENGTH + headerSize, protocolVersion, false, header.getHeight(), header.getVersion());
 	
 	// Create block
-	const Block block(move(inputs), move(outputs), move(rangeproofs), move(kernels));
+	const Block block(move(get<0>(transactionBody)), move(get<1>(transactionBody)), move(get<2>(transactionBody)), move(get<3>(transactionBody)), false);
 	
 	// Return header and block
 	return {header, block};
@@ -981,6 +741,374 @@ Header Message::readCompactBlockMessage(const vector<uint8_t> &compactBlockMessa
 	
 	// Return header
 	return header;
+}
+
+// Read stem transaction message
+vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemTransactionMessage, const uint32_t protocolVersion) {
+
+	// Check if stem transaction message doesn't contain an offset or the number of inputs
+	if(stemTransactionMessage.size() < MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Stem transaction message doesn't contain an offset or the number of inputs");
+	}
+	
+	// Get number of inputs from stem transaction message
+	const uint64_t numberOfInputs = Common::readUint64(stemTransactionMessage, MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH);
+	
+	// Check if number of inputs is invalid
+	if(numberOfInputs > MAXIMUM_INPUTS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of inputs is invalid");
+	}
+	
+	// Check if stem transaction message doesn't contain the number of outputs
+	if(stemTransactionMessage.size() < MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs) + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Stem transaction message doesn't contain the number of outputs");
+	}
+	
+	// Get number of outputs from stem transaction message
+	const uint64_t numberOfOutputs = Common::readUint64(stemTransactionMessage, MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs));
+	
+	// Check if number of outputs is invalid
+	if(numberOfOutputs > MAXIMUM_INPUTS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of outputs is invalid");
+	}
+	
+	// Check if stem transaction message doesn't contain the number of kernels
+	if(stemTransactionMessage.size() < MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Stem transaction message doesn't contain the number of kernels");
+	}
+	
+	// Get number of kernels from stem transaction message
+	const uint64_t numberOfKernels = Common::readUint64(stemTransactionMessage, MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs) + sizeof(numberOfOutputs));
+	
+	// Check if number of kernels is invalid
+	if(numberOfKernels > MAXIMUM_KERNELS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of kernels is invalid");
+	}
+	
+	// Append offset, number of inputs, number of outputs, and number of kernels to payload
+	vector<uint8_t> payload(stemTransactionMessage.cbegin() + MESSAGE_HEADER_LENGTH, stemTransactionMessage.cbegin() + MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(numberOfKernels));
+	
+	// Initialize offset
+	vector<uint8_t>::size_type offset = MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(numberOfKernels);
+	
+	// Go through all inputs
+	for(uint64_t i = 0; i < numberOfInputs; ++i) {
+	
+		// Check protocol version
+		switch(protocolVersion) {
+		
+			// Zero, one, or two
+			case 0:
+			case 1:
+			case 2:
+			
+				// Check if stem transaction message doesn't contain an input
+				if(stemTransactionMessage.size() < offset + sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH) {
+				
+					// Throw exception
+					throw runtime_error("Stem transaction message doesn't contain an input");
+				}
+			
+				// Append input to payload
+				payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(Input::Features), stemTransactionMessage.cbegin() + offset + sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH);
+			
+				// Update offset
+				offset += sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH;
+			
+				// Break
+				break;
+			
+			// Three
+			case 3:
+			
+				// Check if stem transaction message doesn't contain an input
+				if(stemTransactionMessage.size() < offset + Crypto::COMMITMENT_LENGTH) {
+				
+					// Throw exception
+					throw runtime_error("Stem transaction message doesn't contain an input");
+				}
+				
+				// Append input to payload
+				payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + Crypto::COMMITMENT_LENGTH);
+				
+				// Update offset
+				offset += Crypto::COMMITMENT_LENGTH;
+			
+				// Break
+				break;
+		}
+	}
+	
+	// Go through all outputs
+	for(uint64_t i = 0; i < numberOfOutputs; ++i) {
+	
+		// Check if stem transaction message doesn't contain an output or a rangeproof length
+		if(stemTransactionMessage.size() < offset + sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(uint64_t)) {
+		
+			// Throw exception
+			throw runtime_error("Stem transaction message doesn't contain an output or a rangeproof length");
+		}
+		
+		// Get rangeproof length from stem transaction message
+		const uint64_t rangeproofLength = Common::readUint64(stemTransactionMessage, offset + sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH);
+		
+		// Check if rangeproof length is invald
+		if(rangeproofLength != Crypto::BULLETPROOF_LENGTH) {
+		
+			// Throw exception
+			throw runtime_error("Rangeproof length is invalid");
+		}
+		
+		// Check if stem transaction message doesn't contain a rangeproof length
+		if(stemTransactionMessage.size() < offset + sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(rangeproofLength) + rangeproofLength) {
+		
+			// Throw exception
+			throw runtime_error("Stem transaction message doesn't contain a rangeproof");
+		}
+		
+		// Append output and rangeproof to payload
+		payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(rangeproofLength) + rangeproofLength);
+		
+		// Update offset
+		offset += sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(rangeproofLength) + rangeproofLength;
+	}
+	
+	// Go through all kernels
+	for(uint64_t i = 0; i < numberOfKernels; ++i) {
+	
+		// Check if stem transaction message doesn't contain kernel features
+		if(stemTransactionMessage.size() < offset + sizeof(Kernel::Features)) {
+		
+			// Throw exception
+			throw runtime_error("Stem transaction message doesn't contain kernel features");
+		}
+		
+		// Get kernel features from stem transaction message
+		const Kernel::Features kernelFeatures = (Common::readUint8(stemTransactionMessage, offset) < static_cast<underlying_type_t<Kernel::Features>>(Kernel::Features::UNKNOWN)) ? static_cast<Kernel::Features>(Common::readUint8(stemTransactionMessage, offset)) : Kernel::Features::UNKNOWN;
+		
+		// Check protocol version
+		switch(protocolVersion) {
+		
+			// Zero or one
+			case 0:
+			case 1:
+			
+				// Check if stem transaction message doesn't contain a kernel
+				if(stemTransactionMessage.size() < offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
+				
+					// Throw exception
+					throw runtime_error("Stem transaction message doesn't contain a kernel");
+				}
+				
+				// Check kernel features
+				switch(kernelFeatures) {
+				
+					// Plain
+					case Kernel::Features::PLAIN:
+					
+						// Append kernel to payload
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t));
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						
+						// Break
+						break;
+					
+					// Coinbase
+					case Kernel::Features::COINBASE:
+					
+						// Append kernel to payload
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures));
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						
+						// Break
+						break;
+					
+					// Height locked
+					case Kernel::Features::HEIGHT_LOCKED:
+					
+						// Append kernel to payload
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						
+						// Break
+						break;
+					
+					// No recent duplicate
+					case Kernel::Features::NO_RECENT_DUPLICATE:
+					
+						{
+							// Get kernel relative height from kernel
+							const uint64_t kernelRelativeHeight = Common::readUint64(stemTransactionMessage, offset + sizeof(kernelFeatures) + sizeof(uint64_t));
+							
+							// Check if kernel relative height is invalid
+							if(kernelRelativeHeight > UINT16_MAX) {
+							
+								// Throw exception
+								throw runtime_error("Kernel features is invalid");
+							}
+							
+							// Append kernel to payload
+							payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t));
+							Common::writeUint16(payload, kernelRelativeHeight);
+							payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						}
+						
+						// Break
+						break;
+					
+					// Default
+					default:
+					
+						// Throw exception
+						throw runtime_error("Kernel features is invalid");
+					
+						// Break
+						break;
+				}
+				
+				// Update offset
+				offset += sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+				
+				// Break
+				break;
+			
+			// Two or three
+			case 2:
+			case 3:
+		
+				// Check kernel features
+				switch(kernelFeatures) {
+				
+					// Plain
+					case Kernel::Features::PLAIN:
+					
+						// Check if stem transaction message doesn't contain a kernel
+						if(stemTransactionMessage.size() < offset + sizeof(kernelFeatures) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
+						
+							// Throw exception
+							throw runtime_error("Stem transaction message doesn't contain a kernel");
+						}
+						
+						// Append kernel to payload
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						
+						// Update offset
+						offset += sizeof(kernelFeatures) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+					
+					// Coinbase
+					case Kernel::Features::COINBASE:
+					
+						// Check if stem transaction message doesn't contain a kernel
+						if(stemTransactionMessage.size() < offset + sizeof(kernelFeatures) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
+						
+							// Throw exception
+							throw runtime_error("Stem transaction message doesn't contain a kernel");
+						}
+						
+						// Append kernel to payload
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						
+						// Update offset
+						offset += sizeof(kernelFeatures) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+				
+					// Height locked
+					case Kernel::Features::HEIGHT_LOCKED:
+					
+						// Check if stem transaction message doesn't contain a kernel
+						if(stemTransactionMessage.size() < offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
+						
+							// Throw exception
+							throw runtime_error("Stem transaction message doesn't contain a kernel");
+						}
+						
+						// Append kernel to payload
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						
+						// Update offset
+						offset += sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+						
+						// Break
+						break;
+					
+					// No recent duplicate
+					case Kernel::Features::NO_RECENT_DUPLICATE:
+					
+						// Check if stem transaction message doesn't contain a kernel
+						if(stemTransactionMessage.size() < offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
+						
+							// Throw exception
+							throw runtime_error("Stem transaction message doesn't contain a kernel");
+						}
+						
+						// Append kernel to payload
+						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
+						
+						// Update offset
+						offset += sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+					
+					// Default
+					default:
+					
+						// Throw exception
+						throw runtime_error("Kernel features is invalid");
+					
+						// Break
+						break;
+				}
+				
+				// Break
+				break;
+		}
+	}
+	
+	// Create message header
+	const vector messageHeader = createMessageHeader(Type::STEM_TRANSACTION, payload.size());
+	
+	// Prepend message header to payload
+	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
+	
+	// Return payload
+	return payload;
+}
+
+// Read transaction message
+Transaction Message::readTransactionMessage(const vector<uint8_t> &transactionMessage, const uint32_t protocolVersion) {
+
+	// Check if transaction message doesn't contain an offset
+	if(transactionMessage.size() < MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Transaction message doesn't contain an offset");
+	}
+	
+	// Get offset from transaction message
+	const uint8_t *offset = &transactionMessage[MESSAGE_HEADER_LENGTH];
+	
+	// Read transaction body from transaction message
+	tuple transactionBody = readTransactionBody(transactionMessage, MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, protocolVersion, true);
+	
+	// Return transaction
+	return Transaction(offset, move(get<0>(transactionBody)), move(get<1>(transactionBody)), move(get<2>(transactionBody)), move(get<3>(transactionBody)));
 }
 
 // Read transaction hash set archive message
@@ -2105,4 +2233,274 @@ Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>:
 	
 	// Return kernel
 	return Kernel(features, fee, lockHeight, relativeHeight, excess, signature);
+}
+
+// Read transaction body
+tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTransactionBody(const vector<uint8_t> &buffer, vector<uint8_t>::size_type offset, const uint32_t protocolVersion, const bool isTransaction, const uint64_t headerHeight, const uint16_t headerVersion) {
+
+	// Check if transaction body doesn't contain the number of inputs
+	if(buffer.size() < offset + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Transaction body doesn't contain the number of inputs");
+	}
+	
+	// Get number of inputs from transaction body
+	const uint64_t numberOfInputs = Common::readUint64(buffer, offset);
+	
+	// Check if number of inputs is invalid
+	if(numberOfInputs > MAXIMUM_INPUTS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of inputs is invalid");
+	}
+	
+	// Check if transaction body doesn't contain the number of outputs
+	if(buffer.size() < offset + sizeof(numberOfInputs) + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Transaction body doesn't contain the number of outputs");
+	}
+	
+	// Get number of outputs from transaction body
+	const uint64_t numberOfOutputs = Common::readUint64(buffer, offset + sizeof(numberOfInputs));
+	
+	// Check if number of outputs is invalid
+	if(numberOfOutputs > MAXIMUM_INPUTS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of outputs is invalid");
+	}
+	
+	// Check if transaction body doesn't contain the number of kernels
+	if(buffer.size() < offset + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Transaction body doesn't contain the number of kernels");
+	}
+	
+	// Get number of kernels from transaction body
+	const uint64_t numberOfKernels = Common::readUint64(buffer, offset + sizeof(numberOfInputs) + sizeof(numberOfOutputs));
+	
+	// Check if number of kernels is invalid
+	if(numberOfKernels > MAXIMUM_KERNELS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of kernels is invalid");
+	}
+	
+	// Update offset
+	offset += sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(numberOfKernels);
+	
+	// Initialize inputs
+	list<Input> inputs;
+	
+	// Go through all inputs
+	for(uint64_t i = 0; i < numberOfInputs; ++i) {
+	
+		// Read input from transaction body
+		Input input = readInput(buffer, offset, protocolVersion);
+		
+		// Check protocol version
+		switch(protocolVersion) {
+		
+			// Zero, one, or two
+			case 0:
+			case 1:
+			case 2:
+			
+				// Update offset
+				offset += sizeof(input.getFeatures()) + Crypto::COMMITMENT_LENGTH;
+			
+				// Break
+				break;
+			
+			// Three
+			case 3:
+			
+				// Update offset
+				offset += Crypto::COMMITMENT_LENGTH;
+			
+				// Break
+				break;
+		}
+		
+		// Append input to list
+		inputs.push_back(move(input));
+	}
+	
+	// Initialize outputs and rangeproofs
+	list<Output> outputs;
+	list<Rangeproof> rangeproofs;
+	
+	// Go through all outputs
+	for(uint64_t i = 0; i < numberOfOutputs; ++i) {
+	
+		// Read output from transaction body
+		Output output = readOutput(buffer, offset);
+		
+		// Check if output is invalid
+		if(isTransaction && output.getFeatures() == Output::Features::COINBASE) {
+		
+			// Throw exception
+			throw runtime_error("Output is invalid");
+		}
+		
+		// Update offset
+		offset += sizeof(output.getFeatures()) + Crypto::COMMITMENT_LENGTH;
+		
+		// Read rangeproof from transaction body
+		Rangeproof rangeproof = readRangeproof(buffer, offset);
+		
+		// Update offset
+		offset += sizeof(rangeproof.getLength()) + rangeproof.getLength();
+		
+		// Check if rangeproof is invalid
+		if(!secp256k1_bulletproof_rangeproof_verify(Crypto::getSecp256k1Context(), Crypto::getSecp256k1ScratchSpace(), Crypto::getSecp256k1Generators(), rangeproof.getProof(), rangeproof.getLength(), nullptr, &output.getCommitment(), 1, sizeof(uint64_t) * Common::BITS_IN_A_BYTE, &secp256k1_generator_const_h, nullptr, 0)) {
+		
+			// Throw exception
+			throw runtime_error("Rangeproof is invalid");
+		}
+		
+		// Append output to list
+		outputs.push_back(move(output));
+		
+		// Append rangeproof to list
+		rangeproofs.push_back(move(rangeproof));
+	}
+	
+	// Initialize kernels
+	list<Kernel> kernels;
+	
+	// Go through all kernels
+	for(uint64_t i = 0; i < numberOfKernels; ++i) {
+	
+		// Read kernel from transaction body
+		Kernel kernel = readKernel(buffer, offset, protocolVersion);
+		
+		// Check kernel's features
+		switch(kernel.getFeatures()) {
+		
+			// Coinbase
+			case Kernel::Features::COINBASE:
+			
+				// Check if kernel is invalid
+				if(isTransaction) {
+				
+					// Throw exception
+					throw runtime_error("Kernel is invalid");
+				}
+				
+				// Break
+				break;
+				
+			// Height locked
+			case Kernel::Features::HEIGHT_LOCKED:
+			
+				// Check if kernel's lock height is greater than the header's height
+				if(!isTransaction && kernel.getLockHeight() > headerHeight) {
+				
+					// Throw exception
+					throw runtime_error("Kernel's lock height is greater than the header's height");
+				}
+				
+				// Break
+				break;
+			
+			// No recent duplicate
+			case Kernel::Features::NO_RECENT_DUPLICATE:
+			
+				// Check if header version is less than four
+				if(!isTransaction && headerVersion < 4) {
+				
+					// Throw exception
+					throw runtime_error("Header version is less than four");
+				}
+				
+				// Break
+				break;
+			
+			// Default
+			default:
+			
+				// Break
+				break;
+		}
+		
+		// Check protocol version
+		switch(protocolVersion) {
+		
+			// Zero or one
+			case 0:
+			case 1:
+			
+				// Update offset
+				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+				
+				// Break
+				break;
+			
+			// Two or three
+			case 2:
+			case 3:
+		
+				// Check kernel's features
+				switch(kernel.getFeatures()) {
+				
+					// Plain
+					case Kernel::Features::PLAIN:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+					
+					// Coinbase
+					case Kernel::Features::COINBASE:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+				
+					// Height locked
+					case Kernel::Features::HEIGHT_LOCKED:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(kernel.getLockHeight()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+						
+						// Break
+						break;
+					
+					// No recent duplicate
+					case Kernel::Features::NO_RECENT_DUPLICATE:
+					
+						// Update offset
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+					
+						// Break
+						break;
+					
+					// Default
+					default:
+					
+						// Throw exception
+						throw runtime_error("Unknown features");
+					
+						// Break
+						break;
+				}
+				
+				// Break
+				break;
+		}
+		
+		// Append kernel to list
+		kernels.push_back(move(kernel));
+	}
+	
+	// Return inputs, outputs, rangeproofs, and kernels
+	return {inputs, outputs, rangeproofs, kernels};
 }

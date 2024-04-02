@@ -4453,7 +4453,40 @@ bool Peer::processRequestsAndOrResponses() {
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
 				
-					// TODO
+					// Initialize stem transaction message
+					vector<uint8_t> stemTransactionMessage;
+					
+					// Try
+					try {
+					
+						// Read stem transaction message
+						stemTransactionMessage = Message::readStemTransactionMessage(readBuffer, protocolVersion);
+					}
+		
+					// Catch errors
+					catch(...) {
+					
+						// Set ban to true
+						ban = true;
+						
+						// Break
+						break;
+					}
+					
+					{
+						// Lock for writing
+						lock_guard writeLock(lock);
+						
+						// Append stem transaction message to write buffer
+						writeBuffer.insert(writeBuffer.cend(), stemTransactionMessage.cbegin(), stemTransactionMessage.cend());
+						
+						// Check if not at the max number of messages sent
+						if(numberOfMessagesSent != INT_MAX) {
+						
+							// Increment number of messages sent
+							++numberOfMessagesSent;
+						}
+					}
 				}
 				
 				// Otherwise
@@ -4472,7 +4505,32 @@ bool Peer::processRequestsAndOrResponses() {
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
 				
-					// TODO
+					// Check if mempool is enabled
+					#ifdef ENABLE_MEMPOOL
+					
+						// Initialize transaction
+						optional<Transaction> transaction;
+						
+						// Try
+						try {
+						
+							// Read transaction message
+							transaction = Message::readTransactionMessage(readBuffer, protocolVersion);
+						}
+			
+						// Catch errors
+						catch(...) {
+						
+							// Set ban to true
+							ban = true;
+							
+							// Break
+							break;
+						}
+						
+						// Add transaction to node's mempool
+						node.addToMempool(move(transaction.value()));
+					#endif
 				}
 				
 				// Otherwise
@@ -6017,9 +6075,9 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 		inputCommitments.push_back(&coinbaseRewardCommitment);
 	}
 	
-	// Check if getting UXTO commitments sum failed
-	secp256k1_pedersen_commitment uxtoCommitmentsSum;
-	if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &uxtoCommitmentsSum, outputCommitments.data(), outputCommitments.size(), inputCommitments.data(), inputCommitments.size())) {
+	// Check if getting UTXO commitments sum failed
+	secp256k1_pedersen_commitment utxoCommitmentsSum;
+	if(!secp256k1_pedersen_commit_sum(secp256k1_context_no_precomp, &utxoCommitmentsSum, outputCommitments.data(), outputCommitments.size(), inputCommitments.data(), inputCommitments.size())) {
 	
 		// Return false
 		return false;
@@ -6032,9 +6090,9 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 		return true;
 	}
 	
-	// Check if serializing the UXTO commitments sum failed
-	uint8_t serializedUxtoCommitmentsSum[Crypto::COMMITMENT_LENGTH];
-	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedUxtoCommitmentsSum, &uxtoCommitmentsSum)) {
+	// Check if serializing the UTXO commitments sum failed
+	uint8_t serializedUtxoCommitmentsSum[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedUtxoCommitmentsSum, &utxoCommitmentsSum)) {
 	
 		// Return false
 		return false;
@@ -6047,8 +6105,8 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 		return true;
 	}
 	
-	// Check if serialized UXTO commitments sum doesn't equal the serialized kernel excesses sum
-	if(memcmp(serializedUxtoCommitmentsSum, serializedKernelExcessesSum, sizeof(serializedKernelExcessesSum))) {
+	// Check if serialized UTXO commitments sum doesn't equal the serialized kernel excesses sum
+	if(memcmp(serializedUtxoCommitmentsSum, serializedKernelExcessesSum, sizeof(serializedKernelExcessesSum))) {
 	
 		// Return false
 		return false;

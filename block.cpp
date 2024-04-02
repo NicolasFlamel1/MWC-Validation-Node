@@ -5,6 +5,7 @@
 #include "blake2.h"
 #include "./block.h"
 #include "./consensus.h"
+#include "./saturate_math.h"
 
 using namespace std;
 
@@ -16,7 +17,7 @@ using namespace MwcValidationNode;
 // Supporting function implementation
 
 // Constructor
-Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels) :
+Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction) :
 
 	// Set inputs to inputs
 	inputs(move(inputs)),
@@ -32,7 +33,7 @@ Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&ra
 {
 
 	// Check if doesn't have valid weight
-	if(!hasValidWeight()) {
+	if(!hasValidWeight(isTransaction)) {
 	
 		// Throw exception
 		throw runtime_error("Doesn't have valid weight");
@@ -216,13 +217,13 @@ bool Block::isSortedAndUnique() const {
 }
 
 // Has valid weight
-bool Block::hasValidWeight() const {
+bool Block::hasValidWeight(const bool isTransaction) const {
 
 	// Get weight
-	const uint64_t blockWeight = Consensus::getBlockWeight(inputs.size(), outputs.size(), kernels.size());
+	const uint64_t weight = Consensus::getBlockWeight(inputs.size(), outputs.size(), kernels.size());
 	
 	// Check if weight is invalid
-	if(blockWeight > Consensus::MAXIMUM_BLOCK_WEIGHT) {
+	if(weight > SaturateMath::subtract(Consensus::MAXIMUM_BLOCK_WEIGHT, isTransaction ? Consensus::COINBASE_WEIGHT : 0)) {
 	
 		// Return false
 		return false;
