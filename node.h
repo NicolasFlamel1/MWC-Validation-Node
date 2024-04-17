@@ -17,7 +17,6 @@
 #include "./header.h"
 #include "./mempool.h"
 #include "./merkle_mountain_range.h"
-#include "./transaction.h"
 
 using namespace std;
 

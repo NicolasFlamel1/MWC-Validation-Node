@@ -797,9 +797,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 		throw runtime_error("Number of kernels is invalid");
 	}
 	
-	// Append offset, number of inputs, number of outputs, and number of kernels to payload
-	vector<uint8_t> payload(stemTransactionMessage.cbegin() + MESSAGE_HEADER_LENGTH, stemTransactionMessage.cbegin() + MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(numberOfKernels));
-	
 	// Initialize offset
 	vector<uint8_t>::size_type offset = MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs) + sizeof(numberOfOutputs) + sizeof(numberOfKernels);
 	
@@ -821,9 +818,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 					throw runtime_error("Stem transaction message doesn't contain an input");
 				}
 			
-				// Append input to payload
-				payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(Input::Features), stemTransactionMessage.cbegin() + offset + sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH);
-			
 				// Update offset
 				offset += sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH;
 			
@@ -839,9 +833,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 					// Throw exception
 					throw runtime_error("Stem transaction message doesn't contain an input");
 				}
-				
-				// Append input to payload
-				payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + Crypto::COMMITMENT_LENGTH);
 				
 				// Update offset
 				offset += Crypto::COMMITMENT_LENGTH;
@@ -871,15 +862,12 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 			throw runtime_error("Rangeproof length is invalid");
 		}
 		
-		// Check if stem transaction message doesn't contain a rangeproof length
+		// Check if stem transaction message doesn't contain a rangeproof
 		if(stemTransactionMessage.size() < offset + sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(rangeproofLength) + rangeproofLength) {
 		
 			// Throw exception
 			throw runtime_error("Stem transaction message doesn't contain a rangeproof");
 		}
-		
-		// Append output and rangeproof to payload
-		payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(rangeproofLength) + rangeproofLength);
 		
 		// Update offset
 		offset += sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(rangeproofLength) + rangeproofLength;
@@ -887,16 +875,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 	
 	// Go through all kernels
 	for(uint64_t i = 0; i < numberOfKernels; ++i) {
-	
-		// Check if stem transaction message doesn't contain kernel features
-		if(stemTransactionMessage.size() < offset + sizeof(Kernel::Features)) {
-		
-			// Throw exception
-			throw runtime_error("Stem transaction message doesn't contain kernel features");
-		}
-		
-		// Get kernel features from stem transaction message
-		const Kernel::Features kernelFeatures = (Common::readUint8(stemTransactionMessage, offset) < static_cast<underlying_type_t<Kernel::Features>>(Kernel::Features::UNKNOWN)) ? static_cast<Kernel::Features>(Common::readUint8(stemTransactionMessage, offset)) : Kernel::Features::UNKNOWN;
 		
 		// Check protocol version
 		switch(protocolVersion) {
@@ -906,79 +884,14 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 			case 1:
 			
 				// Check if stem transaction message doesn't contain a kernel
-				if(stemTransactionMessage.size() < offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
+				if(stemTransactionMessage.size() < offset + sizeof(Kernel::Features) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) {
 				
 					// Throw exception
 					throw runtime_error("Stem transaction message doesn't contain a kernel");
 				}
 				
-				// Check kernel features
-				switch(kernelFeatures) {
-				
-					// Plain
-					case Kernel::Features::PLAIN:
-					
-						// Append kernel to payload
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t));
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
-						
-						// Break
-						break;
-					
-					// Coinbase
-					case Kernel::Features::COINBASE:
-					
-						// Append kernel to payload
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures));
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
-						
-						// Break
-						break;
-					
-					// Height locked
-					case Kernel::Features::HEIGHT_LOCKED:
-					
-						// Append kernel to payload
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
-						
-						// Break
-						break;
-					
-					// No recent duplicate
-					case Kernel::Features::NO_RECENT_DUPLICATE:
-					
-						{
-							// Get kernel relative height from kernel
-							const uint64_t kernelRelativeHeight = Common::readUint64(stemTransactionMessage, offset + sizeof(kernelFeatures) + sizeof(uint64_t));
-							
-							// Check if kernel relative height is invalid
-							if(kernelRelativeHeight > UINT16_MAX) {
-							
-								// Throw exception
-								throw runtime_error("Kernel features is invalid");
-							}
-							
-							// Append kernel to payload
-							payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t));
-							Common::writeUint16(payload, kernelRelativeHeight);
-							payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t), stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
-						}
-						
-						// Break
-						break;
-					
-					// Default
-					default:
-					
-						// Throw exception
-						throw runtime_error("Kernel features is invalid");
-					
-						// Break
-						break;
-				}
-				
 				// Update offset
-				offset += sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+				offset += sizeof(Kernel::Features) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 				
 				// Break
 				break;
@@ -986,7 +899,17 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 			// Two or three
 			case 2:
 			case 3:
-		
+			
+				// Check if stem transaction message doesn't contain kernel features
+				if(stemTransactionMessage.size() < offset + sizeof(Kernel::Features)) {
+				
+					// Throw exception
+					throw runtime_error("Stem transaction message doesn't contain kernel features");
+				}
+				
+				// Get kernel features from stem transaction message
+				const Kernel::Features kernelFeatures = (Common::readUint8(stemTransactionMessage, offset) < static_cast<underlying_type_t<Kernel::Features>>(Kernel::Features::UNKNOWN)) ? static_cast<Kernel::Features>(Common::readUint8(stemTransactionMessage, offset)) : Kernel::Features::UNKNOWN;
+				
 				// Check kernel features
 				switch(kernelFeatures) {
 				
@@ -999,9 +922,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 							// Throw exception
 							throw runtime_error("Stem transaction message doesn't contain a kernel");
 						}
-						
-						// Append kernel to payload
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
 						
 						// Update offset
 						offset += sizeof(kernelFeatures) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
@@ -1019,9 +939,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 							throw runtime_error("Stem transaction message doesn't contain a kernel");
 						}
 						
-						// Append kernel to payload
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
-						
 						// Update offset
 						offset += sizeof(kernelFeatures) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 					
@@ -1038,9 +955,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 							throw runtime_error("Stem transaction message doesn't contain a kernel");
 						}
 						
-						// Append kernel to payload
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
-						
 						// Update offset
 						offset += sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 						
@@ -1056,9 +970,6 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 							// Throw exception
 							throw runtime_error("Stem transaction message doesn't contain a kernel");
 						}
-						
-						// Append kernel to payload
-						payload.insert(payload.cend(), stemTransactionMessage.cbegin() + offset, stemTransactionMessage.cbegin() + offset + sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
 						
 						// Update offset
 						offset += sizeof(kernelFeatures) + sizeof(uint64_t) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
@@ -1081,14 +992,14 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 		}
 	}
 	
-	// Create message header
-	const vector messageHeader = createMessageHeader(Type::STEM_TRANSACTION, payload.size());
+	// Create message
+	vector message = createMessageHeader(Type::STEM_TRANSACTION, offset - MESSAGE_HEADER_LENGTH);
 	
-	// Prepend message header to payload
-	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
+	// Append transaction to message
+	message.insert(message.cend(), stemTransactionMessage.cbegin() + MESSAGE_HEADER_LENGTH, stemTransactionMessage.cbegin() + offset);
 	
-	// Return payload
-	return payload;
+	// Return message
+	return message;
 }
 
 // Read transaction message
