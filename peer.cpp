@@ -2311,7 +2311,7 @@ void Peer::readAndWrite() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Check if messages can be sent and received
 						if(numberOfMessagesReceived < MAXIMUM_NUMBER_OF_MESSAGES_RECEIVED_PER_INTERVAL / 2 && numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -2347,7 +2347,7 @@ void Peer::readAndWrite() {
 			
 				{
 					// Lock for writing
-					shared_lock writeLock(lock);
+					unique_lock writeLock(lock);
 					
 					// Check if syncing state is requested block
 					if(syncingState == SyncingState::REQUESTED_BLOCK) {
@@ -2658,7 +2658,7 @@ void Peer::readAndWrite() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Check if messages can be sent and received
 						if(numberOfMessagesReceived < MAXIMUM_NUMBER_OF_MESSAGES_RECEIVED_PER_INTERVAL / 2 && numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -3273,6 +3273,9 @@ bool Peer::processRequestsAndOrResponses() {
 		// Set message attachment length to zero
 		vector<uint8_t>::size_type messageAttachmentLength = 0;
 		
+		// Set increment number of messages received to true
+		bool incrementNumberOfMessagesReceived = true;
+		
 		// Check message's type
 		switch(messageType) {
 		
@@ -3425,7 +3428,7 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Set total difficulty changed to if the total difficulty changed
 						totalDifficultyChanged = totalDifficulty != currentTotalDifficulty;
@@ -3499,7 +3502,7 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Set total difficulty changed to if the total difficulty changed
 						totalDifficultyChanged = totalDifficulty != currentTotalDifficulty;
@@ -3955,7 +3958,7 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Check if messages can be sent
 						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -4005,15 +4008,19 @@ bool Peer::processRequestsAndOrResponses() {
 						break;
 					}
 					
-					// Initialize total difficulty changed
+					// Initialize total difficulty changed and total difficulty increased
 					bool totalDifficultyChanged;
+					bool totalDifficultyIncreased;
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Set total difficulty changed to if the total difficulty changed
 						totalDifficultyChanged = totalDifficulty != header.value().getTotalDifficulty();
+						
+						// Set total difficulty increased to if the total difficulty increased
+						totalDifficultyIncreased = totalDifficulty < header.value().getTotalDifficulty();
 				
 						// Set total difficulty to the header's total difficulty
 						totalDifficulty = header.value().getTotalDifficulty();
@@ -4030,6 +4037,13 @@ bool Peer::processRequestsAndOrResponses() {
 					
 						// Notify peers that event occurred
 						eventOccurred.notify_one();
+					}
+					
+					// Check if total difficulty increased
+					if(totalDifficultyIncreased) {
+					
+						// Set increment number of messages received to false
+						incrementNumberOfMessagesReceived = false;
 					}
 				}
 				
@@ -4256,7 +4270,7 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Check if messages can be sent
 						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -4359,7 +4373,7 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Check if messages can be sent
 						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -4409,15 +4423,19 @@ bool Peer::processRequestsAndOrResponses() {
 						break;
 					}
 					
-					// Initialize total difficulty changed
+					// Initialize total difficulty changed and total difficulty increased
 					bool totalDifficultyChanged;
+					bool totalDifficultyIncreased;
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Set total difficulty changed to if the total difficulty changed
 						totalDifficultyChanged = totalDifficulty != header.value().getTotalDifficulty();
+						
+						// Set total difficulty increased to if the total difficulty increased
+						totalDifficultyIncreased = totalDifficulty < header.value().getTotalDifficulty();
 				
 						// Set total difficulty to the header's total difficulty
 						totalDifficulty = header.value().getTotalDifficulty();
@@ -4434,6 +4452,13 @@ bool Peer::processRequestsAndOrResponses() {
 					
 						// Notify peers that event occurred
 						eventOccurred.notify_one();
+					}
+					
+					// Check if total difficulty increased
+					if(totalDifficultyIncreased) {
+					
+						// Set increment number of messages received to false
+						incrementNumberOfMessagesReceived = false;
 					}
 				}
 				
@@ -4479,14 +4504,10 @@ bool Peer::processRequestsAndOrResponses() {
 						
 						// Append stem transaction message to write buffer
 						writeBuffer.insert(writeBuffer.cend(), stemTransactionMessage.cbegin(), stemTransactionMessage.cend());
-						
-						// Check if not at the max number of messages sent
-						if(numberOfMessagesSent != INT_MAX) {
-						
-							// Increment number of messages sent
-							++numberOfMessagesSent;
-						}
 					}
+					
+					// Set increment number of messages received to false
+					incrementNumberOfMessagesReceived = false;
 				}
 				
 				// Otherwise
@@ -4531,6 +4552,9 @@ bool Peer::processRequestsAndOrResponses() {
 						// Add transaction to node's mempool
 						node.addToMempool(move(transaction.value()));
 					#endif
+					
+					// Set increment number of messages received to false
+					incrementNumberOfMessagesReceived = false;
 				}
 				
 				// Otherwise
@@ -4554,7 +4578,7 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Check if messages can be sent
 						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -4748,7 +4772,7 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					{
 						// Lock for writing
-						unique_lock writeLock(lock);
+						lock_guard writeLock(lock);
 						
 						// Check if messages can be sent
 						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -4884,8 +4908,8 @@ bool Peer::processRequestsAndOrResponses() {
 			}
 		}
 		
-		// Check if not at the max number of messages received
-		if(numberOfMessagesReceived != INT_MAX) {
+		// Check if incrementing number of messages received and not at the max number of messages received
+		if(incrementNumberOfMessagesReceived && numberOfMessagesReceived != INT_MAX) {
 		
 			// Increment number of messages received
 			++numberOfMessagesReceived;
