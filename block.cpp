@@ -17,7 +17,7 @@ using namespace MwcValidationNode;
 // Supporting function implementation
 
 // Constructor
-Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction) :
+Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction, const bool verify) :
 
 	// Set inputs to inputs
 	inputs(move(inputs)),
@@ -32,33 +32,44 @@ Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&ra
 	kernels(move(kernels))
 {
 
-	// Check if doesn't have valid weight
-	if(!hasValidWeight(isTransaction)) {
-	
-		// Throw exception
-		throw runtime_error("Doesn't have valid weight");
-	}
+	// Check if verifying
+	if(verify) {
 
-	// Check if not sorted and unique
-	if(!isSortedAndUnique()) {
-	
-		// Throw exception
-		throw runtime_error("Not sorted and unique");
+		// Check if doesn't have valid weight
+		if(!hasValidWeight(isTransaction)) {
+		
+			// Throw exception
+			throw runtime_error("Doesn't have valid weight");
+		}
+
+		// Check if not sorted and unique
+		if(!isSortedAndUnique()) {
+		
+			// Throw exception
+			throw runtime_error("Not sorted and unique");
+		}
+		
+		// Check if doesn't have unique no recent duplicate kernel excesses
+		if(!hasUniqueNoRecentDuplicateKernelExcesses()) {
+		
+			// Throw exception
+			throw runtime_error("Doesn't have unique no recent duplicate kernel excesses");
+		}
+		
+		// Check if doesn't have valid cut through
+		if(!hasValidCutThrough()) {
+		
+			// Throw exception
+			throw runtime_error("Doesn't have valid cut through");
+		}
 	}
-	
-	// Check if doesn't have unique no recent duplicate kernel excesses
-	if(!hasUniqueNoRecentDuplicateKernelExcesses()) {
-	
-		// Throw exception
-		throw runtime_error("Doesn't have unique no recent duplicate kernel excesses");
-	}
-	
-	// Check if doesn't have valid cut through
-	if(!hasValidCutThrough()) {
-	
-		// Throw exception
-		throw runtime_error("Doesn't have valid cut through");
-	}
+}
+
+// Get inputs
+list<Input> &Block::getInputs() {
+
+	// Return inputs
+	return inputs;
 }
 
 // Get inputs

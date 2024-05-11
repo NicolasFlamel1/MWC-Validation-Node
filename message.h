@@ -113,6 +113,15 @@ class Message final {
 		// Maximum number of block hashes
 		static const uint8_t MAXIMUM_NUMBER_OF_BLOCK_HASHES;
 		
+		// Maximum inputs length
+		static const size_t MAXIMUM_INPUTS_LENGTH;
+		
+		// Maximum outputs length
+		static const size_t MAXIMUM_OUTPUTS_LENGTH;
+		
+		// Maximum kernels length
+		static const size_t MAXIMUM_KERNELS_LENGTH;
+		
 		// Constructor
 		Message() = delete;
 		
@@ -205,15 +214,6 @@ class Message final {
 		
 		// Minimum proof nonces bytes length
 		static const size_t MINIMUM_PROOF_NONCES_BYTES_LENGTH;
-		
-		// Maximum inputs length
-		static const size_t MAXIMUM_INPUTS_LENGTH;
-		
-		// Maximum outputs length
-		static const size_t MAXIMUM_OUTPUTS_LENGTH;
-		
-		// Maximum kernels length
-		static const size_t MAXIMUM_KERNELS_LENGTH;
 		
 		// Get maximum payload length
 		static vector<uint8_t>::size_type getMaximumPayloadLength(const Type type);

@@ -203,6 +203,9 @@ class Node final {
 		// Add to mempool
 		void addToMempool(Transaction &&transaction);
 		
+		// Get next block
+		tuple<Header, Block> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
+		
 	// Private
 	private:
 		
@@ -247,6 +250,12 @@ class Node final {
 		
 		// Remove random peer interval
 		static const chrono::hours REMOVE_RANDOM_PEER_INTERVAL;
+		
+		// Default base fee
+		static const uint64_t DEFAULT_BASE_FEE;
+		
+		// Cleanup mempool
+		void cleanupMempool();
 		
 		// Apply block to sync state
 		bool applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &block);
@@ -337,6 +346,9 @@ class Node final {
 		
 		// Is syncing
 		bool isSyncing;
+		
+		// Is synced
+		bool isSynced;
 		
 		// Unused peer candidates
 		unordered_map<string, chrono::time_point<chrono::steady_clock>> unusedPeerCandidates;

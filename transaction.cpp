@@ -11,13 +11,22 @@ using namespace std;
 using namespace MwcValidationNode;
 
 
+// Constants
+
+// Body weight output factor
+const uint64_t Transaction::BODY_WEIGHT_OUTPUT_FACTOR = 4;
+
+
 // Supporting function implementation
 
 // Constructor
 Transaction::Transaction(const uint8_t offset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels) :
 
 	// Create block using inputs, outputs, rangeproofs, and kernels
-	block(move(inputs), move(outputs), move(rangeproofs), move(kernels), true)
+	block(move(inputs), move(outputs), move(rangeproofs), move(kernels), true),
+	
+	// Set fees to zero
+	fees(0)
 {
 
 	// Get if offset is zero
@@ -29,9 +38,6 @@ Transaction::Transaction(const uint8_t offset[Crypto::SECP256K1_PRIVATE_KEY_LENG
 	
 	// Initialize kernel excesses
 	const secp256k1_pedersen_commitment *positiveExcesses[getKernels().size() + (offsetIsZero ? 0 : 1)];
-	
-	// Set fees to zero
-	uint64_t fees = 0;
 	
 	// Go through all kernels
 	size_t i = 0;
@@ -156,6 +162,13 @@ const uint8_t *Transaction::getOffset() const {
 }
 
 // Get inputs
+list<Input> &Transaction::getInputs() {
+
+	// Return block's inputs
+	return block.getInputs();
+}
+
+// Get inputs
 const list<Input> &Transaction::getInputs() const {
 
 	// Return block's inputs
@@ -181,4 +194,79 @@ const list<Kernel> &Transaction::getKernels() const {
 
 	// Return block's kernels
 	return block.getKernels();
+}
+
+// Get fees
+uint64_t Transaction::getFees() const {
+
+	// Return fees
+	return fees;
+}
+
+// Serialize
+vector<uint8_t> Transaction::serialize() const {
+
+	// Initialize serialized transaction
+	vector<uint8_t> serializedTransaction;
+	
+	// Append offset to serialized transaction
+	serializedTransaction.insert(serializedTransaction.cend(), cbegin(offset), cend(offset));
+	
+	// Append number of inputs to serialized transaction
+	Common::writeUint64(serializedTransaction, getInputs().size());
+	
+	// Append number of outputs to serialized transaction
+	Common::writeUint64(serializedTransaction, getOutputs().size());
+	
+	// Append number of kernels to serialized transaction
+	Common::writeUint64(serializedTransaction, getKernels().size());
+	
+	// Go through all inputs
+	for(const Input &input : getInputs()) {
+	
+		// Append serialized input to serialized transaction
+		const vector serialziedInput = input.serialize();
+		serializedTransaction.insert(serializedTransaction.cend(), serialziedInput.cbegin(), serialziedInput.cend());
+	}
+	
+	// Go through all outputs
+	for(const Output &output : getOutputs()) {
+	
+		// Append serialized output to serialized transaction
+		const vector serialziedOutput = output.serialize();
+		serializedTransaction.insert(serializedTransaction.cend(), serialziedOutput.cbegin(), serialziedOutput.cend());
+	}
+	
+	// Go through all rangeproofs
+	for(const Rangeproof &rangeproof : getRangeproofs()) {
+	
+		// Append serialized rangeproof to serialized transaction
+		const vector serialziedRangeproof = rangeproof.serialize();
+		serializedTransaction.insert(serializedTransaction.cend(), serialziedRangeproof.cbegin(), serialziedRangeproof.cend());
+	}
+	
+	// Go through all kernels
+	for(const Kernel &kernel : getKernels()) {
+	
+		// Append serialized kernel to serialized transaction
+		const vector serialziedKernel = kernel.serialize();
+		serializedTransaction.insert(serializedTransaction.cend(), serialziedKernel.cbegin(), serialziedKernel.cend());
+	}
+	
+	// Return serialized transaction
+	return serializedTransaction;
+}
+
+// Equal operator
+bool Transaction::operator==(const Transaction &transaction) const {
+
+	// Return if serialized transactions are equal
+	return serialize() == transaction.serialize();
+}
+
+// Get required fees
+uint64_t Transaction::getRequiredFees(const uint64_t baseFee) const {
+
+	// Return required fees based on the number of inputs, outputs, and kernels
+	return SaturateMath::multiply(max(SaturateMath::subtract(SaturateMath::add(SaturateMath::multiply(getOutputs().size(), BODY_WEIGHT_OUTPUT_FACTOR), getKernels().size()), getInputs().size()), static_cast<uint64_t>(1)), baseFee);
 }

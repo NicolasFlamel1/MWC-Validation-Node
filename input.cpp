@@ -84,6 +84,13 @@ Input::Features Input::getFeatures() const {
 	return features;
 }
 
+// Set features
+void Input::setFeatures(const Features features) {
+
+	// Set features to features
+	this->features = features;
+}
+
 // Get commitment
 const secp256k1_pedersen_commitment &Input::getCommitment() const {
 

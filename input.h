@@ -51,6 +51,9 @@ class Input final {
 		// Get features
 		Features getFeatures() const;
 		
+		// Set features
+		void setFeatures(const Features features);
+		
 		// Get commitment
 		const secp256k1_pedersen_commitment &getCommitment() const;
 	

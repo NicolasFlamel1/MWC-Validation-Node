@@ -155,6 +155,16 @@ class Common final {
 		// Free memory
 		static void freeMemory();
 		
+		// Uint8 vector hash
+		class Uint8VectorHash {
+
+			// Public
+			public:
+			
+				// Operator
+				size_t operator()(const vector<uint8_t> &uint8Vector) const;
+		};
+		
 		// Read uint8
 		template<typename StorageClass> static uint8_t readUint8(const StorageClass &buffer, const typename StorageClass::size_type offset);
 		

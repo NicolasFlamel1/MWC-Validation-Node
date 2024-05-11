@@ -194,6 +194,9 @@ class Peer final {
 		// Maximum allowed number of reorgs during block sync
 		static const int MAXIMUM_ALLOWED_NUMBER_OF_REORGS_DURING_BLOCK_SYNC;
 		
+		// Before disconnect delay duration
+		static const chrono::milliseconds BEFORE_DISCONNECT_DELAY_DURATION;
+		
 		// Connect
 		void connect(const string &address);
 		

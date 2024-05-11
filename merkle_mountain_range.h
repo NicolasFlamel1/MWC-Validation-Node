@@ -141,16 +141,6 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 	// Private
 	private:
 	
-		// Loopup value hash
-		class LookupValueHash {
-
-			// Public
-			public:
-			
-				// Operator
-				size_t operator()(const vector<uint8_t> &lookupValue) const;
-		};
-	
 		// Append leaf or pruned leaf
 		void appendLeafOrPrunedLeaf(optional<MerkleMountainRangeLeafDerivedClass> &&leafOrPrunedLeaf);
 	
@@ -188,7 +178,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		static uint64_t getNextPeakIndex(const uint64_t index);
 		
 		// Lookup table
-		unordered_map<vector<uint8_t>, unordered_set<uint64_t>, LookupValueHash> lookupTable;
+		unordered_map<vector<uint8_t>, unordered_set<uint64_t>, Common::Uint8VectorHash> lookupTable;
 		
 		// Unpruned leaves
 		map<uint64_t, MerkleMountainRangeLeafDerivedClass> unprunedLeaves;
@@ -1774,13 +1764,6 @@ template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRa
 	
 	// Return size
 	return index + 1;
-}
-
-// Operator
-template<typename MerkleMountainRangeLeafDerivedClass> size_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::LookupValueHash::operator()(const vector<uint8_t> &lookupValue) const {
-
-	// Return hash of the lookup value
-	return hash<string>()(Common::toHexString(lookupValue));
 }
 
 // Append leaf or pruned leaf

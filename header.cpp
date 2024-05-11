@@ -25,7 +25,7 @@ const uint64_t Header::FUTURE_NUMBER_OF_BLOCKS_THRESHOLD = 12;
 // Supporting function implementation
 
 // Constructor
-Header::Header(const uint16_t version, const uint64_t height, const chrono::time_point<chrono::system_clock> &timestamp, const uint8_t previousBlockHash[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t previousHeaderRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t outputRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t rangeproofRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t kernelRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], const uint64_t outputMerkleMountainRangeSize, const uint64_t kernelMerkleMountainRangeSize, const uint64_t totalDifficulty, const uint32_t secondaryScaling, const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]) :
+Header::Header(const uint16_t version, const uint64_t height, const chrono::time_point<chrono::system_clock> &timestamp, const uint8_t previousBlockHash[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t previousHeaderRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t outputRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t rangeproofRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t kernelRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], const uint64_t outputMerkleMountainRangeSize, const uint64_t kernelMerkleMountainRangeSize, const uint64_t totalDifficulty, const uint32_t secondaryScaling, const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES], const bool verify) :
 
 	// Set version to version
 	version(version),
@@ -55,68 +55,72 @@ Header::Header(const uint16_t version, const uint64_t height, const chrono::time
 	edgeBits(edgeBits)
 {
 
-	// Check if version is invalid
-	if(Consensus::getHeaderVersion(height) != version) {
+	// Check if verifying
+	if(verify) {
 	
-		// Throw exception
-		throw runtime_error("Version is invalid");
-	}
-	
-	// Check if timestamp is too far in the future
-	if(timestamp > chrono::system_clock::now() + FUTURE_NUMBER_OF_BLOCKS_THRESHOLD * Consensus::BLOCK_TIME) {
-	
-		// Throw exception
-		throw runtime_error("Timestamp is too far in the future");
-	}
-	
-	// Check if total kernel offset is invalid
-	if(any_of(totalKernelOffset, totalKernelOffset + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
-	
-		// Return if value isn't zero
-		return value;
-	
-	}) && !secp256k1_ec_seckey_verify(secp256k1_context_no_precomp, totalKernelOffset)) {
-	
-		// Throw exception
-		throw runtime_error("Total kernel offset is invalid");
-	}
-	
-	// Check if output Merkle mountain range size is invalid
-	if(!MerkleMountainRange<Output>::isSizeValid(outputMerkleMountainRangeSize)) {
-	
-		// Throw exception
-		throw runtime_error("Output Merkle mountain range size is invalid");
-	}
-	
-	// Check if kernel Merkle mountain range size is invalid
-	if(!MerkleMountainRange<Kernel>::isSizeValid(kernelMerkleMountainRangeSize)) {
-	
-		// Throw exception
-		throw runtime_error("Kernel Merkle mountain range size is invalid");
-	}
-	
-	// Get global weight with the number of outputs and kernels
-	const uint64_t globalWeight = Consensus::getBlockWeight(0, MerkleMountainRange<Output>::getNumberOfLeavesAtSize(outputMerkleMountainRangeSize), MerkleMountainRange<Kernel>::getNumberOfLeavesAtSize(kernelMerkleMountainRangeSize));
-	
-	// Check if global weight at the height is invalid
-	if(globalWeight > SaturateMath::multiply(Consensus::MAXIMUM_BLOCK_WEIGHT, SaturateMath::add(height, 1))) {
-	
-		// Throw exception
-		throw runtime_error("Global weight at the height is invalid");
-	}
-	
-	// Check if total difficulty is invalid
-	if(totalDifficulty < Consensus::GENESIS_BLOCK_HEADER.totalDifficulty) {
-	
-		// Throw exception
-		throw runtime_error("Total difficulty is invalid");
-	}
-	
-	// Check if edge bits are invalid
-	if(!edgeBits || edgeBits > Consensus::MAXIMUM_EDGE_BITS) {
-	
-		// Throw exception
-		throw runtime_error("Edge bits are invalid");
+		// Check if version is invalid
+		if(Consensus::getHeaderVersion(height) != version) {
+		
+			// Throw exception
+			throw runtime_error("Version is invalid");
+		}
+		
+		// Check if timestamp is too far in the future
+		if(timestamp > chrono::system_clock::now() + FUTURE_NUMBER_OF_BLOCKS_THRESHOLD * Consensus::BLOCK_TIME) {
+		
+			// Throw exception
+			throw runtime_error("Timestamp is too far in the future");
+		}
+		
+		// Check if total kernel offset is invalid
+		if(any_of(totalKernelOffset, totalKernelOffset + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
+		
+			// Return if value isn't zero
+			return value;
+		
+		}) && !secp256k1_ec_seckey_verify(secp256k1_context_no_precomp, totalKernelOffset)) {
+		
+			// Throw exception
+			throw runtime_error("Total kernel offset is invalid");
+		}
+		
+		// Check if output Merkle mountain range size is invalid
+		if(!MerkleMountainRange<Output>::isSizeValid(outputMerkleMountainRangeSize)) {
+		
+			// Throw exception
+			throw runtime_error("Output Merkle mountain range size is invalid");
+		}
+		
+		// Check if kernel Merkle mountain range size is invalid
+		if(!MerkleMountainRange<Kernel>::isSizeValid(kernelMerkleMountainRangeSize)) {
+		
+			// Throw exception
+			throw runtime_error("Kernel Merkle mountain range size is invalid");
+		}
+		
+		// Get global weight with the number of outputs and kernels
+		const uint64_t globalWeight = Consensus::getBlockWeight(0, MerkleMountainRange<Output>::getNumberOfLeavesAtSize(outputMerkleMountainRangeSize), MerkleMountainRange<Kernel>::getNumberOfLeavesAtSize(kernelMerkleMountainRangeSize));
+		
+		// Check if global weight at the height is invalid
+		if(globalWeight > SaturateMath::multiply(Consensus::MAXIMUM_BLOCK_WEIGHT, SaturateMath::add(height, 1))) {
+		
+			// Throw exception
+			throw runtime_error("Global weight at the height is invalid");
+		}
+		
+		// Check if total difficulty is invalid
+		if(totalDifficulty < Consensus::GENESIS_BLOCK_HEADER.totalDifficulty) {
+		
+			// Throw exception
+			throw runtime_error("Total difficulty is invalid");
+		}
+		
+		// Check if edge bits are invalid
+		if(!edgeBits || edgeBits > Consensus::MAXIMUM_EDGE_BITS) {
+		
+			// Throw exception
+			throw runtime_error("Edge bits are invalid");
+		}
 	}
 
 	// Set previous block hash to previous block hash
@@ -140,25 +144,29 @@ Header::Header(const uint16_t version, const uint64_t height, const chrono::time
 	// Set proof nonces to proof nonces
 	memcpy(this->proofNonces, proofNonces, sizeof(this->proofNonces));
 	
-	// Check if proof of work is invalid
-	if(height != Consensus::GENESIS_BLOCK_HEADER.height && !ProofOfWork::hasValidProofOfWork(*this)) {
+	// Check if verifying
+	if(verify) {
 	
-		// Throw exception
-		throw runtime_error("Proof of work is invalid");
-	}
-	
-	// Check if block hash is banned
-	if(Consensus::isBlockHashBanned(getBlockHash().data())) {
-	
-		// Throw error
-		throw runtime_error("Block hash is banned");
-	}
-	
-	// Check if header doesn't match the genesis block header
-	if(height == Consensus::GENESIS_BLOCK_HEADER.height && *this != Consensus::GENESIS_BLOCK_HEADER) {
-	
-		// Throw exception
-		throw runtime_error("Header doesn't match the genesis block header");
+		// Check if proof of work is invalid
+		if(height != Consensus::GENESIS_BLOCK_HEADER.height && !ProofOfWork::hasValidProofOfWork(*this)) {
+		
+			// Throw exception
+			throw runtime_error("Proof of work is invalid");
+		}
+		
+		// Check if block hash is banned
+		if(Consensus::isBlockHashBanned(getBlockHash().data())) {
+		
+			// Throw error
+			throw runtime_error("Block hash is banned");
+		}
+		
+		// Check if header doesn't match the genesis block header
+		if(height == Consensus::GENESIS_BLOCK_HEADER.height && *this != Consensus::GENESIS_BLOCK_HEADER) {
+		
+			// Throw exception
+			throw runtime_error("Header doesn't match the genesis block header");
+		}
 	}
 }
 

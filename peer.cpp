@@ -112,6 +112,9 @@ const int Peer::MAXIMUM_ALLOWED_NUMBER_OF_REORGS_DURING_HEADERS_SYNC = 3;
 // Maximum allowed number of reorgs during block sync
 const int Peer::MAXIMUM_ALLOWED_NUMBER_OF_REORGS_DURING_BLOCK_SYNC = 2;
 
+// Before disconnect delay duration
+const chrono::milliseconds Peer::BEFORE_DISCONNECT_DELAY_DURATION = 1ms;
+
 
 // Supporting function implementation
 
@@ -591,6 +594,9 @@ void Peer::connect(const string &address) {
 			// Otherwise
 			#else
 			
+				// Delay
+				this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+				
 				{
 					// Lock for writing
 					lock_guard writeLock(lock);
@@ -660,6 +666,9 @@ void Peer::connect(const string &address) {
 			if(getaddrinfo(currentAddress.c_str(), port, &hints, &addressInfo)) {
 		#endif
 		
+			// Delay
+			this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+			
 			{
 				// Lock for writing
 				lock_guard writeLock(lock);
@@ -2134,6 +2143,9 @@ void Peer::connect(const string &address) {
 					// Free all memory allocated by the write buffer
 					vector<uint8_t>().swap(writeBuffer);
 					
+					// Delay
+					this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+					
 					{
 						// Lock for writing
 						lock_guard writeLock(lock);
@@ -2159,6 +2171,9 @@ void Peer::connect(const string &address) {
 			// Otherwise
 			else {
 			
+				// Delay
+				this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+				
 				{
 					// Lock for writing
 					lock_guard writeLock(lock);
@@ -2180,6 +2195,9 @@ void Peer::connect(const string &address) {
 	// Catch errors
 	catch(...) {
 	
+		// Delay
+		this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+		
 		// Try
 		try {
 	
@@ -3168,6 +3186,9 @@ void Peer::disconnect() {
 	
 	// Free all memory allocated by the read buffer
 	vector<uint8_t>().swap(readBuffer);
+	
+	// Delay
+	this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
 	
 	// Try
 	try {
@@ -4526,32 +4547,37 @@ bool Peer::processRequestsAndOrResponses() {
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
 				
-					// Check if mempool is enabled
-					#ifdef ENABLE_MEMPOOL
+					// Initialize transaction
+					optional<Transaction> transaction;
 					
-						// Initialize transaction
-						optional<Transaction> transaction;
+					// Try
+					try {
+					
+						// Read transaction message
+						transaction = Message::readTransactionMessage(readBuffer, protocolVersion);
+					}
+		
+					// Catch errors
+					catch(...) {
+					
+						// Set ban to true
+						ban = true;
 						
-						// Try
-						try {
-						
-							// Read transaction message
-							transaction = Message::readTransactionMessage(readBuffer, protocolVersion);
-						}
-			
-						// Catch errors
-						catch(...) {
-						
-							// Set ban to true
-							ban = true;
-							
-							// Break
-							break;
-						}
-						
+						// Break
+						break;
+					}
+					
+					// Try
+					try {
+					
 						// Add transaction to node's mempool
 						node.addToMempool(move(transaction.value()));
-					#endif
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+					}
 					
 					// Set increment number of messages received to false
 					incrementNumberOfMessagesReceived = false;

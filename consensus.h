@@ -115,6 +115,9 @@ class Consensus final {
 		// Coinbase maturity
 		static const uint64_t COINBASE_MATURITY;
 		
+		// C31 hard fork height
+		static const uint64_t C31_HARD_FORK_HEIGHT;
+		
 		// Constructor
 		Consensus() = delete;
 		
@@ -144,9 +147,6 @@ class Consensus final {
 	
 	// Private
 	private:
-	
-		// C31 hard fork height
-		static const uint64_t C31_HARD_FORK_HEIGHT;
 		
 		// Base edge bits
 		static const uint8_t BASE_EDGE_BITS;

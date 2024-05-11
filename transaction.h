@@ -30,6 +30,9 @@ class Transaction final {
 		const uint8_t *getOffset() const;
 		
 		// Get inputs
+		list<Input> &getInputs();
+		
+		// Get inputs
 		const list<Input> &getInputs() const;
 		
 		// Get outputs
@@ -41,14 +44,32 @@ class Transaction final {
 		// Get kernels
 		const list<Kernel> &getKernels() const;
 		
+		// Get fees
+		uint64_t getFees() const;
+		
+		// Serialize
+		vector<uint8_t> serialize() const;
+		
+		// Equal operator
+		bool operator==(const Transaction &transaction) const;
+		
+		// Get required fees
+		uint64_t getRequiredFees(const uint64_t baseFee) const;
+		
 	// Private
 	private:
 	
+		// Body weight output factor
+		static const uint64_t BODY_WEIGHT_OUTPUT_FACTOR;
+		
 		// Offset
 		uint8_t offset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH];
 	
 		// Block
 		Block block;
+		
+		// Fees
+		uint64_t fees;
 };
 
 

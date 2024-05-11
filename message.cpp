@@ -38,6 +38,15 @@ const uint16_t Message::MAXIMUM_NUMBER_OF_HEADERS = 512;
 // Maximum number of block hashes
 const uint8_t Message::MAXIMUM_NUMBER_OF_BLOCK_HASHES = 20;
 
+// Maximum inputs length
+const size_t Message::MAXIMUM_INPUTS_LENGTH = 100000;
+
+// Maximum outputs length
+const size_t Message::MAXIMUM_OUTPUTS_LENGTH = 100000;
+
+// Maximum kernels length
+const size_t Message::MAXIMUM_KERNELS_LENGTH = 100000;
+
 // Compatible protocol versions
 const set<uint32_t> Message::COMPATIBLE_PROTOCOL_VERSIONS = {
 	0,
@@ -54,15 +63,6 @@ const size_t Message::MAXIMUM_USER_AGENT_LENGTH = 10000;
 
 // Minimum proof nonces bytes length
 const size_t Message::MINIMUM_PROOF_NONCES_BYTES_LENGTH = 8;
-
-// Maximum inputs length
-const size_t Message::MAXIMUM_INPUTS_LENGTH = 100000;
-
-// Maximum outputs length
-const size_t Message::MAXIMUM_OUTPUTS_LENGTH = 100000;
-
-// Maximum kernels length
-const size_t Message::MAXIMUM_KERNELS_LENGTH = 100000;
 
 
 // Supporting function implementation
@@ -774,7 +774,7 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 	const uint64_t numberOfOutputs = Common::readUint64(stemTransactionMessage, MESSAGE_HEADER_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(numberOfInputs));
 	
 	// Check if number of outputs is invalid
-	if(numberOfOutputs > MAXIMUM_INPUTS_LENGTH) {
+	if(numberOfOutputs > MAXIMUM_OUTPUTS_LENGTH) {
 	
 		// Throw exception
 		throw runtime_error("Number of outputs is invalid");
@@ -2177,7 +2177,7 @@ tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTr
 	const uint64_t numberOfOutputs = Common::readUint64(buffer, offset + sizeof(numberOfInputs));
 	
 	// Check if number of outputs is invalid
-	if(numberOfOutputs > MAXIMUM_INPUTS_LENGTH) {
+	if(numberOfOutputs > MAXIMUM_OUTPUTS_LENGTH) {
 	
 		// Throw exception
 		throw runtime_error("Number of outputs is invalid");

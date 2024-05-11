@@ -2,6 +2,7 @@
 #include "./common.h"
 #include "./consensus.h"
 #include "./crypto.h"
+#include "./message.h"
 #include "./node.h"
 #include "./peer.h"
 #include "./saturate_math.h"
@@ -108,6 +109,9 @@ const chrono::hours Node::BANNED_PEERS_CLEANUP_INTERVAL = 6h;
 // Remove random peer interval
 const chrono::hours Node::REMOVE_RANDOM_PEER_INTERVAL = 6h;
 
+// Default base fee
+const uint64_t Node::DEFAULT_BASE_FEE = 1000000;
+
 
 // Supporting function implementation
 
@@ -140,6 +144,9 @@ Node::Node(const string &torProxyAddress, const string &torProxyPort) :
 	
 	// Set is syncing to false
 	isSyncing(false),
+	
+	// Set is synced to false
+	isSynced(false),
 
 	// Set stop monitoring to false
 	stopMonitoring(false)
@@ -665,8 +672,14 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 	// Set rangeproofs to rangeproofs
 	this->rangeproofs = move(rangeproofs);
 	
+	// Clear mempool
+	mempool.clear();
+	
 	// Set is syncing to false
 	isSyncing = false;
+	
+	// Set is synced to false
+	isSynced = false;
 }
 
 // Update sync state
@@ -768,10 +781,1116 @@ const unordered_set<string> &Node::getDnsSeeds() const {
 // Add to mempool
 void Node::addToMempool(Transaction &&transaction) {
 
-	// Lock for writing
-	lock_guard writeLock(lock);
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
 	
-	// TODO
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Check if synced
+		if(isSynced) {
+		
+			// Check if transaction can be added to a block with a coinbase output and kernel
+			if(transaction.getOutputs().size() <= Message::MAXIMUM_OUTPUTS_LENGTH - 1 && transaction.getKernels().size() <= Message::MAXIMUM_KERNELS_LENGTH - 1) {
+		
+				// Go through all of the transaction's inputs
+				for(Input &input : transaction.getInputs()) {
+				
+					// Check if input's features are the same as the output's
+					if(input.getFeatures() == Input::Features::SAME_AS_OUTPUT) {
+					
+						// Check if output doesn't exist
+						const vector inputLookupValue = input.getLookupValue();
+						const Output *output = outputs.getLeafByLookupValue(inputLookupValue);
+						if(!output) {
+						
+							// Check if output doesn't exist in the mempool
+							output = mempool.getOutput(inputLookupValue);
+							if(!output) {
+							
+								// Return
+								return;
+							}
+						}
+						
+						// Set input's features to the output's features
+						input.setFeatures(static_cast<Input::Features>(output->getFeatures()));
+					}
+				}
+				
+				// Check if transaction isn't already in the mempool
+				if(!mempool.contains(transaction)) {
+				
+					// Check if transaction's fees are less than the required fees
+					if(transaction.getFees() < transaction.getRequiredFees(DEFAULT_BASE_FEE)) {
+					
+						// Return
+						return;
+					}
+					
+					// Initialize replaced fees to zero
+					uint64_t replacedFees = 0;
+					
+					// Initialize replaced transactions
+					unordered_set<const Transaction *> replacedTransactions;
+					
+					// Initialize removed outputs
+					unordered_set<vector<uint8_t>, Common::Uint8VectorHash> removedOutputs;
+			
+					// Go through all of the transaction's outputs
+					for(const Output &output : transaction.getOutputs()) {
+					
+						// Check if output already exists
+						const vector outputLookupValue = output.getLookupValue().value();
+						if(outputs.leafWithLookupValueExists(outputLookupValue)) {
+						
+							// Return
+							return;
+						}
+						
+						// Check if output already exists in the mempool
+						const Transaction *existingTransaction = mempool.getTransaction(outputLookupValue);
+						if(existingTransaction) {
+						
+							// Add existing transaction's fees to replaced fees
+							replacedFees = SaturateMath::add(replacedFees, existingTransaction->getFees());
+							
+							// Add existing transaction to list of transactions to replace
+							replacedTransactions.emplace(existingTransaction);
+							
+							// Go through all of the existing transaction's outputs
+							for(const Output &existingOutput : existingTransaction->getOutputs()) {
+							
+								// Add existing output to list of removed outputs
+								removedOutputs.emplace(existingOutput.getLookupValue().value());
+							}
+						}
+					}
+					
+					// Check if transaction replaces other transactions
+					if(!replacedTransactions.empty()) {
+					
+						// Go through all of the transaction's outputs
+						for(const Output &output : transaction.getOutputs()) {
+						
+							// Remove output from list of removed outputs
+							removedOutputs.erase(output.getLookupValue().value());
+						}
+						
+						// Go through all transactions in the mempool
+						unordered_set<vector<uint8_t>, Common::Uint8VectorHash> inputDependencies;
+						for(Mempool::const_iterator i = mempool.cbegin(); i != mempool.cend();) {
+						
+							// Get existing transaction
+							const Transaction &existingTransaction = *i;
+							
+							// Check if existing transaction isn't already being replaced
+							if(!replacedTransactions.contains(&existingTransaction)) {
+							
+								// Initialize remove transaction to false
+								bool removeTransaction = false;
+								
+								// Go through all of the existing transactions inputs
+								for(const Input &input : existingTransaction.getInputs()) {
+								
+									// Check if output doesn't exist
+									vector inputLookupValue = input.getLookupValue();
+									if(!outputs.leafWithLookupValueExists(inputLookupValue)) {
+									
+										// Check if output will be removed
+										if(removedOutputs.contains(inputLookupValue)) {
+										
+											// Set remove transaction to true
+											removeTransaction = true;
+											
+											// Break
+											break;
+										}
+										
+										// Add output to input dependencies
+										inputDependencies.emplace(move(inputLookupValue));
+									}
+								}
+								
+								// Check if removing transaction
+								if(removeTransaction) {
+								
+									// Add existing transaction's fees to replaced fees
+									replacedFees = SaturateMath::add(replacedFees, existingTransaction.getFees());
+									
+									// Add existing transaction to list of transactions to replace
+									replacedTransactions.emplace(&existingTransaction);
+									
+									// Initialize recheck transactions to false
+									bool recheckTransactions = false;
+									
+									// Go through all of the existing transaction's outputs
+									for(const Output &existingOutput : existingTransaction.getOutputs()) {
+									
+										// Check if existing output is the input to another transaction
+										vector outputLookupValue = existingOutput.getLookupValue().value();
+										if(inputDependencies.contains(outputLookupValue)) {
+										
+											// Set recheck transactions to true
+											recheckTransactions = true;
+										}
+										
+										// Add existing output to list of removed outputs
+										removedOutputs.emplace(move(outputLookupValue));
+									}
+									
+									// Check if rechecking transactions
+									if(recheckTransactions) {
+									
+										// Go to first transaction
+										i = mempool.cbegin();
+										
+										// Clear input dependencies
+										inputDependencies.clear();
+									}
+									
+									// Otherwise
+									else {
+									
+										// Go to next transaction
+										++i;
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Go to next transaction
+									++i;
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Go to next transaction
+								++i;
+							}
+						}
+						
+						// Check if transaction's fees aren't greater than the fees of the transactions it replaces
+						if(transaction.getFees() <= replacedFees) {
+						
+							// Return
+							return;
+						}
+					}
+					
+					// Get next header height
+					const uint64_t nextHeaderHeight = SaturateMath::add(syncedHeaderIndex, 1);
+					
+					// Get unspendable coinbase outputs starting index at the next header's height
+					const uint64_t unspendableCoinbaseOutputsStartingIndex = MerkleMountainRange<Header>::getNumberOfLeavesAtSize(headers.getLeaf(SaturateMath::subtract(nextHeaderHeight, Consensus::COINBASE_MATURITY))->getOutputMerkleMountainRangeSize());
+					
+					// Go through all of the transaction's inputs
+					for(const Input &input : transaction.getInputs()) {
+					
+						// Check if output doesn't exist
+						const vector inputLookupValue = input.getLookupValue();
+						const Output *output = outputs.getLeafByLookupValue(inputLookupValue);
+						if(!output) {
+						
+							// Check if output doesn't exist in the mempool, it has coinbase features, or it will be replaced
+							output = mempool.getOutput(inputLookupValue);
+							if(!output || output->getFeatures() == Output::Features::COINBASE || replacedTransactions.contains(mempool.getTransaction(inputLookupValue))) {
+							
+								// Return
+								return;
+							}
+						}
+						
+						// Otherwise check if output has coinbase features
+						else if(output->getFeatures() == Output::Features::COINBASE) {
+						
+							// Check if output won't reach maturity by the next header's height
+							if(nextHeaderHeight < Consensus::COINBASE_MATURITY || outputs.getLeafIndexByLookupValue(inputLookupValue) >= unspendableCoinbaseOutputsStartingIndex) {
+							
+								// Return
+								return;
+							}
+						}
+						
+						// Check if input's features don't match the output's features
+						if(static_cast<underlying_type_t<Input::Features>>(input.getFeatures()) != static_cast<underlying_type_t<Output::Features>>(output->getFeatures())) {
+						
+							// Return
+							return;
+						}
+					}
+					
+					// Go through all of the transaction's kernels
+					for(const Kernel &kernel : transaction.getKernels()) {
+					
+						// Check kernel's features
+						switch(kernel.getFeatures()) {
+						
+							// Height locked
+							case Kernel::Features::HEIGHT_LOCKED:
+							
+								// Check if kernel's lock height is greater than the next header's height
+								if(kernel.getLockHeight() > nextHeaderHeight) {
+								
+									// Return
+									return;
+								}
+								
+								// Break
+								break;
+							
+							// No recent duplicate
+							case Kernel::Features::NO_RECENT_DUPLICATE:
+							
+								// Check if header version at next header's height is less than four
+								if(Consensus::getHeaderVersion(nextHeaderHeight) < 4) {
+								
+									// Return
+									return;
+								}
+								
+								// TODO Support NRD kernels
+								return;
+								
+								// Break
+								break;
+							
+							// Default
+							default:
+							
+								// Break
+								break;
+						}
+					}
+					
+					// Try
+					try {
+					
+						// Go through all replaced transactions
+						for(const Transaction *replacedTransaction : replacedTransactions) {
+						
+							// Remove transaction from mempool
+							mempool.erase(*replacedTransaction);
+						}
+						
+						// Insert transaction into mempool
+						mempool.insert(move(transaction));
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+						// Clear mempool
+						mempool.clear();
+					}
+				}
+			}
+		}
+	#endif
+}
+
+// Get next block
+tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase) {
+
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
+	
+		// Check if not synced
+		if(!isSynced) {
+		
+			// Throw exception
+			throw runtime_error("Node isn't sycned");
+		}
+		
+		// Get next header height
+		const uint64_t nextHeaderHeight = SaturateMath::add(syncedHeaderIndex, 1);
+		
+		// Check if next header height is before the C31 hard fork height
+		// TODO support C29
+		if(nextHeaderHeight < Consensus::C31_HARD_FORK_HEIGHT) {
+		
+			// Throw exception
+			throw runtime_error("Next block isn't supported at height");
+		}
+		
+		// Initialize block inputs, outputs, and kernels
+		unordered_map<vector<uint8_t>, const Input *, Common::Uint8VectorHash> blockInputs;
+		unordered_map<vector<uint8_t>, pair<const Output *, const Rangeproof *>, Common::Uint8VectorHash> blockOutputs;
+		unordered_map<vector<uint8_t>, const Kernel *, Common::Uint8VectorHash> blockKernels;
+		
+		// Initialize fees to zero
+		uint64_t fees = 0;
+		
+		// Initialize offsets
+		vector<const uint8_t *> offsets;
+		
+		// Go through all fees in the mempool in descending order
+		unordered_set<const Transaction *> includedTransactions;
+		unordered_set<vector<uint8_t>, Common::Uint8VectorHash> pendingOutputs;
+		for(map<uint64_t, unordered_set<const Transaction *>>::const_reverse_iterator i = mempool.getFees().crbegin(); i != mempool.getFees().crend();) {
+		
+			// Initialize recheck transactions to false
+			bool recheckTransactions = false;
+			
+			// Go through all transactions with the fees
+			for(const Transaction *transaction : i->second) {
+			
+				// Check if transaction isn't already included in the block
+				if(!includedTransactions.contains(transaction)) {
+			
+					// Check if block with the transaction won't have too many inputs, outputs, or kernels
+					if(blockInputs.size() + transaction->getInputs().size() <= Message::MAXIMUM_INPUTS_LENGTH && blockOutputs.size() + transaction->getOutputs().size() <= Message::MAXIMUM_OUTPUTS_LENGTH - 1 && blockKernels.size() + transaction->getKernels().size() <= Message::MAXIMUM_KERNELS_LENGTH - 1) {
+				
+						// Check if block's weight with the transaction is valid
+						if(Consensus::getBlockWeight(blockInputs.size() + transaction->getInputs().size(), blockOutputs.size() + transaction->getOutputs().size() + 1, blockKernels.size() + transaction->getKernels().size() + 1) <= Consensus::MAXIMUM_BLOCK_WEIGHT) {
+				
+							// Initialize include transaction to true
+							bool includeTransaction = true;
+							
+							// Go through all of the transaction's kernels
+							for(const Kernel &kernel : transaction->getKernels()) {
+							
+								// Check if kernel already exists in the block
+								if(blockKernels.contains(kernel.serialize())) {
+								
+									// Set include transaction to false
+									includeTransaction = false;
+									
+									// Break
+									break;
+								}
+							}
+							
+							// Check if including transaction
+							if(includeTransaction) {
+						
+								// Go through all of the transaction's inputs
+								for(const Input &input : transaction->getInputs()) {
+									
+									// Check if input already exists in the block
+									vector inputLookupValue = input.getLookupValue();
+									if(blockInputs.contains(inputLookupValue)) {
+									
+										// Set include transaction to false
+										includeTransaction = false;
+										
+										// Break
+										break;
+									}
+									
+									// Otherwise check if output doesn't exist
+									else if(!outputs.leafWithLookupValueExists(inputLookupValue) && !blockOutputs.contains(inputLookupValue)) {
+									
+										// Set include transaction to false
+										includeTransaction = false;
+										
+										// Add output to pending outputs
+										pendingOutputs.emplace(move(inputLookupValue));
+										
+										// Break
+										break;
+									}
+								}
+							}
+							
+							// Check if including transaction
+							if(includeTransaction) {
+							
+								// Add transaction to list of included transactions
+								includedTransactions.emplace(transaction);
+								
+								// Check if transaction's offset isn't zero
+								if(any_of(transaction->getOffset(), transaction->getOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
+	
+									// Return if value isn't zero
+									return value;
+								
+								})) {
+								
+									// Add transaction's offset to list of offsets
+									offsets.push_back(transaction->getOffset());
+								}
+							
+								// Go through all of the transaction's inputs
+								for(const Input &input : transaction->getInputs()) {
+								
+									// Check if input is the output from another transaction in the block
+									vector inputLookupValue = input.getLookupValue();
+									if(blockOutputs.contains(inputLookupValue)) {
+									
+										// Remove output from block outputs
+										blockOutputs.erase(inputLookupValue);
+									}
+									
+									// Otherwise
+									else {
+								
+										// Add input to block inputs
+										blockInputs.emplace(move(inputLookupValue), &input);
+									}
+								}
+								
+								// Go through all of the transaction's outputs
+								list<Output>::const_iterator j = transaction->getOutputs().cbegin();
+								for(list<Rangeproof>::const_iterator k = transaction->getRangeproofs().cbegin(); j != transaction->getOutputs().cend(); ++j, ++k) {
+								
+									// Check if output is the input to another transaction
+									vector outputLookupValue = j->getLookupValue().value();
+									if(pendingOutputs.contains(outputLookupValue)) {
+									
+										// Set recheck transactions to true
+										recheckTransactions = true;
+									}
+									
+									// Add output and rangeproof to block outputs
+									blockOutputs.emplace(move(outputLookupValue), make_pair(&*j, &*k));
+								}
+								
+								// Go through all of the transaction's kernels
+								for(const Kernel &kernel : transaction->getKernels()) {
+								
+									// Add kernel to block kernels
+									blockKernels.emplace(kernel.serialize(), &kernel);
+									
+									// Add kernel's fees to fees
+									fees = SaturateMath::add(fees, kernel.getFee());
+								}
+								
+								// Check if rechecking transactions
+								if(recheckTransactions) {
+								
+									// Break
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			// Check if rechecking transactions
+			if(recheckTransactions) {
+			
+				// Go to first fees
+				i = mempool.getFees().crbegin();
+				
+				// Clear pending outputs
+				pendingOutputs.clear();
+			}
+			
+			// Otherwise
+			else {
+			
+				// Go to next fees
+				++i;
+			}
+		}
+		
+		// Get coinbase reward at next header's height
+		const uint64_t coinbaseReward = Consensus::getCoinbaseReward(nextHeaderHeight);
+		
+		// Create coinbase for block's reward and fees
+		tuple coinbase = createCoinbase(SaturateMath::add(coinbaseReward, fees));
+		
+		// Check if coinbase output or kernel already exist
+		const vector coinbaseOutputLookupValue = get<0>(coinbase).getLookupValue().value();
+		if(outputs.leafWithLookupValueExists(coinbaseOutputLookupValue) || blockInputs.contains(coinbaseOutputLookupValue) || blockOutputs.contains(coinbaseOutputLookupValue) || blockKernels.contains(get<2>(coinbase).serialize())) {
+		
+			// Throw exception
+			throw runtime_error("Coinbase output or kernel already exist");
+		}
+		
+		// Go through all of the block's inputs
+		list<Input> sortedInputs;
+		for(const pair<const vector<uint8_t>, const Input *> &input : blockInputs) {
+		
+			// Add input to sorted inputs
+			sortedInputs.push_back(*input.second);
+		}
+		
+		// Sort sorted inputs
+		sortedInputs.sort([](const Input &firstInput, const Input &secondInput) {
+		
+			// Get serialized first input
+			const vector serializedFirstInput = firstInput.serialize();
+			
+			// Check if creating first input's hash failed
+			uint8_t firstInputHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(firstInputHash, sizeof(firstInputHash), serializedFirstInput.data(), serializedFirstInput.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating first input's hash failed");
+			}
+			
+			// Get serialized second input
+			const vector serializedSecondInput = secondInput.serialize();
+			
+			// Check if creating second input's hash failed
+			uint8_t secondInputHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(secondInputHash, sizeof(secondInputHash), serializedSecondInput.data(), serializedSecondInput.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating second input's hash failed");
+			}
+			
+			// Return comparing the first and second input hashes
+			return memcmp(firstInputHash, secondInputHash, sizeof(secondInputHash));
+		});
+		
+		// Go through all of the block's outputs
+		list<pair<Output, Rangeproof>> sortedOutputsAndRangeproofs;
+		for(const pair<const vector<uint8_t>, pair<const Output *, const Rangeproof *>> &output : blockOutputs) {
+		
+			// Add output to sorted outputs and rangeproofs
+			sortedOutputsAndRangeproofs.emplace_back(*output.second.first, *output.second.second);
+		}
+		
+		// Add coinbase output and rangeproof to sorted outputs and rangeproofs
+		sortedOutputsAndRangeproofs.emplace_back(move(get<0>(coinbase)), move(get<1>(coinbase)));
+		
+		// Sort sorted outputs and rangeproofs
+		sortedOutputsAndRangeproofs.sort([](const pair<Output, Rangeproof> &firstOutputAndRangeproof, const pair<Output, Rangeproof> &secondOutputAndRangeproof) {
+		
+			// Get serialized first output and rangeproof's output
+			const vector serializedFirstOutput = firstOutputAndRangeproof.first.serialize();
+			
+			// Check if creating first output's hash failed
+			uint8_t firstOutputHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(firstOutputHash, sizeof(firstOutputHash), serializedFirstOutput.data(), serializedFirstOutput.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating first output's hash failed");
+			}
+			
+			// Get serialized second output and rangeproof's output
+			const vector serializedSecondOutput = secondOutputAndRangeproof.first.serialize();
+			
+			// Check if creating second output's hash failed
+			uint8_t secondOutputHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(secondOutputHash, sizeof(secondOutputHash), serializedSecondOutput.data(), serializedSecondOutput.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating second output's hash failed");
+			}
+			
+			// Return comparing the first and second output hashes
+			return memcmp(firstOutputHash, secondOutputHash, sizeof(secondOutputHash));
+		});
+		
+		// Go through all sorted outputs and rangeproofs
+		list<Output> sortedOutputs;
+		list<Rangeproof> sortedRangeproofs;
+		for(pair<Output, Rangeproof> &outputAndRangeproof : sortedOutputsAndRangeproofs) {
+		
+			// Add output to sorted outputs
+			sortedOutputs.emplace_back(move(outputAndRangeproof.first));
+			
+			// Add rangeproof to sorted rangeproofs
+			sortedRangeproofs.emplace_back(move(outputAndRangeproof.second));
+		}
+		
+		// Go through all of the block's kernels
+		list<Kernel> sortedKernels;
+		for(const pair<const vector<uint8_t>, const Kernel *> &kernel : blockKernels) {
+		
+			// Add kernel to sorted kernels
+			sortedKernels.push_back(*kernel.second);
+		}
+		
+		// Add coinbase kernel to sorted kernels
+		sortedKernels.emplace_back(move(get<2>(coinbase)));
+		
+		// Sort sorted kernels
+		sortedKernels.sort([](const Kernel &firstKernel, const Kernel &secondKernel) {
+		
+			// Get serialized first kernel
+			const vector serializedFirstKernel = firstKernel.serialize();
+			
+			// Check if creating first kernel's hash failed
+			uint8_t firstKernelHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(firstKernelHash, sizeof(firstKernelHash), serializedFirstKernel.data(), serializedFirstKernel.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating first kernel's hash failed");
+			}
+			
+			// Get serialized second kernel
+			const vector serializedSecondKernel = secondKernel.serialize();
+			
+			// Check if creating second kernel's hash failed
+			uint8_t secondKernelHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(secondKernelHash, sizeof(secondKernelHash), serializedSecondKernel.data(), serializedSecondKernel.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating second kernel's hash failed");
+			}
+			
+			// Return comparing the first and second kernel hashes
+			return memcmp(firstKernelHash, secondKernelHash, sizeof(secondKernelHash));
+		});
+		
+		// Create block from sorted inputs, outputs, rangeproofs, and kernels
+		const Block block(move(sortedInputs), move(sortedOutputs), move(sortedRangeproofs), move(sortedKernels), false, false);
+		
+		// Get previous header
+		const Header *previousHeader = headers.getLeaf(syncedHeaderIndex);
+		
+		// Check if previous header's total kernel offset isn't zero
+		if(any_of(previousHeader->getTotalKernelOffset(), previousHeader->getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
+
+			// Return if value isn't zero
+			return value;
+		
+		})) {
+		
+			// Add previous header's total kernel offset to list of offsets
+			offsets.push_back(previousHeader->getTotalKernelOffset());
+		}
+		
+		// Initialize total kernel offset
+		uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH] = {};
+		
+		// Check if non-zero offsets exist
+		if(!offsets.empty()) {
+		
+			// Check if getting total kernel offset failed
+			if(!secp256k1_pedersen_blind_sum(secp256k1_context_no_precomp, totalKernelOffset, offsets.data(), offsets.size(), offsets.size())) {
+			
+				// Throw exception
+				throw runtime_error("Getting total kernel offset failed");
+			}
+		
+			// Check if total kernel offset is invalid
+			if(any_of(cbegin(totalKernelOffset), cend(totalKernelOffset), [](const uint8_t value) {
+			
+				// Return if value isn't zero
+				return value;
+			
+			}) && !secp256k1_ec_seckey_verify(secp256k1_context_no_precomp, totalKernelOffset)) {
+			
+				// Throw exception
+				throw runtime_error("Total kernel offset is invalid");
+			}
+		}
+		
+		// Try
+		try {
+		
+			// Go through all of the block's kernels
+			for(const Kernel &kernel : block.getKernels()) {
+			
+				// Append kernel to kernels
+				kernels.appendLeaf(kernel);
+			}
+			
+			// Go through all of the block's outputs
+			for(const Output &output : block.getOutputs()) {
+			
+				// Append output to outputs
+				outputs.appendLeaf(output);
+			}
+			
+			// Go through all of the block's rangeproofs
+			for(const Rangeproof &rangeproof : block.getRangeproofs()) {
+			
+				// Append rangeproof to rangeproofs
+				rangeproofs.appendLeaf(rangeproof);
+			}
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Set headers to include the genesis block header
+			headers.clear();
+			headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
+			
+			// Set synced header index to the newest known height
+			syncedHeaderIndex = headers.back().getHeight();
+			
+			// Set kernels to include the genesis block kernel
+			kernels.clear();
+			kernels.appendLeaf(Consensus::GENESIS_BLOCK_KERNEL);
+			
+			// Set outputs to include the genesis block output
+			outputs.clear();
+			outputs.appendLeaf(Consensus::GENESIS_BLOCK_OUTPUT);
+			
+			// Set rangeproofs to include the genesis block rangeproof
+			rangeproofs.clear();
+			rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
+			
+			// Clear mempool
+			mempool.clear();
+			
+			// Set is synced to false
+			isSynced = false;
+			
+			// Throw exception
+			throw runtime_error("Adding block to Merkle mountain ranges failed");
+		}
+		
+		// Try
+		try {
+			
+			// Create header
+			const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES] = {};
+			const Header header(Consensus::getHeaderVersion(nextHeaderHeight), nextHeaderHeight, max(chrono::system_clock::now(), previousHeader->getTimestamp() + 1s), previousHeader->getBlockHash().data(), headers.getRootAtNumberOfLeaves(previousHeader->getHeight() + 1).data(), outputs.getRootAtSize(outputs.getSize()).data(), rangeproofs.getRootAtSize(rangeproofs.getSize()).data(), kernels.getRootAtSize(kernels.getSize()).data(), totalKernelOffset, outputs.getSize(), kernels.getSize(), previousHeader->getTotalDifficulty(), Consensus::MINIMUM_SECONDARY_SCALING, 0, Consensus::C31_EDGE_BITS, proofNonces, false);
+			
+			// Try
+			try {
+			
+				// Undo changed to kernels, outputs, and rangeproofs
+				kernels.rewindToSize(previousHeader->getKernelMerkleMountainRangeSize());
+				outputs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+				rangeproofs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+				// Set headers to include the genesis block header
+				headers.clear();
+				headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
+				
+				// Set synced header index to the newest known height
+				syncedHeaderIndex = headers.back().getHeight();
+				
+				// Set kernels to include the genesis block kernel
+				kernels.clear();
+				kernels.appendLeaf(Consensus::GENESIS_BLOCK_KERNEL);
+				
+				// Set outputs to include the genesis block output
+				outputs.clear();
+				outputs.appendLeaf(Consensus::GENESIS_BLOCK_OUTPUT);
+				
+				// Set rangeproofs to include the genesis block rangeproof
+				rangeproofs.clear();
+				rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
+				
+				// Clear mempool
+				mempool.clear();
+				
+				// Set is synced to false
+				isSynced = false;
+				
+				// Throw exception
+				throw runtime_error("Removing block to Merkle mountain ranges failed");
+			}
+			
+			// Return header and block
+			return {header, block};
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Try
+			try {
+			
+				// Undo changed to kernels, outputs, and rangeproofs
+				kernels.rewindToSize(previousHeader->getKernelMerkleMountainRangeSize());
+				outputs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+				rangeproofs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+				// Set headers to include the genesis block header
+				headers.clear();
+				headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
+				
+				// Set synced header index to the newest known height
+				syncedHeaderIndex = headers.back().getHeight();
+				
+				// Set kernels to include the genesis block kernel
+				kernels.clear();
+				kernels.appendLeaf(Consensus::GENESIS_BLOCK_KERNEL);
+				
+				// Set outputs to include the genesis block output
+				outputs.clear();
+				outputs.appendLeaf(Consensus::GENESIS_BLOCK_OUTPUT);
+				
+				// Set rangeproofs to include the genesis block rangeproof
+				rangeproofs.clear();
+				rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
+				
+				// Clear mempool
+				mempool.clear();
+				
+				// Set is synced to false
+				isSynced = false;
+			}
+			
+			// Rethrow error
+			throw;
+		}
+	
+	// Otherwise
+	#else
+	
+		// Throw exception
+		throw runtime_error("Mempool isn't enabled");
+	#endif
+}
+
+// Cleanup mempool
+void Node::cleanupMempool() {
+
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
+	
+		// Check if synced
+		if(isSynced) {
+		
+			// Try
+			try {
+			
+				// Get next header height
+				const uint64_t nextHeaderHeight = SaturateMath::add(syncedHeaderIndex, 1);
+				
+				// Get unspendable coinbase outputs starting index at the next header's height
+				const uint64_t unspendableCoinbaseOutputsStartingIndex = MerkleMountainRange<Header>::getNumberOfLeavesAtSize(headers.getLeaf(SaturateMath::subtract(nextHeaderHeight, Consensus::COINBASE_MATURITY))->getOutputMerkleMountainRangeSize());
+				
+				// Go through all transactions in the mempool
+				for(Mempool::const_iterator i = mempool.cbegin(); i != mempool.cend();) {
+				
+					// Get transaction
+					const Transaction &transaction = *i;
+					
+					// Initialize remove transaction to false
+					bool removeTransaction = false;
+					
+					// Go through all of the transaction's outputs
+					for(const Output &output : transaction.getOutputs()) {
+					
+						// Check if output already exists
+						if(outputs.leafWithLookupValueExists(output.getLookupValue().value())) {
+						
+							// Set remove transaction to true
+							removeTransaction = true;
+							
+							// Break
+							break;
+						}
+					}
+					
+					// Check if not removing transaction
+					if(!removeTransaction) {
+					
+						// Go through all of the transaction's inputs
+						for(const Input &input : transaction.getInputs()) {
+						
+							// Check if output doesn't exist
+							const vector inputLookupValue = input.getLookupValue();
+							const Output *output = outputs.getLeafByLookupValue(inputLookupValue);
+							if(!output) {
+							
+								// Check if output doesn't exist in the mempool or it has coinbase features
+								output = mempool.getOutput(inputLookupValue);
+								if(!output || output->getFeatures() == Output::Features::COINBASE) {
+								
+									// Set remove transaction to true
+									removeTransaction = true;
+									
+									// Break
+									break;
+								}
+							}
+							
+							// Check if output has coinbase features
+							else if(output->getFeatures() == Output::Features::COINBASE) {
+							
+								// Check if output won't reach maturity by the next header's height
+								if(nextHeaderHeight < Consensus::COINBASE_MATURITY || outputs.getLeafIndexByLookupValue(inputLookupValue) >= unspendableCoinbaseOutputsStartingIndex) {
+								
+									// Set remove transaction to true
+									removeTransaction = true;
+									
+									// Break
+									break;
+								}
+							}
+							
+							// Check if input's features don't match the output's features
+							if(static_cast<underlying_type_t<Input::Features>>(input.getFeatures()) != static_cast<underlying_type_t<Output::Features>>(output->getFeatures())) {
+							
+								// Set remove transaction to true
+								removeTransaction = true;
+								
+								// Break
+								break;
+							}
+						}
+					}
+					
+					// Check if not removing transaction
+					if(!removeTransaction) {
+				
+						// Go through all of the transaction's kernels
+						for(const Kernel &kernel : transaction.getKernels()) {
+						
+							// Check kernel's features
+							switch(kernel.getFeatures()) {
+							
+								// Height locked
+								case Kernel::Features::HEIGHT_LOCKED:
+								
+									// Check if kernel's lock height is greater than the next header's height
+									if(kernel.getLockHeight() > nextHeaderHeight) {
+									
+										// Set remove transaction to true
+										removeTransaction = true;
+									}
+									
+									// Break
+									break;
+								
+								// No recent duplicate
+								case Kernel::Features::NO_RECENT_DUPLICATE:
+								
+									// Check if header version at next header's height is less than four
+									if(Consensus::getHeaderVersion(nextHeaderHeight) < 4) {
+									
+										// Set remove transaction to true
+										removeTransaction = true;
+									}
+									
+									// TODO Support NRD kernels
+									removeTransaction = true;
+									
+									// Break
+									break;
+								
+								// Default
+								default:
+								
+									// Break
+									break;
+							}
+							
+							// Check if removing transaction
+							if(removeTransaction) {
+							
+								// Break
+								break;
+							}
+						}
+					}
+					
+					// Check if removing transaction
+					if(removeTransaction) {
+					
+						// Remove transaction from mempool and go to next transaction
+						i = mempool.erase(i);
+					}
+					
+					// Otherwise
+					else {
+					
+						// Go to next transaction
+						++i;
+					}
+				}
+				
+				// Go through all transactions in the mempool
+				unordered_set<vector<uint8_t>, Common::Uint8VectorHash> inputDependencies;
+				for(Mempool::const_iterator i = mempool.cbegin(); i != mempool.cend();) {
+				
+					// Get transaction
+					const Transaction &transaction = *i;
+					
+					// Initialize remove transaction to false
+					bool removeTransaction = false;
+					
+					// Go through all of the transaction's inputs
+					for(const Input &input : transaction.getInputs()) {
+					
+						// Check if output doesn't exist
+						vector inputLookupValue = input.getLookupValue();
+						if(!outputs.leafWithLookupValueExists(inputLookupValue)) {
+						
+							// Check if output doesn't exist in the mempool
+							if(!mempool.getOutput(inputLookupValue)) {
+						
+								// Set remove transaction to true
+								removeTransaction = true;
+								
+								// Break
+								break;
+							}
+							
+							// Otherwise
+							else {
+							
+								// Add output to input dependencies
+								inputDependencies.emplace(move(inputLookupValue));
+							}
+						}
+					}
+					
+					// Check if removing transaction
+					if(removeTransaction) {
+					
+						// Initialize recheck transactions to false
+						bool recheckTransactions = false;
+						
+						// Go through all of the transaction's outputs
+						for(const Output &output : transaction.getOutputs()) {
+						
+							// Check if output is the input to another transaction
+							if(inputDependencies.contains(output.getLookupValue().value())) {
+							
+								// Set recheck transactions to true
+								recheckTransactions = true;
+								
+								// Break
+								break;
+							}
+						}
+						
+						// Check if rechecking transactions
+						if(recheckTransactions) {
+						
+							// Remove transaction from mempool
+							mempool.erase(i);
+							
+							// Go to the first transaction
+							i = mempool.cbegin();
+							
+							// Clear input dependencies
+							inputDependencies.clear();
+						}
+						
+						// Otherwise
+						else {
+						
+							// Remove transaction from mempool and go to next transaction
+							i = mempool.erase(i);
+						}
+					}
+					
+					// Otherwise
+					else {
+					
+						// Go to next transaction
+						++i;
+					}
+				}
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+				// Clear mempool
+				mempool.clear();
+			}
+		}
+	#endif
 }
 
 // Apply block to sync state
@@ -859,7 +1978,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			const uint64_t outputIndex = outputs.getLeafIndexByLookupValue(input.getLookupValue());
 			
 			// Check if input has coinbase features
-			if(input.getFeatures() == Input::Features::COINBASE) {
+			if(input.getFeatures() == Input::Features::COINBASE || (input.getFeatures() == Input::Features::SAME_AS_OUTPUT && output->getFeatures() == Output::Features::COINBASE)) {
 			
 				// Check if output hasn't reached maturity
 				if(header->getHeight() < Consensus::COINBASE_MATURITY || outputIndex >= unspendableCoinbaseOutputsStartingIndex) {
@@ -975,6 +2094,9 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			throw runtime_error("Verifying kernel sums failed");
 		}
 		
+		// Clean up mempool
+		cleanupMempool();
+		
 		// Check if on block callback exists
 		if(onBlockCallback) {
 		
@@ -995,14 +2117,31 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 	
 		// Check if updating sync state failed or callback failed
 		if(!result || callbackFailed) {
+		
+			// Check if node state wasn't already reset
+			if(this->syncedHeaderIndex != Consensus::GENESIS_BLOCK_HEADER.getHeight()) {
 	
-			// Decrement synced header index
-			--this->syncedHeaderIndex;
+				// Decrement synced header index
+				--this->syncedHeaderIndex;
 			
-			// Rewind kernels, outputs, and rangeproofs to the synced header
-			kernels.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getKernelMerkleMountainRangeSize());
-			outputs.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
-			rangeproofs.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
+				// Rewind kernels, outputs, and rangeproofs to the synced header
+				kernels.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getKernelMerkleMountainRangeSize());
+				outputs.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
+				rangeproofs.rewindToSize(headers.getLeaf(this->syncedHeaderIndex)->getOutputMerkleMountainRangeSize());
+				
+				// Clean up mempool
+				cleanupMempool();
+			}
+			
+			// Otherwise
+			else {
+			
+				// Set is syncing to false
+				isSyncing = false;
+				
+				// Return true
+				return true;
+			}
 		}
 		
 		// Otherwise
@@ -1027,8 +2166,14 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			rangeproofs.clear();
 			rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
 			
+			// Clear mempool
+			mempool.clear();
+			
 			// Set is syncing to false
 			isSyncing = false;
+			
+			// Set is synced to false
+			isSynced = false;
 			
 			// Return true
 			return true;
@@ -1697,6 +2842,9 @@ void Node::sync() {
 				// Remove on start syncing callback
 				onStartSyncingCallback = nullptr;
 			}
+			
+			// Set is synced to true
+			isSynced = true;
 			
 			// Check if on synced callback exists
 			if(onSyncedCallback) {

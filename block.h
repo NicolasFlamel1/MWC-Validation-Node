@@ -27,7 +27,10 @@ class Block final {
 	public:
 	
 		// Constructor
-		explicit Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction);
+		explicit Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction, const bool verify = true);
+		
+		// Get inputs
+		list<Input> &getInputs();
 		
 		// Get inputs
 		const list<Input> &getInputs() const;

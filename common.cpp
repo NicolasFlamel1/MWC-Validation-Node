@@ -488,3 +488,10 @@ void Common::freeMemory() {
 	
 	}
 }
+
+// Uint8 vector hash operator
+size_t Common::Uint8VectorHash::operator()(const vector<uint8_t> &uint8Vector) const {
+
+	// Return hash of the uint8 vector
+	return hash<string>()(Common::toHexString(uint8Vector));
+}
