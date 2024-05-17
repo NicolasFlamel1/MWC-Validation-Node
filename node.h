@@ -113,6 +113,9 @@ class Node final {
 		// Set on peer disconnect callback
 		void setOnPeerDisconnectCallback(const function<void(const string &peerIdentifier)> &onPeerDisconnectCallback);
 		
+		// Set on transaction callback
+		void setOnTransactionCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionCallback);
+		
 		// Start
 		void start(const char *customDnsSeed = nullptr);
 		
@@ -200,6 +203,15 @@ class Node final {
 		// Get DNS seeds
 		const unordered_set<string> &getDnsSeeds() const;
 		
+		// Broadcast transaction
+		void broadcastTransaction(const Transaction &transaction);
+		
+		// Broadcast block
+		void broadcastBlock(Header &&header, Block &&block);
+		
+		// Get mempool
+		const Mempool &getMempool() const;
+		
 		// Add to mempool
 		void addToMempool(Transaction &&transaction);
 		
@@ -263,6 +275,12 @@ class Node final {
 		// Monitor
 		void monitor();
 		
+		// Broadcast pending transactions
+		void broadcastPendingTransactions();
+		
+		// Broadcast pending block
+		void broadcastPendingBlock();
+		
 		// Remove disconnected peers
 		void removeDisconnectedPeers();
 		
@@ -310,6 +328,9 @@ class Node final {
 		
 		// On peer disconnect callback
 		function<void(const string &peerIdentifier)> onPeerDisconnectCallback;
+		
+		// On transaction callback
+		function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> onTransactionCallback;
 		
 		// Tor proxy address
 		const string torProxyAddress;
@@ -370,6 +391,12 @@ class Node final {
 		
 		// Mempool
 		Mempool mempool;
+		
+		// Pending transactions
+		list<Transaction> pendingTransactions;
+		
+		// Pending block
+		optional<const tuple<const Header, const Block>> pendingBlock;
 		
 		// Stop monitoring
 		atomic_bool stopMonitoring;

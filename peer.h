@@ -104,6 +104,9 @@ class Peer final {
 		// Get total difficulty
 		uint64_t getTotalDifficulty() const;
 		
+		// Get protocol version
+		uint32_t getProtocolVersion() const;
+		
 		// Is message queue full
 		bool isMessageQueueFull() const;
 		
@@ -115,6 +118,9 @@ class Peer final {
 		
 		// Is worker operation running
 		bool isWorkerOperationRunning() const;
+		
+		// Send message
+		void sendMessage(const vector<uint8_t> &message);
 	
 	// Private
 	private:

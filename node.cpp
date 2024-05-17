@@ -325,6 +325,13 @@ void Node::setOnPeerDisconnectCallback(const function<void(const string &peerIde
 	this->onPeerDisconnectCallback = onPeerDisconnectCallback;
 }
 
+// Set on transaction callback
+void Node::setOnTransactionCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionCallback) {
+
+	// Set on transaction callback
+	this->onTransactionCallback = onTransactionCallback;
+}
+
 // Start
 void Node::start(const char *customDnsSeed) {
 
@@ -778,6 +785,39 @@ const unordered_set<string> &Node::getDnsSeeds() const {
 	}
 }
 
+// Broadcast transaction
+void Node::broadcastTransaction(const Transaction &transaction) {
+
+	// Lock for writing
+	lock_guard writeLock(lock);
+	
+	// Add transaction to list of pending transactions
+	pendingTransactions.push_back(transaction);
+	
+	// Notify that an event occurred
+	peerEventOccurred.notify_one();
+}
+
+// Broadcast block
+void Node::broadcastBlock(Header &&header, Block &&block) {
+
+	// Lock for writing
+	lock_guard writeLock(lock);
+	
+	// Set pending block to the block
+	pendingBlock.emplace(move(header), move(block));
+	
+	// Notify that an event occurred
+	peerEventOccurred.notify_one();
+}
+
+// Get mempool
+const Mempool &Node::getMempool() const {
+
+	// Return mempool
+	return mempool;
+}
+
 // Add to mempool
 void Node::addToMempool(Transaction &&transaction) {
 
@@ -1066,6 +1106,13 @@ void Node::addToMempool(Transaction &&transaction) {
 						}
 					}
 					
+					// Check if on transaction callback exists
+					if(onTransactionCallback) {
+					
+						// Run on transaction callback
+						onTransactionCallback(transaction, replacedTransactions);
+					}
+					
 					// Try
 					try {
 					
@@ -1103,17 +1150,6 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 		
 			// Throw exception
 			throw runtime_error("Node isn't sycned");
-		}
-		
-		// Get next header height
-		const uint64_t nextHeaderHeight = SaturateMath::add(syncedHeaderIndex, 1);
-		
-		// Check if next header height is before the C31 hard fork height
-		// TODO support C29
-		if(nextHeaderHeight < Consensus::C31_HARD_FORK_HEIGHT) {
-		
-			// Throw exception
-			throw runtime_error("Next block isn't supported at height");
 		}
 		
 		// Initialize block inputs, outputs, and kernels
@@ -1289,152 +1325,6 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 			}
 		}
 		
-		// Get coinbase reward at next header's height
-		const uint64_t coinbaseReward = Consensus::getCoinbaseReward(nextHeaderHeight);
-		
-		// Create coinbase for block's reward and fees
-		tuple coinbase = createCoinbase(SaturateMath::add(coinbaseReward, fees));
-		
-		// Check if coinbase output or kernel already exist
-		const vector coinbaseOutputLookupValue = get<0>(coinbase).getLookupValue().value();
-		if(outputs.leafWithLookupValueExists(coinbaseOutputLookupValue) || blockInputs.contains(coinbaseOutputLookupValue) || blockOutputs.contains(coinbaseOutputLookupValue) || blockKernels.contains(get<2>(coinbase).serialize())) {
-		
-			// Throw exception
-			throw runtime_error("Coinbase output or kernel already exist");
-		}
-		
-		// Go through all of the block's inputs
-		list<Input> sortedInputs;
-		for(const pair<const vector<uint8_t>, const Input *> &input : blockInputs) {
-		
-			// Add input to sorted inputs
-			sortedInputs.push_back(*input.second);
-		}
-		
-		// Sort sorted inputs
-		sortedInputs.sort([](const Input &firstInput, const Input &secondInput) {
-		
-			// Get serialized first input
-			const vector serializedFirstInput = firstInput.serialize();
-			
-			// Check if creating first input's hash failed
-			uint8_t firstInputHash[Crypto::BLAKE2B_HASH_LENGTH];
-			if(blake2b(firstInputHash, sizeof(firstInputHash), serializedFirstInput.data(), serializedFirstInput.size(), nullptr, 0)) {
-			
-				// Throw exception
-				throw runtime_error("Creating first input's hash failed");
-			}
-			
-			// Get serialized second input
-			const vector serializedSecondInput = secondInput.serialize();
-			
-			// Check if creating second input's hash failed
-			uint8_t secondInputHash[Crypto::BLAKE2B_HASH_LENGTH];
-			if(blake2b(secondInputHash, sizeof(secondInputHash), serializedSecondInput.data(), serializedSecondInput.size(), nullptr, 0)) {
-			
-				// Throw exception
-				throw runtime_error("Creating second input's hash failed");
-			}
-			
-			// Return comparing the first and second input hashes
-			return memcmp(firstInputHash, secondInputHash, sizeof(secondInputHash));
-		});
-		
-		// Go through all of the block's outputs
-		list<pair<Output, Rangeproof>> sortedOutputsAndRangeproofs;
-		for(const pair<const vector<uint8_t>, pair<const Output *, const Rangeproof *>> &output : blockOutputs) {
-		
-			// Add output to sorted outputs and rangeproofs
-			sortedOutputsAndRangeproofs.emplace_back(*output.second.first, *output.second.second);
-		}
-		
-		// Add coinbase output and rangeproof to sorted outputs and rangeproofs
-		sortedOutputsAndRangeproofs.emplace_back(move(get<0>(coinbase)), move(get<1>(coinbase)));
-		
-		// Sort sorted outputs and rangeproofs
-		sortedOutputsAndRangeproofs.sort([](const pair<Output, Rangeproof> &firstOutputAndRangeproof, const pair<Output, Rangeproof> &secondOutputAndRangeproof) {
-		
-			// Get serialized first output and rangeproof's output
-			const vector serializedFirstOutput = firstOutputAndRangeproof.first.serialize();
-			
-			// Check if creating first output's hash failed
-			uint8_t firstOutputHash[Crypto::BLAKE2B_HASH_LENGTH];
-			if(blake2b(firstOutputHash, sizeof(firstOutputHash), serializedFirstOutput.data(), serializedFirstOutput.size(), nullptr, 0)) {
-			
-				// Throw exception
-				throw runtime_error("Creating first output's hash failed");
-			}
-			
-			// Get serialized second output and rangeproof's output
-			const vector serializedSecondOutput = secondOutputAndRangeproof.first.serialize();
-			
-			// Check if creating second output's hash failed
-			uint8_t secondOutputHash[Crypto::BLAKE2B_HASH_LENGTH];
-			if(blake2b(secondOutputHash, sizeof(secondOutputHash), serializedSecondOutput.data(), serializedSecondOutput.size(), nullptr, 0)) {
-			
-				// Throw exception
-				throw runtime_error("Creating second output's hash failed");
-			}
-			
-			// Return comparing the first and second output hashes
-			return memcmp(firstOutputHash, secondOutputHash, sizeof(secondOutputHash));
-		});
-		
-		// Go through all sorted outputs and rangeproofs
-		list<Output> sortedOutputs;
-		list<Rangeproof> sortedRangeproofs;
-		for(pair<Output, Rangeproof> &outputAndRangeproof : sortedOutputsAndRangeproofs) {
-		
-			// Add output to sorted outputs
-			sortedOutputs.emplace_back(move(outputAndRangeproof.first));
-			
-			// Add rangeproof to sorted rangeproofs
-			sortedRangeproofs.emplace_back(move(outputAndRangeproof.second));
-		}
-		
-		// Go through all of the block's kernels
-		list<Kernel> sortedKernels;
-		for(const pair<const vector<uint8_t>, const Kernel *> &kernel : blockKernels) {
-		
-			// Add kernel to sorted kernels
-			sortedKernels.push_back(*kernel.second);
-		}
-		
-		// Add coinbase kernel to sorted kernels
-		sortedKernels.emplace_back(move(get<2>(coinbase)));
-		
-		// Sort sorted kernels
-		sortedKernels.sort([](const Kernel &firstKernel, const Kernel &secondKernel) {
-		
-			// Get serialized first kernel
-			const vector serializedFirstKernel = firstKernel.serialize();
-			
-			// Check if creating first kernel's hash failed
-			uint8_t firstKernelHash[Crypto::BLAKE2B_HASH_LENGTH];
-			if(blake2b(firstKernelHash, sizeof(firstKernelHash), serializedFirstKernel.data(), serializedFirstKernel.size(), nullptr, 0)) {
-			
-				// Throw exception
-				throw runtime_error("Creating first kernel's hash failed");
-			}
-			
-			// Get serialized second kernel
-			const vector serializedSecondKernel = secondKernel.serialize();
-			
-			// Check if creating second kernel's hash failed
-			uint8_t secondKernelHash[Crypto::BLAKE2B_HASH_LENGTH];
-			if(blake2b(secondKernelHash, sizeof(secondKernelHash), serializedSecondKernel.data(), serializedSecondKernel.size(), nullptr, 0)) {
-			
-				// Throw exception
-				throw runtime_error("Creating second kernel's hash failed");
-			}
-			
-			// Return comparing the first and second kernel hashes
-			return memcmp(firstKernelHash, secondKernelHash, sizeof(secondKernelHash));
-		});
-		
-		// Create block from sorted inputs, outputs, rangeproofs, and kernels
-		const Block block(move(sortedInputs), move(sortedOutputs), move(sortedRangeproofs), move(sortedKernels), false, false);
-		
 		// Get previous header
 		const Header *previousHeader = headers.getLeaf(syncedHeaderIndex);
 		
@@ -1475,6 +1365,237 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 				throw runtime_error("Total kernel offset is invalid");
 			}
 		}
+		
+		// Initialize secondary scaling sum to zero
+		uint64_t secondaryScalingSum = 0;
+		
+		// Initialize difficulty sum to zero
+		uint64_t difficultySum = 0;
+		
+		// Initialize number of C29 headers to zero
+		uint64_t numberOfC29Headers = 0;
+		
+		// Go through all previous headers in the difficulty adjustment window
+		for(uint64_t i = 0; i < Consensus::DIFFICULTY_ADJUSTMENT_WINDOW; ++i) {
+		
+			// Add header's secondary scaling to the sum
+			secondaryScalingSum += (i <= previousHeader->getHeight()) ? headers.getLeaf(previousHeader->getHeight() - i)->getSecondaryScaling() : Consensus::GENESIS_BLOCK_HEADER.getSecondaryScaling();
+			
+			// Check if previous header exists
+			if(i <= previousHeader->getHeight()) {
+			
+				// Check if header before the previous header exists
+				if(i + 1 <= previousHeader->getHeight()) {
+				
+					// Add header's difficulty to the difficulty sum
+					difficultySum += headers.getLeaf(previousHeader->getHeight() - i)->getTotalDifficulty() - headers.getLeaf(previousHeader->getHeight() - (i + 1))->getTotalDifficulty();
+				}
+				
+				// Otherwise
+				else {
+				
+					// Add header's difficulty to the difficulty sum
+					difficultySum += headers.getLeaf(previousHeader->getHeight() - i)->getTotalDifficulty();
+				}
+			}
+			
+			// Otherwise
+			else {
+			
+				// Add header's difficulty to the difficulty sum
+				difficultySum += previousHeader->getTotalDifficulty() - (previousHeader->getHeight() ? headers.getLeaf(previousHeader->getHeight() - 1)->getTotalDifficulty() : 0);
+			}
+			
+			// Check if header uses C29 proof of work
+			if(((i <= previousHeader->getHeight()) ? headers.getLeaf(previousHeader->getHeight() - i)->getEdgeBits() : Consensus::GENESIS_BLOCK_HEADER.getEdgeBits()) == Consensus::C29_EDGE_BITS) {
+			
+				// Increment the number of C29 headers
+				++numberOfC29Headers;
+			}
+		}
+		
+		// Get next header height
+		const uint64_t nextHeaderHeight = SaturateMath::add(syncedHeaderIndex, 1);
+		
+		// Get target C29 ratio
+		const uint64_t targetC29Ratio = Consensus::getC29ProofOfWorkRatio(nextHeaderHeight);
+		
+		// Get target number of C29 headers
+		const uint64_t targetNumberOfC29Headers = Consensus::DIFFICULTY_ADJUSTMENT_WINDOW * targetC29Ratio;
+		
+		// Get C29 headers adjustment
+		const uint64_t c29HeadersAdjustment = Common::clamp(Common::damp(numberOfC29Headers * 100, targetNumberOfC29Headers, Consensus::C29_HEADERS_ADJUSTMENT_DAMP_FACTOR), targetNumberOfC29Headers, Consensus::C29_HEADERS_ADJUSTMENT_CLAMP_FACTOR);
+		
+		// Get target secondary scaling
+		const uint32_t targetSecondaryScaling = max(secondaryScalingSum * targetC29Ratio / max(static_cast<uint64_t>(1), c29HeadersAdjustment), static_cast<uint64_t>(Consensus::MINIMUM_SECONDARY_SCALING));
+		
+		// Set number of missing headers
+		const uint64_t numberOfMissingHeaders = (previousHeader->getHeight() < Consensus::DIFFICULTY_ADJUSTMENT_WINDOW) ? Consensus::DIFFICULTY_ADJUSTMENT_WINDOW - previousHeader->getHeight() : 0;
+		
+		// Get last timestamp delta
+		const chrono::seconds lastTimestampDelta = (previousHeader->getHeight() != Consensus::GENESIS_BLOCK_HEADER.getHeight()) ? chrono::duration_cast<chrono::seconds>(previousHeader->getTimestamp() - headers.getLeaf(previousHeader->getHeight() - 1)->getTimestamp()) : Consensus::BLOCK_TIME;
+		
+		// Initialize window start timestamp
+		chrono::time_point<chrono::system_clock> windowStartTimestamp;
+		
+		// Check if headers are missing from the window
+		if(numberOfMissingHeaders) {
+		
+			// Check if window start timestamp won't underflow
+			if(lastTimestampDelta * numberOfMissingHeaders <= chrono::duration_cast<chrono::seconds>(Consensus::GENESIS_BLOCK_HEADER.getTimestamp().time_since_epoch())) {
+			
+				// Set window start timestamp to the timestamp of the first missing block in the window
+				windowStartTimestamp = Consensus::GENESIS_BLOCK_HEADER.getTimestamp() - lastTimestampDelta * numberOfMissingHeaders;
+			}
+			
+			// Otherwise
+			else {
+			
+				// Set window start timestamp to zero
+				windowStartTimestamp = chrono::time_point<chrono::system_clock>(chrono::seconds(0));
+			}
+		}
+		
+		// Otherwise
+		else {
+		
+			// Set window start timestamp to the timestamp of the first header in the window
+			windowStartTimestamp = headers.getLeaf(previousHeader->getHeight() - Consensus::DIFFICULTY_ADJUSTMENT_WINDOW)->getTimestamp();
+		}
+		
+		// Get window duration
+		const chrono::seconds windowDuration = chrono::duration_cast<chrono::seconds>(previousHeader->getTimestamp() - windowStartTimestamp);
+		
+		// Get window duration adjustment
+		const uint64_t windowDurationAdjustment = Common::clamp(Common::damp(windowDuration.count(), Consensus::DIFFICULTY_ADJUSTMENT_WINDOW * Consensus::BLOCK_TIME.count(), Consensus::WINDOW_DURATION_ADJUSTMENT_DAMP_FACTOR), Consensus::DIFFICULTY_ADJUSTMENT_WINDOW * Consensus::BLOCK_TIME.count(), Consensus::WINDOW_DURATION_ADJUSTMENT_CLAMP_FACTOR);
+		
+		// Get target difficulty
+		const uint64_t targetDifficulty = max(Consensus::MINIMUM_DIFFICULTY, difficultySum * Consensus::BLOCK_TIME.count() / windowDurationAdjustment);
+		
+		// Get reward as the sum of the coinbase reward at next header's height and the fees
+		const uint64_t reward = SaturateMath::add(Consensus::getCoinbaseReward(nextHeaderHeight), fees);
+		
+		// Loop until coinbase can be used in the block
+		optional<tuple<Output, Rangeproof, Kernel>> coinbase;
+		while(true) {
+		
+			// Create coinbase for reward
+			coinbase = createCoinbase(reward);
+		
+			// Check if coinbase output and kernel don't already exist in the block
+			const vector coinbaseOutputLookupValue = get<0>(coinbase.value()).getLookupValue().value();
+			if(!outputs.leafWithLookupValueExists(coinbaseOutputLookupValue) && !blockInputs.contains(coinbaseOutputLookupValue) && !blockOutputs.contains(coinbaseOutputLookupValue) && !blockKernels.contains(get<2>(coinbase.value()).serialize())) {
+			
+				// Break
+				break;
+			}
+		}
+		
+		// Go through all of the block's inputs
+		list<Input> inputs;
+		for(const pair<const vector<uint8_t>, const Input *> &input : blockInputs) {
+		
+			// Add input to inputs
+			inputs.push_back(*input.second);
+		}
+		
+		// Go through all of the block's outputs
+		list<pair<Output, Rangeproof>> sortedOutputsAndRangeproofs;
+		for(const pair<const vector<uint8_t>, pair<const Output *, const Rangeproof *>> &output : blockOutputs) {
+		
+			// Add output to sorted outputs and rangeproofs
+			sortedOutputsAndRangeproofs.emplace_back(*output.second.first, *output.second.second);
+		}
+		
+		// Add coinbase output and rangeproof to sorted outputs and rangeproofs
+		sortedOutputsAndRangeproofs.emplace_back(move(get<0>(coinbase.value())), move(get<1>(coinbase.value())));
+		
+		// Sort sorted outputs and rangeproofs
+		sortedOutputsAndRangeproofs.sort([](const pair<Output, Rangeproof> &firstOutputAndRangeproof, const pair<Output, Rangeproof> &secondOutputAndRangeproof) -> bool {
+		
+			// Get serialized first output and rangeproof's output
+			const vector serializedFirstOutput = firstOutputAndRangeproof.first.serialize();
+			
+			// Check if creating first output's hash failed
+			uint8_t firstOutputHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(firstOutputHash, sizeof(firstOutputHash), serializedFirstOutput.data(), serializedFirstOutput.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating first output's hash failed");
+			}
+			
+			// Get serialized second output and rangeproof's output
+			const vector serializedSecondOutput = secondOutputAndRangeproof.first.serialize();
+			
+			// Check if creating second output's hash failed
+			uint8_t secondOutputHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(secondOutputHash, sizeof(secondOutputHash), serializedSecondOutput.data(), serializedSecondOutput.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating second output's hash failed");
+			}
+			
+			// Return comparing the first and second output hashes
+			return memcmp(firstOutputHash, secondOutputHash, sizeof(secondOutputHash)) < 0;
+		});
+		
+		// Go through all sorted outputs and rangeproofs
+		list<Output> sortedOutputs;
+		list<Rangeproof> sortedRangeproofs;
+		for(pair<Output, Rangeproof> &outputAndRangeproof : sortedOutputsAndRangeproofs) {
+		
+			// Add output to sorted outputs
+			sortedOutputs.emplace_back(move(outputAndRangeproof.first));
+			
+			// Add rangeproof to sorted rangeproofs
+			sortedRangeproofs.emplace_back(move(outputAndRangeproof.second));
+		}
+		
+		// Go through all of the block's kernels
+		list<Kernel> sortedKernels;
+		for(const pair<const vector<uint8_t>, const Kernel *> &kernel : blockKernels) {
+		
+			// Add kernel to sorted kernels
+			sortedKernels.push_back(*kernel.second);
+		}
+		
+		// Add coinbase kernel to sorted kernels
+		sortedKernels.emplace_back(move(get<2>(coinbase.value())));
+		
+		// Sort sorted kernels
+		sortedKernels.sort([](const Kernel &firstKernel, const Kernel &secondKernel) -> bool {
+		
+			// Get serialized first kernel
+			const vector serializedFirstKernel = firstKernel.serialize();
+			
+			// Check if creating first kernel's hash failed
+			uint8_t firstKernelHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(firstKernelHash, sizeof(firstKernelHash), serializedFirstKernel.data(), serializedFirstKernel.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating first kernel's hash failed");
+			}
+			
+			// Get serialized second kernel
+			const vector serializedSecondKernel = secondKernel.serialize();
+			
+			// Check if creating second kernel's hash failed
+			uint8_t secondKernelHash[Crypto::BLAKE2B_HASH_LENGTH];
+			if(blake2b(secondKernelHash, sizeof(secondKernelHash), serializedSecondKernel.data(), serializedSecondKernel.size(), nullptr, 0)) {
+			
+				// Throw exception
+				throw runtime_error("Creating second kernel's hash failed");
+			}
+			
+			// Return comparing the first and second kernel hashes
+			return memcmp(firstKernelHash, secondKernelHash, sizeof(secondKernelHash)) < 0;
+		});
+		
+		// Create block from inputs, sorted outputs, sorted rangeproofs, and sorted kernels
+		const Block block(move(inputs), move(sortedOutputs), move(sortedRangeproofs), move(sortedKernels), false, false);
+		
+		// Initialize header
+		optional<const Header> header;
 		
 		// Try
 		try {
@@ -1538,51 +1659,7 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 			
 			// Create header
 			const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES] = {};
-			const Header header(Consensus::getHeaderVersion(nextHeaderHeight), nextHeaderHeight, max(chrono::system_clock::now(), previousHeader->getTimestamp() + 1s), previousHeader->getBlockHash().data(), headers.getRootAtNumberOfLeaves(previousHeader->getHeight() + 1).data(), outputs.getRootAtSize(outputs.getSize()).data(), rangeproofs.getRootAtSize(rangeproofs.getSize()).data(), kernels.getRootAtSize(kernels.getSize()).data(), totalKernelOffset, outputs.getSize(), kernels.getSize(), previousHeader->getTotalDifficulty(), Consensus::MINIMUM_SECONDARY_SCALING, 0, Consensus::C31_EDGE_BITS, proofNonces, false);
-			
-			// Try
-			try {
-			
-				// Undo changed to kernels, outputs, and rangeproofs
-				kernels.rewindToSize(previousHeader->getKernelMerkleMountainRangeSize());
-				outputs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
-				rangeproofs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
-			}
-			
-			// Catch errors
-			catch(...) {
-			
-				// Set headers to include the genesis block header
-				headers.clear();
-				headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
-				
-				// Set synced header index to the newest known height
-				syncedHeaderIndex = headers.back().getHeight();
-				
-				// Set kernels to include the genesis block kernel
-				kernels.clear();
-				kernels.appendLeaf(Consensus::GENESIS_BLOCK_KERNEL);
-				
-				// Set outputs to include the genesis block output
-				outputs.clear();
-				outputs.appendLeaf(Consensus::GENESIS_BLOCK_OUTPUT);
-				
-				// Set rangeproofs to include the genesis block rangeproof
-				rangeproofs.clear();
-				rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
-				
-				// Clear mempool
-				mempool.clear();
-				
-				// Set is synced to false
-				isSynced = false;
-				
-				// Throw exception
-				throw runtime_error("Removing block to Merkle mountain ranges failed");
-			}
-			
-			// Return header and block
-			return {header, block};
+			header.emplace(Consensus::getHeaderVersion(nextHeaderHeight), nextHeaderHeight, max(chrono::system_clock::now() + Consensus::BLOCK_TIME, previousHeader->getTimestamp() + 1s), previousHeader->getBlockHash().data(), headers.getRootAtNumberOfLeaves(previousHeader->getHeight() + 1).data(), outputs.getRootAtSize(outputs.getSize()).data(), rangeproofs.getRootAtSize(rangeproofs.getSize()).data(), kernels.getRootAtSize(kernels.getSize()).data(), totalKernelOffset, outputs.getSize(), kernels.getSize(), SaturateMath::add(previousHeader->getTotalDifficulty(), targetDifficulty), targetSecondaryScaling, targetDifficulty, 0, proofNonces, false);
 		}
 		
 		// Catch errors
@@ -1629,6 +1706,50 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 			// Rethrow error
 			throw;
 		}
+		
+		// Try
+		try {
+		
+			// Undo changed to kernels, outputs, and rangeproofs
+			kernels.rewindToSize(previousHeader->getKernelMerkleMountainRangeSize());
+			outputs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+			rangeproofs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Set headers to include the genesis block header
+			headers.clear();
+			headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
+			
+			// Set synced header index to the newest known height
+			syncedHeaderIndex = headers.back().getHeight();
+			
+			// Set kernels to include the genesis block kernel
+			kernels.clear();
+			kernels.appendLeaf(Consensus::GENESIS_BLOCK_KERNEL);
+			
+			// Set outputs to include the genesis block output
+			outputs.clear();
+			outputs.appendLeaf(Consensus::GENESIS_BLOCK_OUTPUT);
+			
+			// Set rangeproofs to include the genesis block rangeproof
+			rangeproofs.clear();
+			rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
+			
+			// Clear mempool
+			mempool.clear();
+			
+			// Set is synced to false
+			isSynced = false;
+			
+			// Throw exception
+			throw runtime_error("Removing block to Merkle mountain ranges failed");
+		}
+		
+		// Return header and block
+		return {header.value(), block};
 	
 	// Otherwise
 	#else
@@ -2109,6 +2230,16 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 				// Throw exception
 				throw runtime_error("Running on block callback failed");
 			}
+			
+			// Check if node state was reset
+			if(this->syncedHeaderIndex == Consensus::GENESIS_BLOCK_HEADER.getHeight()) {
+			
+				// Set is syncing to false
+				isSyncing = false;
+				
+				// Return true
+				return true;
+			}
 		}
 	}
 	
@@ -2118,7 +2249,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 		// Check if updating sync state failed or callback failed
 		if(!result || callbackFailed) {
 		
-			// Check if node state wasn't already reset
+			// Check if node state wasn't reset
 			if(this->syncedHeaderIndex != Consensus::GENESIS_BLOCK_HEADER.getHeight()) {
 	
 				// Decrement synced header index
@@ -2263,6 +2394,12 @@ void Node::monitor() {
 		// Loop while not stopping monitoring and not closing
 		while(!stopMonitoring.load() && !Common::isClosing()) {
 		
+			// Broadcast pending transactions
+			broadcastPendingTransactions();
+			
+			// Broadcast pending block
+			broadcastPendingBlock();
+			
 			// Remove disconnected peers
 			removeDisconnectedPeers();
 			
@@ -2387,6 +2524,160 @@ void Node::monitor() {
 			// Run on error callback
 			onErrorCallback();
 		}
+	}
+}
+
+// Broadcast pending transactions
+void Node::broadcastPendingTransactions() {
+
+	// Try
+	try {
+	
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Go through all pending transactions
+		for(list<Transaction>::const_iterator i = pendingTransactions.cbegin(); i != pendingTransactions.cend(); i = pendingTransactions.erase(i)) {
+		
+			// Initialize transaction messages
+			unordered_map<uint32_t, vector<uint8_t>> transactionMessages;
+			
+			// Initialize message sent to false
+			bool messageSent = false;
+			
+			// Go through all peers
+			for(Peer &peer : peers) {
+				
+				// Try
+				try {
+				
+					// Lock peer for writing
+					lock_guard peerWriteLock(peer.getLock());
+					
+					// Check if peer is connected and healthy
+					if(peer.getConnectionState() == Peer::ConnectionState::CONNECTED_AND_HEALTHY) {
+					
+						// Check if peer's message queue isn't full
+						if(!peer.isMessageQueueFull()) {
+						
+							// Check if transaction message with the peer's protocol version doesn't exist
+							if(!transactionMessages.contains(peer.getProtocolVersion())) {
+							
+								// Create transaction message with peer's protocol version
+								transactionMessages.emplace(peer.getProtocolVersion(), Message::createTransactionMessage(*i, peer.getProtocolVersion()));
+							}
+							
+							// Send transaction message to peer
+							peer.sendMessage(transactionMessages.at(peer.getProtocolVersion()));
+							
+							// Set message sent to true
+							messageSent = true;
+						}
+					}
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+				}
+			}
+			
+			// Check if message wasn't sent
+			if(!messageSent) {
+			
+				// Break
+				break;
+			}
+		}
+	}
+	
+	// Catch errors
+	catch(...) {
+	
+	}
+}
+
+// Broadcast pending block
+void Node::broadcastPendingBlock() {
+
+	// Try
+	try {
+	
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Check if block is pending to be broadcast and is synced
+		if(pendingBlock.has_value() && isSynced) {
+		
+			// Get pending block's components
+			const Header &header = get<0>(pendingBlock.value());
+			const Block &block = get<1>(pendingBlock.value());
+			
+			// Check if block has a higher total difficulty than the newest block's
+			if(header.getTotalDifficulty() > headers.getLeaf(syncedHeaderIndex)->getTotalDifficulty()) {
+			
+				// Initialize block messages
+				unordered_map<uint32_t, vector<uint8_t>> blockMessages;
+				
+				// Initialize message sent to false
+				bool messageSent = false;
+				
+				// Go through all peers
+				for(Peer &peer : peers) {
+					
+					// Try
+					try {
+					
+						// Lock peer for writing
+						lock_guard peerWriteLock(peer.getLock());
+						
+						// Check if peer is connected and healthy and block has a higher difficulty than the peer's
+						if(peer.getConnectionState() == Peer::ConnectionState::CONNECTED_AND_HEALTHY && header.getTotalDifficulty() > peer.getTotalDifficulty()) {
+						
+							// Check if peer's message queue isn't full
+							if(!peer.isMessageQueueFull()) {
+							
+								// Check if block message with the peer's protocol version doesn't exist
+								if(!blockMessages.contains(peer.getProtocolVersion())) {
+								
+									// Create block message with peer's protocol version
+									blockMessages.emplace(peer.getProtocolVersion(), Message::createBlockMessage(header, block, peer.getProtocolVersion()));
+								}
+								
+								// Send block message to peer
+								peer.sendMessage(blockMessages.at(peer.getProtocolVersion()));
+								
+								// Send ping message to peer
+								peer.sendMessage(Message::createPingMessage(headers.getLeaf(syncedHeaderIndex)->getTotalDifficulty(), syncedHeaderIndex));
+								
+								// Set message sent to true
+								messageSent = true;
+							}
+						}
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+					}
+				}
+				
+				// Check if message wasn't sent
+				if(!messageSent) {
+				
+					// Return
+					return;
+				}
+			}
+			
+			// Remove pending block
+			pendingBlock.reset();
+		}
+	}
+	
+	// Catch errors
+	catch(...) {
+	
 	}
 }
 
@@ -2852,8 +3143,12 @@ void Node::sync() {
 				// Run on synced callback
 				onSyncedCallback();
 				
-				// Remove on synced callback
-				onSyncedCallback = nullptr;
+				// Check if still is synced
+				if(isSynced) {
+				
+					// Remove on synced callback
+					onSyncedCallback = nullptr;
+				}
 			}
 		}
 	}

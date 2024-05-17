@@ -518,6 +518,13 @@ uint64_t Peer::getTotalDifficulty() const {
 	return totalDifficulty;
 }
 
+// Get protocol version
+uint32_t Peer::getProtocolVersion() const {
+
+	// Return protocol version
+	return protocolVersion;
+}
+
 // Is message queue full
 bool Peer::isMessageQueueFull() const {
 
@@ -567,6 +574,20 @@ bool Peer::isWorkerOperationRunning() const {
 
 	// Return if worker operation exists
 	return workerOperation.valid();
+}
+
+// Send message
+void Peer::sendMessage(const vector<uint8_t> &message) {
+
+	// Append message to write buffer
+	writeBuffer.insert(writeBuffer.cend(), message.cbegin(), message.cend());
+	
+	// Check if not at the max number of messages sent
+	if(numberOfMessagesSent != INT_MAX) {
+	
+		// Increment number of messages sent
+		++numberOfMessagesSent;
+	}
 }
 
 // Connect
@@ -5155,8 +5176,8 @@ bool Peer::processHeaders(list<Header> &&headers) {
 		// Get difficulty
 		const uint64_t difficulty = header.getTotalDifficulty() - previousHeader->getTotalDifficulty();
 		
-		// Check if difficulty is invalid
-		if(difficulty > Consensus::getMaximumDifficulty(header)) {
+		// Check if header's difficulty is less than the difficulty
+		if(Consensus::getHeaderDifficulty(header) < difficulty) {
 		
 			// Return false
 			return false;
@@ -5758,6 +5779,13 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 		return true;
 	}
 	
+	// Check if coinbase outputs don't exist
+	if(coinbaseOutputCommitments.empty()) {
+	
+		// Return false
+		return false;
+	}
+	
 	// Set fees to zero
 	uint64_t fees = 0;
 	
@@ -5792,6 +5820,13 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 	
 		// Return true
 		return true;
+	}
+	
+	// Check if coinbase kernels don't exist
+	if(coinbaseKernelExcesses.empty()) {
+	
+		// Return false
+		return false;
 	}
 
 	// Get coinbase reward at header's height

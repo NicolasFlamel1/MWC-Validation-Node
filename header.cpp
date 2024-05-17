@@ -467,6 +467,13 @@ uint64_t Header::getNonce() const {
 	return nonce;
 }
 
+// Set nonce
+void Header::setNonce(const uint64_t nonce) {
+
+	// Set nonce to nonce
+	this->nonce = nonce;
+}
+
 // Get edge bits
 uint8_t Header::getEdgeBits() const {
 
@@ -474,11 +481,25 @@ uint8_t Header::getEdgeBits() const {
 	return edgeBits;
 }
 
+// Set edge bits
+void Header::setEdgeBits(const uint8_t edgeBits) {
+
+	// Set edge bits to edge bits
+	this->edgeBits = edgeBits;
+}
+
 // Get proof nonces
 const uint64_t *Header::getProofNonces() const {
 
 	// Return proof nonces
 	return proofNonces;
+}
+
+// Set proof nonces
+void Header::setProofNonces(const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]) {
+
+	// Set proof nonces to proof nonces
+	memcpy(this->proofNonces, proofNonces, sizeof(this->proofNonces));
 }
 
 // Get block hash

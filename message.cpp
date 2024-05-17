@@ -284,6 +284,58 @@ vector<uint8_t> Message::createGetHeadersMessage(const list<array<uint8_t, Crypt
 	return payload;
 }
 
+// Create header message
+vector<uint8_t> Message::createHeaderMessage(const Header &header) {
+
+	// Initialize payload
+	vector<uint8_t> payload;
+	
+	// Append header to payload
+	writeHeader(payload, header);
+	
+	// Create message header
+	const vector messageHeader = createMessageHeader(Type::HEADER, payload.size());
+	
+	// Prepend message header to payload
+	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
+	
+	// Return payload
+	return payload;
+}
+
+// Create headers message
+vector<uint8_t> Message::createHeaderMessage(const list<Header> &headers) {
+
+	// Initialize payload
+	vector<uint8_t> payload;
+	
+	// Check if number of headers is invalid
+	if(headers.size() > MAXIMUM_NUMBER_OF_HEADERS) {
+	
+		// Throw exception
+		throw runtime_error("Number of headers is invalid");
+	}
+	
+	// Append number of headers to payload
+	Common::writeUint16(payload, headers.size());
+	
+	// Go through all headers
+	for(const Header &header : headers) {
+	
+		// Append header to payload
+		writeHeader(payload, header);
+	}
+	
+	// Create message header
+	const vector messageHeader = createMessageHeader(Type::HEADERS, payload.size());
+	
+	// Prepend message header to payload
+	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
+	
+	// Return payload
+	return payload;
+}
+
 // Create get block message
 vector<uint8_t> Message::createGetBlockMessage(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]) {
 
@@ -295,6 +347,50 @@ vector<uint8_t> Message::createGetBlockMessage(const uint8_t blockHash[Crypto::B
 	
 	// Create message header
 	const vector messageHeader = createMessageHeader(Type::GET_BLOCK, payload.size());
+	
+	// Prepend message header to payload
+	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
+	
+	// Return payload
+	return payload;
+}
+
+// Create block message
+vector<uint8_t> Message::createBlockMessage(const Header &header, const Block &block, const uint32_t protocolVersion) {
+
+	// Initialize payload
+	vector<uint8_t> payload;
+	
+	// Append header to payload
+	writeHeader(payload, header);
+	
+	// Append block's transaction body to payload
+	writeTransactionBody(payload, block.getInputs(), block.getOutputs(), block.getRangeproofs(), block.getKernels(), protocolVersion);
+	
+	// Create message header
+	const vector messageHeader = createMessageHeader(Type::BLOCK, payload.size());
+	
+	// Prepend message header to payload
+	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
+	
+	// Return payload
+	return payload;
+}
+
+// Create transaction message
+vector<uint8_t> Message::createTransactionMessage(const Transaction &transaction, const uint32_t protocolVersion) {
+
+	// Initialize payload
+	vector<uint8_t> payload;
+	
+	// Append transaction's offset to payload
+	payload.insert(payload.cend(), transaction.getOffset(), transaction.getOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH);
+	
+	// Append transaction's body to payload
+	writeTransactionBody(payload, transaction.getInputs(), transaction.getOutputs(), transaction.getRangeproofs(), transaction.getKernels(), protocolVersion);
+	
+	// Create message header
+	const vector messageHeader = createMessageHeader(Type::TRANSACTION, payload.size());
 	
 	// Prepend message header to payload
 	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
@@ -719,7 +815,7 @@ tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &blockMessa
 	const uint64_t numberOfProofNoncesBytes = Common::numberOfBytesRequired(header.getEdgeBits() * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES);
 	
 	// Set header size
-	const size_t headerSize = sizeof(header.getVersion()) + sizeof(header.getHeight()) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(header.getTotalDifficulty()) + sizeof(header.getSecondaryScaling()) + sizeof(header.getNonce()) + sizeof(header.getEdgeBits()) + numberOfProofNoncesBytes;
+	const vector<uint8_t>::size_type headerSize = sizeof(header.getVersion()) + sizeof(header.getHeight()) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(header.getTotalDifficulty()) + sizeof(header.getSecondaryScaling()) + sizeof(header.getNonce()) + sizeof(header.getEdgeBits()) + numberOfProofNoncesBytes;
 	
 	// Read transaction body from block message
 	tuple transactionBody = readTransactionBody(blockMessage, MESSAGE_HEADER_LENGTH + headerSize, protocolVersion, false, header.getHeight(), header.getVersion());
@@ -1563,6 +1659,99 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 	return networkAddress;
 }
 
+// Write header
+void Message::writeHeader(vector<uint8_t> &buffer, const Header &header) {
+
+	// Append header's version to buffer
+	Common::writeUint16(buffer, header.getVersion());
+	
+	// Check if header's height is invalid
+	if(header.getHeight() == Consensus::GENESIS_BLOCK_HEADER.getHeight()) {
+	
+		// Throw exception
+		throw runtime_error("Height is invalid");
+	}
+	
+	// Append header's height to buffer
+	Common::writeUint64(buffer, header.getHeight());
+	
+	// Append header's timestamp to buffer
+	Common::writeInt64(buffer, chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count());
+	
+	// Append header's previous block hash to buffer
+	buffer.insert(buffer.cend(), header.getPreviousBlockHash(), header.getPreviousBlockHash() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's previous header root to buffer
+	buffer.insert(buffer.cend(), header.getPreviousHeaderRoot(), header.getPreviousHeaderRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's output root to buffer
+	buffer.insert(buffer.cend(), header.getOutputRoot(), header.getOutputRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's rangeproof root to buffer
+	buffer.insert(buffer.cend(), header.getRangeproofRoot(), header.getRangeproofRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's kernel root to buffer
+	buffer.insert(buffer.cend(), header.getKernelRoot(), header.getKernelRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's total kernel offset to buffer
+	buffer.insert(buffer.cend(), header.getTotalKernelOffset(), header.getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH);
+	
+	// Append header's output Merkle mountain range size to buffer
+	Common::writeUint64(buffer, header.getOutputMerkleMountainRangeSize());
+	
+	// Append header's kernel Merkle mountain range size to buffer
+	Common::writeUint64(buffer, header.getKernelMerkleMountainRangeSize());
+	
+	// Append header's total difficulty to buffer
+	Common::writeUint64(buffer, header.getTotalDifficulty());
+	
+	// Append header's secondary scaling to buffer
+	Common::writeUint32(buffer, header.getSecondaryScaling());
+	
+	// Append header's nonce to buffer
+	Common::writeUint64(buffer, header.getNonce());
+	
+	// Append header's edge bits to buffer
+	Common::writeUint8(buffer, header.getEdgeBits());
+	
+	// Set number of proof nonces bytes
+	const uint64_t numberOfProofNoncesBytes = Common::numberOfBytesRequired(header.getEdgeBits() * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES);
+	
+	// Check if number of proof nonces bytes is invalid
+	if(numberOfProofNoncesBytes < MINIMUM_PROOF_NONCES_BYTES_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of proof nonces bytes is invalid");
+	}
+	
+	// Initialize proof nonces bytes
+	uint8_t proofNoncesBytes[numberOfProofNoncesBytes] = {};
+	
+	// Go through all header's proof nonces
+	for(uint64_t i = 0; i < Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES; ++i) {
+	
+		// Get header's proof nonce
+		const uint64_t &proofNonce = header.getProofNonces()[i];
+		
+		// Go through all edge bits
+		for(uint8_t j = 0; j < header.getEdgeBits(); ++j) {
+		
+			// Check if bit is set in the proof nonce
+			if(proofNonce & (static_cast<uint64_t>(1) << j)) {
+			
+				// Set bit position
+				const uint64_t bitPosition = i * header.getEdgeBits() + j;
+				
+				// Set bit in the proof nonces bytes
+				proofNoncesBytes[bitPosition / Common::BITS_IN_A_BYTE] |= 1 << (bitPosition % Common::BITS_IN_A_BYTE);
+			}
+		}
+	}
+	
+	// Append proof nonces bytes to buffer
+	buffer.insert(buffer.cend(), proofNoncesBytes, proofNoncesBytes + numberOfProofNoncesBytes);
+}
+
 // Read header
 Header Message::readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
 
@@ -1785,6 +1974,51 @@ Header Message::readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>:
 	return Header(version, height, chrono::time_point<chrono::system_clock>(chrono::seconds(timestamp)), previousBlockHash, previousHeaderRoot, outputRoot, rangeproofRoot, kernelRoot, totalKernelOffset, outputMerkleMountainRangeSize, kernelMerkleMountainRangeSize, totalDifficulty, secondaryScaling, nonce, edgeBits, proofNonces);
 }
 
+// Write input
+void Message::writeInput(vector<uint8_t> &buffer, const Input &input, const uint32_t protocolVersion) {
+	
+	// Check protocol version
+	switch(protocolVersion) {
+	
+		// Zero, one, or two
+		case 0:
+		case 1:
+		case 2:
+		
+			// Append input's features to buffer
+			Common::writeUint8(buffer, static_cast<underlying_type_t<Input::Features>>(input.getFeatures()));
+			
+			// Break
+			break;
+		
+		// Three
+		case 3:
+		
+			// Break
+			break;
+		
+		// Default
+		default:
+		
+			// Throw exception
+			throw runtime_error("Unknown protocol version");
+		
+			// Break
+			break;
+	}
+	
+	// Check if serializing input's commitment failed
+	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &input.getCommitment())) {
+	
+		// Throw exception
+		throw runtime_error("Serializing commitment failed");
+	}
+	
+	// Append serialized commitment to buffer
+	buffer.insert(buffer.cend(), cbegin(serializedCommitment), cend(serializedCommitment));
+}
+
 // Read input
 Input Message::readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion) {
 
@@ -1854,6 +2088,24 @@ Input Message::readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::s
 	return Input(features, commitment);
 }
 
+// Write output
+void Message::writeOutput(vector<uint8_t> &buffer, const Output &output) {
+
+	// Append output's features to buffer
+	Common::writeUint8(buffer, static_cast<underlying_type_t<Output::Features>>(output.getFeatures()));
+	
+	// Check if serializing output's commitment failed
+	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &output.getCommitment())) {
+	
+		// Throw exception
+		throw runtime_error("Serializing commitment failed");
+	}
+	
+	// Append serialized commitment to buffer
+	buffer.insert(buffer.cend(), cbegin(serializedCommitment), cend(serializedCommitment));
+}
+
 // Read output
 Output Message::readOutput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
 
@@ -1881,6 +2133,16 @@ Output Message::readOutput(const vector<uint8_t> &buffer, const vector<uint8_t>:
 	return Output(features, commitment);
 }
 
+// Write rangeproof
+void Message::writeRangeproof(vector<uint8_t> &buffer, const Rangeproof &rangeproof) {
+
+	// Append rangeproof's length to buffer
+	Common::writeUint64(buffer, rangeproof.getLength());
+	
+	// Append rangeproof's proof to buffer
+	buffer.insert(buffer.cend(), rangeproof.getProof(), rangeproof.getProof() + rangeproof.getLength());
+}
+
 // Read rangeproof
 Rangeproof Message::readRangeproof(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset) {
 
@@ -1906,6 +2168,142 @@ Rangeproof Message::readRangeproof(const vector<uint8_t> &buffer, const vector<u
 	
 	// Return rangeproof
 	return Rangeproof(length, proof);
+}
+
+// Write kernel
+void Message::writeKernel(vector<uint8_t> &buffer, const Kernel &kernel, const uint32_t protocolVersion) {
+
+	// Append kernel's features to buffer
+	Common::writeUint8(buffer, static_cast<underlying_type_t<Kernel::Features>>(kernel.getFeatures()));
+	
+	// Check protocol version
+	switch(protocolVersion) {
+	
+		// Zero or one
+		case 0:
+		case 1:
+		
+			// Append kernel's fee to buffer
+			Common::writeUint64(buffer, kernel.getFee());
+			
+			// Check kernel's features
+			switch(kernel.getFeatures()) {
+			
+				// Plain, coinbase, or height locked
+				case Kernel::Features::PLAIN:
+				case Kernel::Features::COINBASE:
+				case Kernel::Features::HEIGHT_LOCKED:
+				
+					// Append kernel's lock height to buffer
+					Common::writeUint64(buffer, kernel.getLockHeight());
+					
+					// Break
+					break;
+				
+				// No recent duplicate
+				case Kernel::Features::NO_RECENT_DUPLICATE:
+				
+					// Append kernel's relative height to buffer
+					Common::writeUint64(buffer, kernel.getRelativeHeight());
+					
+					// Break
+					break;
+				
+				// Default
+				default:
+				
+					// Throw exception
+					throw runtime_error("Unknown features");
+				
+					// Break
+					break;
+			}
+			
+			// Break
+			break;
+		
+		// Two or three
+		case 2:
+		case 3:
+		
+			// Check kernel's features
+			switch(kernel.getFeatures()) {
+			
+				// Plain
+				case Kernel::Features::PLAIN:
+				
+					// Append kernel's fee to buffer
+					Common::writeUint64(buffer, kernel.getFee());
+					
+					// Break
+					break;
+				
+				// Coinbase
+				case Kernel::Features::COINBASE:
+				
+					// Break
+					break;
+				
+				// Height locked
+				case Kernel::Features::HEIGHT_LOCKED:
+				
+					// Append kernel's fee to buffer
+					Common::writeUint64(buffer, kernel.getFee());
+					
+					// Append kernel's lock height to buffer
+					Common::writeUint64(buffer, kernel.getLockHeight());
+					
+					// Break
+					break;
+				
+				// No recent duplicate
+				case Kernel::Features::NO_RECENT_DUPLICATE:
+				
+					// Append kernel's fee to buffer
+					Common::writeUint64(buffer, kernel.getFee());
+					
+					// Append kernel's relative height to buffer
+					Common::writeUint16(buffer, kernel.getRelativeHeight());
+					
+					// Break
+					break;
+				
+				// Default
+				default:
+				
+					// Throw exception
+					throw runtime_error("Unknown features");
+				
+					// Break
+					break;
+			}
+		
+			// Break
+			break;
+		
+		// Default
+		default:
+		
+			// Throw exception
+			throw runtime_error("Unknown protocol version");
+		
+			// Break
+			break;
+	}
+	
+	// Check if serializing kernel's excess failed
+	uint8_t serializedExcess[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedExcess, &kernel.getExcess())) {
+	
+		// Throw exception
+		throw runtime_error("Serializing excess failed");
+	}
+	
+	// Append serialized excess to buffer
+	buffer.insert(buffer.cend(), cbegin(serializedExcess), cend(serializedExcess));
+	
+	// Append kernel's signature to buffer
+	buffer.insert(buffer.cend(), kernel.getSignature(), kernel.getSignature() + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH);
 }
 
 // Read kernel
@@ -2144,6 +2542,109 @@ Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>:
 	
 	// Return kernel
 	return Kernel(features, fee, lockHeight, relativeHeight, excess, signature);
+}
+
+// Write transaction body
+void Message::writeTransactionBody(vector<uint8_t> &buffer, const list<Input> &inputs, const list<Output> &outputs, const list<Rangeproof> &rangeproofs, const list<Kernel> &kernels, const uint32_t protocolVersion) {
+
+	// Check if number of inputs is invalid
+	if(inputs.size() > MAXIMUM_INPUTS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of inputs is invalid");
+	}
+	
+	// Append number of inputs to buffer
+	Common::writeUint64(buffer, inputs.size());
+	
+	// Check if number of outputs is invalid
+	if(outputs.size() > MAXIMUM_OUTPUTS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of outputs is invalid");
+	}
+	
+	// Append number of outputs to buffer
+	Common::writeUint64(buffer, outputs.size());
+	
+	// Check if number of rangeproofs is invalid
+	if(rangeproofs.size() != outputs.size()) {
+	
+		// Throw exception
+		throw runtime_error("Number of rangeproofs is invalid");
+	}
+	
+	// Check if number of kernels is invalid
+	if(kernels.size() > MAXIMUM_KERNELS_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Number of kernels is invalid");
+	}
+	
+	// Append number of kernels to buffer
+	Common::writeUint64(buffer, kernels.size());
+	
+	// Go through all inputs
+	list<const Input *> sortedInputs;
+	for(const Input &input : inputs) {
+	
+		// Add input to list of sorted inputs
+		sortedInputs.emplace_back(&input);
+	}
+	
+	// Sort sorted inputs
+	sortedInputs.sort([protocolVersion](const Input *firstInput, const Input *secondInput) -> bool {
+	
+		// Get serialized first input
+		const vector serializedFirstInput = firstInput->serialize(protocolVersion);
+		
+		// Check if creating first input's hash failed
+		uint8_t firstInputHash[Crypto::BLAKE2B_HASH_LENGTH];
+		if(blake2b(firstInputHash, sizeof(firstInputHash), serializedFirstInput.data(), serializedFirstInput.size(), nullptr, 0)) {
+		
+			// Throw exception
+			throw runtime_error("Creating first input's hash failed");
+		}
+		
+		// Get serialized second input
+		const vector serializedSecondInput = secondInput->serialize(protocolVersion);
+		
+		// Check if creating second input's hash failed
+		uint8_t secondInputHash[Crypto::BLAKE2B_HASH_LENGTH];
+		if(blake2b(secondInputHash, sizeof(secondInputHash), serializedSecondInput.data(), serializedSecondInput.size(), nullptr, 0)) {
+		
+			// Throw exception
+			throw runtime_error("Creating second input's hash failed");
+		}
+		
+		// Return comparing the first and second input hashes
+		return memcmp(firstInputHash, secondInputHash, sizeof(secondInputHash)) < 0;
+	});
+	
+	// Go through all sorted inputs
+	for(const Input *input : sortedInputs) {
+	
+		// Append input to buffer
+		writeInput(buffer, *input, protocolVersion);
+	}
+	
+	// Go through all outputs and rangeproofs
+	list<Output>::const_iterator i = outputs.cbegin();
+	for(list<Rangeproof>::const_iterator j = rangeproofs.cbegin(); i != outputs.cend(); ++i, ++j) {
+	
+		// Append output to buffer
+		writeOutput(buffer, *i);
+		
+		// Append rangeproof to buffer
+		writeRangeproof(buffer, *j);
+	}
+	
+	// Go through all kernels
+	for(const Kernel &kernel : kernels) {
+	
+		// Append kernel to buffer
+		writeKernel(buffer, kernel, protocolVersion);
+	}
 }
 
 // Read transaction body

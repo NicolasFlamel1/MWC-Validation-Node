@@ -81,11 +81,20 @@ class Header final : public MerkleMountainRangeLeaf<Header> {
 		// Get nonce
 		uint64_t getNonce() const;
 		
+		// Set nonce
+		void setNonce(const uint64_t nonce);
+		
 		// Get edge bits
 		uint8_t getEdgeBits() const;
 		
+		// Set edge bits
+		void setEdgeBits(const uint8_t edgeBits);
+		
 		// Get proof nonces
 		const uint64_t *getProofNonces() const;
+		
+		// Set proof nonces
+		void setProofNonces(const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]);
 		
 		// Get block hash
 		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getBlockHash() const;

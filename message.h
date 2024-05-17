@@ -143,8 +143,20 @@ class Message final {
 		// Create get headers message
 		static vector<uint8_t> createGetHeadersMessage(const list<array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH>> &blockHashes);
 		
+		// Create header message
+		static vector<uint8_t> createHeaderMessage(const Header &header);
+		
+		// Create headers message
+		static vector<uint8_t> createHeaderMessage(const list<Header> &headers);
+		
 		// Create get block message
 		static vector<uint8_t> createGetBlockMessage(const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
+		
+		// Create block message
+		static vector<uint8_t> createBlockMessage(const Header &header, const Block &block, const uint32_t protocolVersion);
+		
+		// Create transaction message
+		static vector<uint8_t> createTransactionMessage(const Transaction &transaction, const uint32_t protocolVersion);
 		
 		// Create get transaction hash set message
 		static vector<uint8_t> createGetTransactionHashSetMessage(const uint64_t height, const uint8_t blockHash[Crypto::BLAKE2B_HASH_LENGTH]);
@@ -227,20 +239,38 @@ class Message final {
 		// Read network address
 		static NetworkAddress readNetworkAddress(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
 		
+		// Write header
+		static void writeHeader(vector<uint8_t> &buffer, const Header &header);
+		
 		// Read header
 		static Header readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
+		
+		// Write input
+		static void writeInput(vector<uint8_t> &buffer, const Input &input, const uint32_t protocolVersion);
 		
 		// Read input
 		static Input readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion);
 		
+		// Write output
+		static void writeOutput(vector<uint8_t> &buffer, const Output &output);
+		
 		// Read output
 		static Output readOutput(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
+		
+		// Write rangeproof
+		static void writeRangeproof(vector<uint8_t> &buffer, const Rangeproof &rangeproof);
 		
 		// Read rangeproof
 		static Rangeproof readRangeproof(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset);
 		
+		// Write kernel
+		static void writeKernel(vector<uint8_t> &buffer, const Kernel &kernel, const uint32_t protocolVersion);
+		
 		// Read kernel
 		static Kernel readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>::size_type offset, const uint32_t protocolVersion);
+		
+		// Write transaction body
+		static void writeTransactionBody(vector<uint8_t> &buffer, const list<Input> &inputs, const list<Output> &outputs, const list<Rangeproof> &rangeproofs, const list<Kernel> &kernels, const uint32_t protocolVersion);
 		
 		// Read transaction body
 		static tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> readTransactionBody(const vector<uint8_t> &buffer, vector<uint8_t>::size_type offset, const uint32_t protocolVersion, const bool isTransaction, const uint64_t headerHeight = 0, const uint16_t headerVersion = Consensus::getHeaderVersion(0));

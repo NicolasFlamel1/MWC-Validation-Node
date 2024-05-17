@@ -43,7 +43,7 @@ class Input final {
 		explicit Input(const Features features, const uint8_t commitment[Crypto::COMMITMENT_LENGTH]);
 		
 		// Serialize
-		vector<uint8_t> serialize() const;
+		vector<uint8_t> serialize(const uint32_t protocolVersion = 0) const;
 		
 		// Get lookup value
 		vector<uint8_t> getLookupValue() const;

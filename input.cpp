@@ -35,13 +35,13 @@ Input::Input(const Features features, const uint8_t commitment[Crypto::COMMITMEN
 }
 
 // Serialize
-vector<uint8_t> Input::serialize() const {
+vector<uint8_t> Input::serialize(const uint32_t protocolVersion) const {
 
 	// Initialize serialized input
 	vector<uint8_t> serializedInput;
 	
-	// Check if features aren't the same as output
-	if(features != Features::SAME_AS_OUTPUT) {
+	// Check if features aren't the same as output and protocol version is at most two
+	if(features != Features::SAME_AS_OUTPUT && protocolVersion <= 2) {
 	
 		// Append features to serialized input
 		Common::writeUint8(serializedInput, static_cast<underlying_type_t<Features>>(features));

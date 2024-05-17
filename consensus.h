@@ -136,8 +136,8 @@ class Consensus final {
 		// Get C29 proof of work ratio
 		static uint64_t getC29ProofOfWorkRatio(const uint64_t height);
 		
-		// Get maximum difficulty
-		static uint64_t getMaximumDifficulty(const Header &header);
+		// Get header difficulty
+		static uint64_t getHeaderDifficulty(const Header &header);
 		
 		// Get coinbase reward
 		static uint64_t getCoinbaseReward(const uint64_t height);
