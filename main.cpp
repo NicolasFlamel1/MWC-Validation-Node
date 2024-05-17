@@ -1,14 +1,9 @@
 // Header files
-#include "./common.h"
+#include "./mwc_validation_node.h"
 #include <iostream>
 #include <mutex>
-#include "./node.h"
 
 using namespace std;
-
-
-// Namespace
-using namespace MwcValidationNode;
 
 
 // Classes
@@ -63,7 +58,7 @@ int main() {
 	try {
 
 		// Check if initializing common failed
-		if(!Common::initialize()) {
+		if(!MwcValidationNode::Common::initialize()) {
 		
 			// Return failure
 			return EXIT_FAILURE;
@@ -77,7 +72,7 @@ int main() {
 		#endif
 		
 		// Create node
-		Node node;
+		MwcValidationNode::Node node;
 		
 		// Try
 		try {
@@ -105,7 +100,7 @@ int main() {
 		mutex messageLock;
 		
 		// Set node's on start syncing callback
-		node.setOnStartSyncingCallback([&messageLock]() {
+		node.setOnStartSyncingCallback([&messageLock]() -> void {
 		
 			// Try
 			try {
@@ -124,7 +119,7 @@ int main() {
 		});
 		
 		// Set node's on synced syncing callback
-		node.setOnSyncedCallback([&messageLock]() {
+		node.setOnSyncedCallback([&messageLock]() -> void {
 		
 			// Try
 			try {
@@ -143,7 +138,7 @@ int main() {
 		});
 		
 		// Set node's on block callback
-		node.setOnBlockCallback([&messageLock](const Header &header, const Block &block, const uint64_t oldHeight) -> bool {
+		node.setOnBlockCallback([&messageLock](const MwcValidationNode::Header &header, const MwcValidationNode::Block &block, const uint64_t oldHeight) -> bool {
 		
 			// Try
 			try {
@@ -172,7 +167,7 @@ int main() {
 		});
 		
 		// Set node's on peer connect callback
-		node.setOnPeerConnectCallback([&messageLock](const string &peerIdentifier) {
+		node.setOnPeerConnectCallback([&messageLock](const string &peerIdentifier) -> void {
 		
 			// Try
 			try {
@@ -191,7 +186,7 @@ int main() {
 		});
 		
 		// Set node's on peer disconnect callback
-		node.setOnPeerDisconnectCallback([&messageLock](const string &peerIdentifier) {
+		node.setOnPeerDisconnectCallback([&messageLock](const string &peerIdentifier) -> void {
 		
 			// Try
 			try {
@@ -243,7 +238,7 @@ int main() {
 		}
 		
 		// Check if an error occurred
-		if(Common::errorOccurred()) {
+		if(MwcValidationNode::Common::errorOccurred()) {
 		
 			// Return failure
 			return EXIT_FAILURE;
