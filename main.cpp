@@ -142,8 +142,8 @@ int main() {
 			}
 		});
 		
-		// Set node's on reorg callback
-		node.setOnReorgCallback([&node, &messageLock](const uint64_t newHeight) -> bool {
+		// Set node's on block callback
+		node.setOnBlockCallback([&messageLock](const Header &header, const Block &block, const uint64_t oldHeight) -> bool {
 		
 			// Try
 			try {
@@ -151,27 +151,12 @@ int main() {
 				// Lock message lock
 				lock_guard lock(messageLock);
 				
-				// Display message
-				cout << "Reorg occurred with depth: " << (node.getHeight() - newHeight + 1) << endl;
-			}
-			
-			// Catch errors
-			catch(...) {
-			
-			}
-			
-			// Return true;
-			return true;
-		});
-		
-		// Set node's on block callback
-		node.setOnBlockCallback([&messageLock](const Header &header, const Block &block) -> bool {
-		
-			// Try
-			try {
-			
-				// Lock message lock
-				lock_guard lock(messageLock);
+				// Check if a reorg occurred
+				if(oldHeight >= header.getHeight()) {
+				
+					// Display message
+					cout << "Reorg occurred with depth: " << (oldHeight - header.getHeight() + 1) << endl;
+				}
 				
 				// Display message
 				cout << "Block height: " << header.getHeight() << " at " << chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count() << endl;

@@ -298,7 +298,7 @@ void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMount
 }
 
 // Set on block callback
-void Node::setOnBlockCallback(const function<bool(const Header &header, const Block &block)> &onBlockCallback) {
+void Node::setOnBlockCallback(const function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback) {
 
 	// Set on block callback
 	this->onBlockCallback = onBlockCallback;
@@ -326,7 +326,7 @@ void Node::setOnTransactionCallback(const function<void(const Transaction &trans
 }
 
 // Start
-void Node::start(const char *customDnsSeed) {
+void Node::start(const char *customDnsSeed, const uint64_t baseFee) {
 
 	// Check if custom DNS seed exists
 	if(customDnsSeed) {
@@ -334,6 +334,9 @@ void Node::start(const char *customDnsSeed) {
 		// Set custom DNS seed
 		customDnsSeeds.emplace(customDnsSeed);
 	}
+	
+	// Set base fee to base fee
+	this->baseFee = baseFee;
 	
 	// Create main thread
 	mainThread = thread(&Node::monitor, this);
@@ -819,7 +822,7 @@ void Node::addToMempool(Transaction &&transaction) {
 				if(!mempool.contains(transaction)) {
 				
 					// Check if transaction's fees are less than the required fees
-					if(transaction.getFees() < transaction.getRequiredFees(DEFAULT_BASE_FEE)) {
+					if(transaction.getFees() < transaction.getRequiredFees(baseFee)) {
 					
 						// Return
 						return;
@@ -1973,6 +1976,9 @@ void Node::cleanupMempool() {
 
 // Apply block to sync state
 bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &block) {
+
+	// Save old synced header index
+	const uint64_t oldSyncedHeaderIndex = this->syncedHeaderIndex;
 	
 	// Set synced header index to synced header index
 	this->syncedHeaderIndex = syncedHeaderIndex;
@@ -2179,7 +2185,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 		if(onBlockCallback) {
 		
 			// Check if running on block callback failed
-			if(!onBlockCallback(*header, block)) {
+			if(!onBlockCallback(*header, block, oldSyncedHeaderIndex)) {
 			
 				// Set callback failed to true
 				callbackFailed = true;

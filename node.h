@@ -102,7 +102,7 @@ class Node final {
 		void setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> &onTransactionHashSetCallback);
 		
 		// Set on block callback
-		void setOnBlockCallback(const function<bool(const Header &header, const Block &block)> &onBlockCallback);
+		void setOnBlockCallback(const function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback);
 		
 		// Set on peer connect callback
 		void setOnPeerConnectCallback(const function<void(const string &peerIdentifier)> &onPeerConnectCallback);
@@ -114,7 +114,7 @@ class Node final {
 		void setOnTransactionCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionCallback);
 		
 		// Start
-		void start(const char *customDnsSeed = nullptr);
+		void start(const char *customDnsSeed = nullptr, const uint64_t baseFee = DEFAULT_BASE_FEE);
 		
 		// Stop
 		void stop();
@@ -315,7 +315,7 @@ class Node final {
 		function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> onTransactionHashSetCallback;
 		
 		// On block callback
-		function<bool(const Header &header, const Block &block)> onBlockCallback;
+		function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> onBlockCallback;
 		
 		// On peer connect callback
 		function<void(const string &peerIdentifier)> onPeerConnectCallback;
@@ -334,6 +334,9 @@ class Node final {
 		
 		// Custom DNS seeds
 		unordered_set<string> customDnsSeeds;
+		
+		// Base fee
+		uint64_t baseFee;
 		
 		// Random number generator
 		mt19937_64 randomNumberGenerator;
