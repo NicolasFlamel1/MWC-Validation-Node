@@ -1725,7 +1725,8 @@ void Message::writeHeader(vector<uint8_t> &buffer, const Header &header) {
 	}
 	
 	// Initialize proof nonces bytes
-	uint8_t proofNoncesBytes[numberOfProofNoncesBytes] = {};
+	uint8_t proofNoncesBytes[numberOfProofNoncesBytes];
+	memset(proofNoncesBytes, 0, sizeof(proofNoncesBytes));
 	
 	// Go through all header's proof nonces
 	for(uint64_t i = 0; i < Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES; ++i) {
