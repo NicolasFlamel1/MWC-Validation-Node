@@ -101,9 +101,6 @@ class Node final {
 		// Set on transaction hash set callback
 		void setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> &onTransactionHashSetCallback);
 		
-		// Set on reorg callback
-		void setOnReorgCallback(const function<bool(const uint64_t newHeight)> &onReorgCallback);
-		
 		// Set on block callback
 		void setOnBlockCallback(const function<bool(const Header &header, const Block &block)> &onBlockCallback);
 		
@@ -316,9 +313,6 @@ class Node final {
 		
 		// On transaction hash set callback
 		function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> onTransactionHashSetCallback;
-		
-		// On reorg callback
-		function<bool(const uint64_t newHeight)> onReorgCallback;
 		
 		// On block callback
 		function<bool(const Header &header, const Block &block)> onBlockCallback;

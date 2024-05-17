@@ -297,13 +297,6 @@ void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMount
 	this->onTransactionHashSetCallback = onTransactionHashSetCallback;
 }
 
-// Set on reorg callback
-void Node::setOnReorgCallback(const function<bool(const uint64_t newHeight)> &onReorgCallback) {
-
-	// Set on reorg callback
-	this->onReorgCallback = onReorgCallback;
-}
-
 // Set on block callback
 void Node::setOnBlockCallback(const function<bool(const Header &header, const Block &block)> &onBlockCallback) {
 
@@ -692,24 +685,6 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 // Update sync state
 bool Node::updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, const Block &block) {
 
-	// Check if a reorg occurred
-	if(this->syncedHeaderIndex >= syncedHeaderIndex) {
-	
-		// Check if on reorg callback exists
-		if(onReorgCallback) {
-		
-			// Check if running on reorg callback failed
-			if(!onReorgCallback(syncedHeaderIndex)) {
-			
-				// Set is syncing to false
-				isSyncing = false;
-				
-				// Return true
-				return true;
-			}
-		}
-	}
-	
 	// Set headers to headers
 	this->headers = move(headers);
 	
@@ -720,24 +695,6 @@ bool Node::updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t
 // Update sync state
 bool Node::updateSyncState(const uint64_t syncedHeaderIndex, const Block &block) {
 
-	// Check if a reorg occurred
-	if(this->syncedHeaderIndex >= syncedHeaderIndex) {
-	
-		// Check if on reorg callback exists
-		if(onReorgCallback) {
-		
-			// Check if running on reorg callback failed
-			if(!onReorgCallback(syncedHeaderIndex)) {
-			
-				// Set is syncing to false
-				isSyncing = false;
-				
-				// Return true
-				return true;
-			}
-		}
-	}
-	
 	// Return applying block to sync state
 	return applyBlockToSyncState(syncedHeaderIndex, block);
 }
