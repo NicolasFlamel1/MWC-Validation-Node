@@ -26,12 +26,6 @@ using namespace std;
 using namespace MwcValidationNode;
 
 
-// Definitions
-
-// Always lock free
-#define ALWAYS_LOCK_FREE 2
-
-
 // Constants
 
 // Milliseconds in a seconds
@@ -91,12 +85,8 @@ bool Common::initialize() {
 				// Interrupt
 				case SIGINT:
 				
-					// Check if atomic bool isn't always lock free
-					#if ATOMIC_BOOL_LOCK_FREE != ALWAYS_LOCK_FREE
-					
-						// Throw error
-						#error "Atomic bool isn't always lock free"
-					#endif
+					// Throw error if atomic bool isn't always lock free
+					static_assert(atomic_bool::is_always_lock_free, "Atomic bool isn't always lock free");
 				
 					// Set closing to true
 					closing.store(true);

@@ -20,6 +20,7 @@
 // Header files
 #include <atomic>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <vector>
 

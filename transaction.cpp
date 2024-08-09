@@ -1,5 +1,6 @@
 // Header files
 #include "./common.h"
+#include <algorithm>
 #include <cstring>
 #include "./saturate_math.h"
 #include "./transaction.h"
