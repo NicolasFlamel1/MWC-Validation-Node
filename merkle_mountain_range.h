@@ -138,6 +138,9 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 		// Get size at number of leaves
 		static uint64_t getSizeAtNumberOfLeaves(const uint64_t numberOfLeaves);
 		
+		// Get leaf's index
+		static uint64_t getLeafsIndex(const uint64_t leafIndex);
+		
 	// Private
 	private:
 	
@@ -155,9 +158,6 @@ template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange
 	
 		// Get height at index
 		static uint64_t getHeightAtIndex(const uint64_t index);
-		
-		// Get leaf's index
-		static uint64_t getLeafsIndex(const uint64_t leafIndex);
 		
 		// Get left sibling index
 		static uint64_t getLeftSiblingIndex(const uint64_t index);
@@ -578,6 +578,13 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 
 	// Rewind to size at the number of leaves
 	rewindToSize(getSizeAtNumberOfLeaves(numberOfLeaves));
+}
+
+// Get leaf's index
+template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafsIndex(const uint64_t leafIndex) {
+
+	// Return leaf's index
+	return 2 * leafIndex - Common::numberOfOnes(leafIndex);
 }
 
 // Clear
@@ -1352,7 +1359,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<Merkl
 				}
 			
 				// Get Merkle mountain range leaf from bytes
-				pair leaf = MerkleMountainRangeLeafDerivedClass::unserialize(buffer, buffer.size() - remainingBufferSize, protocolVersion, !merkleMountainRange.numberOfHashes);
+				pair leaf = MerkleMountainRangeLeafDerivedClass::unserialize(buffer, buffer.size() - remainingBufferSize, protocolVersion, !merkleMountainRange.numberOfHashes && (!leafSetPath || (0 < leafSet.maximum() && leafSet.contains(1))));
 				
 				// Check if leaf set doesn't exist or leaf set contains the leaf
 				if(!leafSetPath || (merkleMountainRange.numberOfHashes < leafSet.maximum() && leafSet.contains(merkleMountainRange.numberOfHashes + 1))) {
@@ -2069,13 +2076,6 @@ template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRa
 	
 	// Return height
 	return height;
-}
-
-// Get leaf's index
-template<typename MerkleMountainRangeLeafDerivedClass> uint64_t MerkleMountainRange<MerkleMountainRangeLeafDerivedClass>::getLeafsIndex(const uint64_t leafIndex) {
-
-	// Return leaf's index
-	return 2 * leafIndex - Common::numberOfOnes(leafIndex);
 }
 
 // Get left sibling index

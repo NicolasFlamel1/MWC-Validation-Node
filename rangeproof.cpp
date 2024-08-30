@@ -1,6 +1,7 @@
 // Header files
 #include"./common.h"
 #include <cstring>
+#include "blake2.h"
 #include "./consensus.h"
 #include "./rangeproof.h"
 
@@ -106,6 +107,26 @@ const uint8_t *Rangeproof::getProof() const {
 
 	// Return proof
 	return proof;
+}
+
+// Get hash
+array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Rangeproof::getHash() const {
+
+	// Initialize hash
+	array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> hash;
+	
+	// Get length and proof
+	const vector<uint8_t> lengthAndProof = serialize();
+	
+	// Check if getting hash failed
+	if(blake2b(hash.data(), hash.size(), lengthAndProof.data(), lengthAndProof.size(), nullptr, 0)) {
+	
+		// Throw error
+		throw runtime_error("Getting hash failed");
+	}
+	
+	// Return hash
+	return hash;
 }
 
 // Get serialized protocol version

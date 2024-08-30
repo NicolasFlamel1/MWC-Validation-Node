@@ -44,6 +44,9 @@ class Rangeproof final : public MerkleMountainRangeLeaf<Rangeproof, sizeof(uint6
 		// Get proof
 		const uint8_t *getProof() const;
 		
+		// Get hash
+		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getHash() const;
+		
 		// Get serialized protocol version
 		static uint32_t getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedRangeproof, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedRangeproofLength, const uint32_t protocolVersion);
 		

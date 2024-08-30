@@ -5611,7 +5611,7 @@ bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vect
 	
 	// Free memory
 	Common::freeMemory();
-		
+	
 	// Check if stopping read and write or is closing
 	if(stopReadAndWrite.load() || Common::isClosing()) {
 	
