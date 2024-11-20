@@ -1359,7 +1359,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<Merkl
 				}
 			
 				// Get Merkle mountain range leaf from bytes
-				pair leaf = MerkleMountainRangeLeafDerivedClass::unserialize(buffer, buffer.size() - remainingBufferSize, protocolVersion, !merkleMountainRange.numberOfHashes && (!leafSetPath || (0 < leafSet.maximum() && leafSet.contains(1))));
+				pair leaf = MerkleMountainRangeLeafDerivedClass::unserialize(buffer, buffer.size() - remainingBufferSize, protocolVersion, !merkleMountainRange.numberOfHashes && (!leafSetPath || (leafSet.maximum() > 0 && leafSet.contains(1))));
 				
 				// Check if leaf set doesn't exist or leaf set contains the leaf
 				if(!leafSetPath || (merkleMountainRange.numberOfHashes < leafSet.maximum() && leafSet.contains(merkleMountainRange.numberOfHashes + 1))) {
