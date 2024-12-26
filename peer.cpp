@@ -733,6 +733,9 @@ void Peer::connect(const string &address) {
 			// Initialize client address
 			NetworkAddress clientAddress;
 			
+			// Initialize client Onion Service address
+			string clientOnionServiceAddress;
+			
 			// Set loopback address
 			const in_addr inaddr_loopback = {
 			
@@ -1933,86 +1936,125 @@ void Peer::connect(const string &address) {
 										// Check if server is valid
 										if(!invalidServer) {
 										
-											// Check if getting client info was successful
-											sockaddr_storage clientInfo;
-											socklen_t clientInfoLength = sizeof(clientInfo);
+											// Set invalid client to false
+											bool invalidClient = false;
 											
-											if(!getsockname(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
+											// Check if is an Onion service
+											if(isOnionService) {
 											
-												// Set invalid client to false
-												bool invalidClient = false;
-											
-												// Check client info's family
-												switch(clientInfo.ss_family) {
+												// Clear client service address
+												clientOnionServiceAddress.clear();
 												
-													// IPv4
-													case AF_INET:
+												// TODO Create Tor address with checksum and version
+												
+												// Go through all characters in a Tor address
+												for(int i = 0; i < Common::TOR_ADDRESS_LENGTH; ++i) {
+												
+													// Append random base32 character to the client Onion service address
+													clientOnionServiceAddress += Common::BASE32_CHARACTERS[randomNumberGenerator() % sizeof(Common::BASE32_CHARACTERS)];
+												}
+												
+												// Append .onion top-level domain to the client Onion service address
+												clientOnionServiceAddress += ".onion";
+												
+												// Set client address's family to Onion service
+												clientAddress.family = NetworkAddress::Family::ONION_SERVICE;
+												
+												// Set client address's address to the client Onion service address
+												clientAddress.address = clientOnionServiceAddress.c_str();
+												
+												// Set client address's address length to the client Onion service address length
+												clientAddress.addressLength = clientOnionServiceAddress.size();
+											}
+											
+											// Otherwise
+											else {
+										
+												// Check if getting client info was successful
+												sockaddr_storage clientInfo;
+												socklen_t clientInfoLength = sizeof(clientInfo);
+												
+												if(!getsockname(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
+												
+													// Check client info's family
+													switch(clientInfo.ss_family) {
 													
-														{
-															// Get IPv4 info for the client
-															const sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(&clientInfo);
-															
-															// Set client address's family to IPv4
-															clientAddress.family = NetworkAddress::Family::IPV4;
-															
-															// Set client address's address to loopback address
-															clientAddress.address = &inaddr_loopback;
-															
-															// Set client address's address length to the loopback address length
-															clientAddress.addressLength = sizeof(inaddr_loopback);
-															
-															// Set client address's port to the port
-															clientAddress.port = ipv4Info->sin_port;
-														}
+														// IPv4
+														case AF_INET:
 														
-														// Break
-														break;
-													
-													// IPv6
-													case AF_INET6:
-													
-														{
-															// Get IPv6 info for the client
-															const sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(&clientInfo);
+															{
+																// Get IPv4 info for the client
+																const sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(&clientInfo);
+																
+																// Set client address's family to IPv4
+																clientAddress.family = NetworkAddress::Family::IPV4;
+																
+																// Set client address's address to loopback address
+																clientAddress.address = &inaddr_loopback;
+																
+																// Set client address's address length to the loopback address length
+																clientAddress.addressLength = sizeof(inaddr_loopback);
+																
+																// Set client address's port to the port
+																clientAddress.port = ipv4Info->sin_port;
+															}
 															
-															// Set client address's family to IPv6
-															clientAddress.family = NetworkAddress::Family::IPV6;
-															
-															// Set client address's address to loopback address
-															clientAddress.address = &in6addr_loopback;
-															
-															// Set client address's address length to the loopback address length
-															clientAddress.addressLength = sizeof(in6addr_loopback);
-															
-															// Set client address's port to the port
-															clientAddress.port = ipv6Info->sin6_port;
-														}
-													
-														// Break
-														break;
-													
-													// Default
-													default:
-													
-														// Set invalid client
-														invalidClient = true;
-													
-														// Break
-														break;
+															// Break
+															break;
+														
+														// IPv6
+														case AF_INET6:
+														
+															{
+																// Get IPv6 info for the client
+																const sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(&clientInfo);
+																
+																// Set client address's family to IPv6
+																clientAddress.family = NetworkAddress::Family::IPV6;
+																
+																// Set client address's address to loopback address
+																clientAddress.address = &in6addr_loopback;
+																
+																// Set client address's address length to the loopback address length
+																clientAddress.addressLength = sizeof(in6addr_loopback);
+																
+																// Set client address's port to the port
+																clientAddress.port = ipv6Info->sin6_port;
+															}
+														
+															// Break
+															break;
+														
+														// Default
+														default:
+														
+															// Set invalid client
+															invalidClient = true;
+														
+															// Break
+															break;
+													}
 												}
 												
-												// Check if client is valid
-												if(!invalidClient) {
+												// Otherwise
+												else {
 												
-													// Let node know that a peer connected
-													node.peerConnected(identifier);
-												
-													// Set peer connected to true
-													peerConnected = true;
-													
-													// Break
-													break;
+													// Set invalid client
+													invalidClient = true;
 												}
+											}
+											
+											// Check if client is valid
+											if(!invalidClient) {
+											
+												// Let node know that a peer connected
+												node.peerConnected(identifier);
+											
+												// Set peer connected to true
+												peerConnected = true;
+												
+												// Break
+												break;
 											}
 										}
 									}

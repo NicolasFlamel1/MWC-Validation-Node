@@ -55,6 +55,9 @@ const int Common::BYTES_IN_A_KILOBYTE = 1024;
 // HTTP port
 const uint16_t Common::HTTP_PORT = 80;
 
+// Tor address length
+const int Common::TOR_ADDRESS_LENGTH = 56;
+
 
 // Global variables
 

@@ -87,6 +87,12 @@ class Common final {
 		// HTTP port
 		static const uint16_t HTTP_PORT;
 		
+		// Tor address length
+		static const int TOR_ADDRESS_LENGTH;
+		
+		// Base32 characters
+		static inline const char BASE32_CHARACTERS[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '2', '3', '4', '5', '6', '7'};
+		
 		// Constructor
 		Common() = delete;
 	
