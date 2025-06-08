@@ -1413,12 +1413,12 @@ void Message::writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress 
 			// Append network address's address to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(networkAddress.address), reinterpret_cast<const uint8_t *>(networkAddress.address) + networkAddress.addressLength);
 			
-			// Check if network address's port is invalid
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
 			if(!networkAddress.port) {
 			
 				// Throw exception
 				throw runtime_error("Port is invalid");
-			}
+			}*/
 			
 			// Append network address's port to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(&networkAddress.port), reinterpret_cast<const uint8_t *>(&networkAddress.port) + sizeof(networkAddress.port));
@@ -1442,12 +1442,12 @@ void Message::writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress 
 			// Append network address's address to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(networkAddress.address), reinterpret_cast<const uint8_t *>(networkAddress.address) + networkAddress.addressLength);
 			
-			// Check if network address's port is invalid
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
 			if(!networkAddress.port) {
 			
 				// Throw exception
 				throw runtime_error("Port is invalid");
-			}
+			}*/
 			
 			// Append network address's port to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(&networkAddress.port), reinterpret_cast<const uint8_t *>(&networkAddress.port) + sizeof(networkAddress.port));
@@ -1547,12 +1547,12 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 			// Set network address's port
 			memcpy(&networkAddress.port, &buffer[offset + sizeof(networkAddress.family) + networkAddress.addressLength], sizeof(networkAddress.port));
 			
-			// Check if network address's port is invalid
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
 			if(!networkAddress.port) {
 			
 				// Throw exception
 				throw runtime_error("Port is invalid");
-			}
+			}*/
 			
 			// Break
 			break;
@@ -1583,12 +1583,12 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 			// Set network address's port
 			memcpy(&networkAddress.port, &buffer[offset + sizeof(networkAddress.family) + networkAddress.addressLength], sizeof(networkAddress.port));
 			
-			// Check if network address's port is invalid
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
 			if(!networkAddress.port) {
 			
 				// Throw exception
 				throw runtime_error("Port is invalid");
-			}
+			}*/
 			
 			// Break
 			break;
