@@ -5469,7 +5469,7 @@ bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vect
 		// Rewind kernels to the transaction hash set archive header
 		kernels.rewindToSize(transactionHashSetArchiveHeader->getKernelMerkleMountainRangeSize());
 		
-		// mwc-node doesn't check existing kernels' lock height and NRD header version
+		// mwc-node doesn't check existing kernels' coinbase maturity, lock height, and NRD header version
 	}
 	
 	// Catch errors

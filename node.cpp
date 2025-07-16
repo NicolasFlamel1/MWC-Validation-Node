@@ -791,7 +791,7 @@ void Node::addToMempool(Transaction &&transaction) {
 		if(isSynced) {
 		
 			// Check if transaction can be added to a block with a coinbase output and kernel
-			if(transaction.getOutputs().size() <= Message::MAXIMUM_OUTPUTS_LENGTH - 1 && transaction.getKernels().size() <= Message::MAXIMUM_KERNELS_LENGTH - 1) {
+			if(transaction.getOutputs().size() <= Message::MAXIMUM_OUTPUTS_LENGTH - 1 && transaction.getKernels().size() <= Message::MAXIMUM_KERNELS_LENGTH - 1 && Consensus::getBlockWeight(transaction.getInputs().size(), transaction.getOutputs().size() + 1, transaction.getKernels().size() + 1) <= Consensus::MAXIMUM_BLOCK_WEIGHT) {
 		
 				// Go through all of the transaction's inputs
 				for(Input &input : transaction.getInputs()) {
