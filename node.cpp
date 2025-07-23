@@ -110,7 +110,7 @@ const chrono::hours Node::BANNED_PEERS_CLEANUP_INTERVAL = 6h;
 const chrono::hours Node::REMOVE_RANDOM_PEER_INTERVAL = 6h;
 
 // Default base fee
-const uint64_t Node::DEFAULT_BASE_FEE = 1000000;
+const uint64_t Node::DEFAULT_BASE_FEE = 1000;
 
 
 // Supporting function implementation

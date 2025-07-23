@@ -465,54 +465,63 @@ uint64_t Consensus::getCoinbaseReward(const uint64_t height) {
 		// Return first epoch reward
 		return getEpochReward(1);
 	}
+	
 	// Check if before the third epoch
 	if(height < getEpochBlockOffset(3)) {
 	
 		// Return second epoch reward
 		return getEpochReward(2);
 	}
+	
 	// Check if before the fourth epoch
 	if(height < getEpochBlockOffset(4)) {
 	
 		// Return third epoch reward
 		return getEpochReward(3);
 	}
+	
 	// Check if before the fifth epoch
 	if(height < getEpochBlockOffset(5)) {
 	
 		// Return fourth epoch reward
 		return getEpochReward(4);
 	}
+	
 	// Check if before the sixth epoch
 	if(height < getEpochBlockOffset(6)) {
 	
 		// Return fifth epoch reward
 		return getEpochReward(5);
 	}
+	
 	// Check if before the seventh epoch
 	if(height < getEpochBlockOffset(7)) {
 	
 		// Return sixth epoch reward
 		return getEpochReward(6);
 	}
+	
 	// Check if before the eighth epoch
 	if(height < getEpochBlockOffset(8)) {
 	
 		// Return seventh epoch reward
 		return getEpochReward(7);
 	}
+	
 	// Check if before the ninth epoch
 	if(height < getEpochBlockOffset(9)) {
 	
 		// Return eighth epoch reward
 		return getEpochReward(8);
 	}
+	
 	// Check if before the tenth epoch
 	if(height < getEpochBlockOffset(10)) {
 	
 		// Return ninth epoch reward
 		return getEpochReward(9);
 	}
+	
 	// Check if before the eleventh epoch
 	if(height < getEpochBlockOffset(11)) {
 	
