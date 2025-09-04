@@ -1719,6 +1719,13 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 	#endif
 }
 
+// Get base fee
+uint64_t Node::getBaseFee() const {
+
+	// Return base fee
+	return baseFee;
+}
+
 // Cleanup mempool
 void Node::cleanupMempool() {
 
@@ -2369,6 +2376,9 @@ void Node::monitor() {
 			// Set number of connected and healthy peers to zero
 			list<Peer>::size_type numberOfConnectedAndHealthyPeers = 0;
 			
+			// Can broadcast transactions to a peer to false
+			bool canBroadcastTransactionsToAPeer = false;
+			
 			// Go through all peers
 			for(Peer &peer : peers) {
 				
@@ -2383,6 +2393,13 @@ void Node::monitor() {
 					
 						// Increment number of connected an healthy peers
 						++numberOfConnectedAndHealthyPeers;
+					}
+					
+					// Check if peer's base fee isn't greater than the base fee
+					if(peer.getBaseFee() <= baseFee) {
+					
+						// Set can broadcast transactions to a peer to true
+						canBroadcastTransactionsToAPeer = true;
 					}
 				}
 				
@@ -2399,8 +2416,8 @@ void Node::monitor() {
 				lastRemoveRandomPeerTime = chrono::steady_clock::now();
 			}
 			
-			// Otherwise check if its time to remove a random peer
-			else if(chrono::steady_clock::now() - lastRemoveRandomPeerTime >= REMOVE_RANDOM_PEER_INTERVAL) {
+			// Otherwise check if its time to remove a random peer or can't broadcast transactions to any connected peers
+			else if(chrono::steady_clock::now() - lastRemoveRandomPeerTime >= REMOVE_RANDOM_PEER_INTERVAL || !canBroadcastTransactionsToAPeer) {
 			
 				// Remove random peer
 				removeRandomPeer();
@@ -2520,8 +2537,8 @@ void Node::broadcastPendingTransactions() {
 					// Check if peer is connected and healthy
 					if(peer.getConnectionState() == Peer::ConnectionState::CONNECTED_AND_HEALTHY) {
 					
-						// Check if peer's message queue isn't full
-						if(!peer.isMessageQueueFull()) {
+						// Check if peer's message queue isn't full and the transaction's fees is greater than or equal to the peer's required fees
+						if(!peer.isMessageQueueFull() && i->getFees() >= i->getRequiredFees(peer.getBaseFee())) {
 						
 							// Check if transaction message with the peer's protocol version doesn't exist
 							if(!transactionMessages.contains(peer.getProtocolVersion())) {

@@ -52,7 +52,8 @@ const set<uint32_t> Message::COMPATIBLE_PROTOCOL_VERSIONS = {
 	0,
 	1,
 	2,
-	3
+	3,
+	4
 };
 
 // Maximum address length
@@ -64,11 +65,14 @@ const size_t Message::MAXIMUM_USER_AGENT_LENGTH = 10000;
 // Minimum proof nonces bytes length
 const size_t Message::MINIMUM_PROOF_NONCES_BYTES_LENGTH = 8;
 
+// Base fee before protocol version four
+const uint64_t Message::BASE_FEE_BEFORE_PROTOCOL_VERSION_FOUR = 1000000;
+
 
 // Supporting function implementation
 
 // Create hand message
-vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress) {
+vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress, const uint64_t baseFee) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -130,6 +134,9 @@ vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t 
 	
 	// Append block hash to payload
 	payload.insert(payload.cend(), blockHash.cbegin(), blockHash.cend());
+	
+	// Append base fee to payload
+	Common::writeUint64(payload, baseFee);
 	
 	// Create message header
 	const vector messageHeader = createMessageHeader(Type::HAND, payload.size());
@@ -472,7 +479,7 @@ tuple<Message::Type, vector<uint8_t>::size_type> Message::readMessageHeader(cons
 }
 
 // Read shake message
-tuple<Node::Capabilities, uint64_t, string, uint32_t> Message::readShakeMessage(const vector<uint8_t> &shakeMessage) {
+tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readShakeMessage(const vector<uint8_t> &shakeMessage) {
 
 	// Check if shake message doesn't contain a version
 	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint32_t)) {
@@ -579,8 +586,30 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t> Message::readShakeMessage(
 		throw runtime_error("Genesis block hash is invalid");
 	}
 	
-	// Return capabilities, total difficulty, user agent, and protocol version
-	return {capabilities, totalDifficulty, userAgent, protocolVersion};
+	// Check if protocol version is at least four
+	uint64_t baseFee;
+	if(protocolVersion >= 4) {
+	
+		// Check if shake message doesn't contain a base fee
+		if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH + sizeof(baseFee)) {
+		
+			// Throw exception
+			throw runtime_error("Shake message doesn't contain a base fee");
+		}
+		
+		// Get base fee from shake message
+		baseFee = Common::readUint64(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH);
+	}
+	
+	// Otherwise
+	else {
+	
+		// Set base fee to the base fee before protocol version four
+		baseFee = BASE_FEE_BEFORE_PROTOCOL_VERSION_FOUR;
+	}
+	
+	// Return capabilities, total difficulty, user agent, protocol version, and base fee
+	return {capabilities, totalDifficulty, userAgent, protocolVersion, baseFee};
 }
 
 // Read ping message
@@ -920,8 +949,9 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 				// Break
 				break;
 			
-			// Three
+			// Three or four
 			case 3:
+			case 4:
 			
 				// Check if stem transaction message doesn't contain an input
 				if(stemTransactionMessage.size() < offset + Crypto::COMMITMENT_LENGTH) {
@@ -992,9 +1022,10 @@ vector<uint8_t> Message::readStemTransactionMessage(const vector<uint8_t> &stemT
 				// Break
 				break;
 			
-			// Two or three
+			// Two, three, or four
 			case 2:
 			case 3:
+			case 4:
 			
 				// Check if stem transaction message doesn't contain kernel features
 				if(stemTransactionMessage.size() < offset + sizeof(Kernel::Features)) {
@@ -1235,13 +1266,13 @@ vector<uint8_t>::size_type Message::getMaximumPayloadLength(const Type type) {
 		case Type::HAND:
 		
 			// Return maximum payload length (mwc-node uses this value)
-			return 128;
+			return 136;
 		
 		// Shake
 		case Type::SHAKE:
 		
 			// Return maximum payload length (mwc-node uses this value)
-			return 88;
+			return 96;
 		
 		// Ping
 		case Type::PING:
@@ -1992,8 +2023,9 @@ void Message::writeInput(vector<uint8_t> &buffer, const Input &input, const uint
 			// Break
 			break;
 		
-		// Three
+		// Three or four
 		case 3:
+		case 4:
 		
 			// Break
 			break;
@@ -2053,8 +2085,9 @@ Input Message::readInput(const vector<uint8_t> &buffer, const vector<uint8_t>::s
 			// Break
 			break;
 		
-		// Three
+		// Three or four
 		case 3:
+		case 4:
 		
 			// Set features to same as output
 			features = Input::Features::SAME_AS_OUTPUT;
@@ -2223,9 +2256,10 @@ void Message::writeKernel(vector<uint8_t> &buffer, const Kernel &kernel, const u
 			// Break
 			break;
 		
-		// Two or three
+		// Two, three, or four
 		case 2:
 		case 3:
+		case 4:
 		
 			// Check kernel's features
 			switch(kernel.getFeatures()) {
@@ -2405,9 +2439,10 @@ Kernel Message::readKernel(const vector<uint8_t> &buffer, const vector<uint8_t>:
 			// Break
 			break;
 		
-		// Two or three
+		// Two, three, or four
 		case 2:
 		case 3:
+		case 4:
 		
 			// Check features
 			switch(features) {
@@ -2728,8 +2763,9 @@ tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTr
 				// Break
 				break;
 			
-			// Three
+			// Three or four
 			case 3:
+			case 4:
 			
 				// Update offset
 				offset += Crypto::COMMITMENT_LENGTH;
@@ -2853,9 +2889,10 @@ tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTr
 				// Break
 				break;
 			
-			// Two or three
+			// Two, three, or four
 			case 2:
 			case 3:
+			case 4:
 		
 				// Check kernel's features
 				switch(kernel.getFeatures()) {

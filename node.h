@@ -215,6 +215,9 @@ class Node final {
 		// Get next block
 		tuple<Header, Block> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
 		
+		// Get base fee
+		uint64_t getBaseFee() const;
+		
 	// Private
 	private:
 		

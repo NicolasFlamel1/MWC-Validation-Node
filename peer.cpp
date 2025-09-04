@@ -525,6 +525,13 @@ uint32_t Peer::getProtocolVersion() const {
 	return protocolVersion;
 }
 
+// Get base fee
+uint64_t Peer::getBaseFee() const {
+
+	// Return base fee
+	return baseFee;
+}
+
 // Is message queue full
 bool Peer::isMessageQueueFull() const {
 
@@ -2154,7 +2161,7 @@ void Peer::connect(const string &address) {
 					}
 				
 					// Create hand message
-					const vector handMessage = Message::createHandMessage(nonce, nodesTotalDifficulty, clientAddress, serverAddress);
+					const vector handMessage = Message::createHandMessage(nonce, nodesTotalDifficulty, clientAddress, serverAddress, node.getBaseFee());
 					
 					// Append hand message to write buffer
 					writeBuffer.insert(writeBuffer.cend(), handMessage.cbegin(), handMessage.cend());
@@ -3388,7 +3395,7 @@ bool Peer::processRequestsAndOrResponses() {
 				if(communicationState == CommunicationState::HAND_SENT) {
 				
 					// Initialize shake components
-					tuple<Node::Capabilities, uint64_t, string, uint32_t> shakeComponents;
+					tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> shakeComponents;
 					
 					// Try
 					try {
@@ -3407,11 +3414,12 @@ bool Peer::processRequestsAndOrResponses() {
 						break;
 					}
 					
-					// Get shake capabilities, total difficulty, user agent, and protocol version from shake components
+					// Get shake capabilities, total difficulty, user agent, protocol version, and base fee from shake components
 					const Node::Capabilities &shakeCapabilities = get<0>(shakeComponents);
 					const uint64_t &shakeTotalDifficulty = get<1>(shakeComponents);
 					const string &shakeUserAgent = get<2>(shakeComponents);
 					const uint32_t &shakeProtocolVersion = get<3>(shakeComponents);
+					const uint64_t &shakeBaseFee = get<4>(shakeComponents);
 					
 					// Create get peer addresses message
 					const vector getPeerAddressesMessage = Message::createGetPeerAddressesMessage(Node::Capabilities::FULL_NODE);
@@ -3431,6 +3439,9 @@ bool Peer::processRequestsAndOrResponses() {
 						
 						// Set protocol version to shake's protocol version
 						protocolVersion = shakeProtocolVersion;
+						
+						// Set base fee to shake's base fee
+						baseFee = shakeBaseFee;
 						
 						// Append get peer addresses messages to write buffer
 						writeBuffer.insert(writeBuffer.cend(), getPeerAddressesMessage.cbegin(), getPeerAddressesMessage.cend());
@@ -4622,6 +4633,16 @@ bool Peer::processRequestsAndOrResponses() {
 		
 					// Catch errors
 					catch(...) {
+					
+						// Set ban to true
+						ban = true;
+						
+						// Break
+						break;
+					}
+					
+					// Check if protocol version is at least four and the transaction's fees are less than the node's required fees
+					if(protocolVersion >= 4 && transaction.value().getFees() < transaction.value().getRequiredFees(node.getBaseFee())) {
 					
 						// Set ban to true
 						ban = true;

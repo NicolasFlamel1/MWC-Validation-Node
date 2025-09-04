@@ -107,6 +107,9 @@ class Peer final {
 		// Get protocol version
 		uint32_t getProtocolVersion() const;
 		
+		// Get base fee
+		uint64_t getBaseFee() const;
+		
 		// Is message queue full
 		bool isMessageQueueFull() const;
 		
@@ -272,6 +275,9 @@ class Peer final {
 		
 		// Protocol version
 		uint32_t protocolVersion;
+		
+		// Base fee
+		uint64_t baseFee;
 		
 		// Total difficulty
 		uint64_t totalDifficulty;

@@ -638,9 +638,10 @@ pair<Kernel, array<uint8_t, Kernel::MAXIMUM_SERIALIZED_LENGTH>::size_type> Kerne
 			// Break
 			break;
 		
-		// Two or three
+		// Two, three, or four
 		case 2:
 		case 3:
+		case 4:
 		
 			// Check features
 			switch(features) {

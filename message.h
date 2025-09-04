@@ -126,7 +126,7 @@ class Message final {
 		Message() = delete;
 		
 		// Create hand message
-		static vector<uint8_t> createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress);
+		static vector<uint8_t> createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress, const uint64_t baseFee);
 		
 		// Create ping message
 		static vector<uint8_t> createPingMessage(const uint64_t totalDifficulty, const uint64_t height);
@@ -168,7 +168,7 @@ class Message final {
 		static tuple<Type, vector<uint8_t>::size_type> readMessageHeader(const vector<uint8_t> &messageHeader);
 		
 		// Read shake message
-		static tuple<Node::Capabilities, uint64_t, string, uint32_t> readShakeMessage(const vector<uint8_t> &shakeMessage);
+		static tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> readShakeMessage(const vector<uint8_t> &shakeMessage);
 		
 		// Read ping message
 		static uint64_t readPingMessage(const vector<uint8_t> &pingMessage);
@@ -226,6 +226,9 @@ class Message final {
 		
 		// Minimum proof nonces bytes length
 		static const size_t MINIMUM_PROOF_NONCES_BYTES_LENGTH;
+		
+		// Base fee before protocol version four
+		static const uint64_t BASE_FEE_BEFORE_PROTOCOL_VERSION_FOUR;
 		
 		// Get maximum payload length
 		static vector<uint8_t>::size_type getMaximumPayloadLength(const Type type);
