@@ -2393,13 +2393,13 @@ void Node::monitor() {
 					
 						// Increment number of connected an healthy peers
 						++numberOfConnectedAndHealthyPeers;
-					}
-					
-					// Check if peer's base fee isn't greater than the base fee
-					if(peer.getBaseFee() <= baseFee) {
-					
-						// Set can broadcast transactions to a peer to true
-						canBroadcastTransactionsToAPeer = true;
+						
+						// Check if peer's base fee isn't greater than the base fee
+						if(peer.getBaseFee() <= baseFee) {
+						
+							// Set can broadcast transactions to a peer to true
+							canBroadcastTransactionsToAPeer = true;
+						}
 					}
 				}
 				
