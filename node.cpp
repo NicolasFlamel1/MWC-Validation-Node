@@ -149,7 +149,13 @@ Node::Node(const string &torProxyAddress, const string &torProxyPort) :
 	isSynced(false),
 
 	// Set stop monitoring to false
-	stopMonitoring(false)
+	stopMonitoring(false),
+	
+	// Set started to false
+	started(false),
+	
+	// Set disconnected to false
+	disconnected(false)
 {
 }
 
@@ -158,7 +164,7 @@ Node::~Node() {
 
 	// Set stop monitoring to true
 	stopMonitoring.store(true);
-
+	
 	// Check if main thread is running
 	if(mainThread.joinable()) {
 	
@@ -181,6 +187,20 @@ Node::~Node() {
 // Save
 void Node::save(ofstream &file) const {
 
+	// Check if main thread is running
+	if(mainThread.joinable()) {
+	
+		// Throw exception
+		throw runtime_error("Node is running");
+	}
+	
+	// Check if started and not disconnected
+	if(started && !disconnected) {
+	
+		// Throw exception
+		throw runtime_error("Node isn't disconnected");
+	}
+	
 	// Write headers to file
 	headers.save(file);
 		
@@ -220,6 +240,13 @@ void Node::save(ofstream &file) const {
 // Restore
 void Node::restore(ifstream &file) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Read headers from file
 	headers = MerkleMountainRange<Header>::restore(file);
 	
@@ -272,6 +299,13 @@ void Node::restore(ifstream &file) {
 // Set on start syncing callback
 void Node::setOnStartSyncingCallback(const function<void()> &onStartSyncingCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Set on start syncing callback
 	this->onStartSyncingCallback = onStartSyncingCallback;
 }
@@ -279,6 +313,13 @@ void Node::setOnStartSyncingCallback(const function<void()> &onStartSyncingCallb
 // Set on synced callback
 void Node::setOnSyncedCallback(const function<void()> &onSyncedCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Set on synced callback
 	this->onSyncedCallback = onSyncedCallback;
 }
@@ -286,6 +327,13 @@ void Node::setOnSyncedCallback(const function<void()> &onSyncedCallback) {
 // Set on error callback
 void Node::setOnErrorCallback(const function<void()> &onErrorCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Set on error callback
 	this->onErrorCallback = onErrorCallback;
 }
@@ -293,6 +341,13 @@ void Node::setOnErrorCallback(const function<void()> &onErrorCallback) {
 // Set on transaction hash set callback
 void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> &onTransactionHashSetCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Set on transaction hash set callback
 	this->onTransactionHashSetCallback = onTransactionHashSetCallback;
 }
@@ -300,6 +355,13 @@ void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMount
 // Set on block callback
 void Node::setOnBlockCallback(const function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Set on block callback
 	this->onBlockCallback = onBlockCallback;
 }
@@ -307,6 +369,12 @@ void Node::setOnBlockCallback(const function<bool(const Header &header, const Bl
 // Set on peer connect callback
 void Node::setOnPeerConnectCallback(const function<void(const string &peerIdentifier)> &onPeerConnectCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
 	// Set on peer connect callback
 	this->onPeerConnectCallback = onPeerConnectCallback;
 }
@@ -314,6 +382,13 @@ void Node::setOnPeerConnectCallback(const function<void(const string &peerIdenti
 // Set on peer disconnect callback
 void Node::setOnPeerDisconnectCallback(const function<void(const string &peerIdentifier)> &onPeerDisconnectCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Set on peer disconnect callback
 	this->onPeerDisconnectCallback = onPeerDisconnectCallback;
 }
@@ -321,6 +396,13 @@ void Node::setOnPeerDisconnectCallback(const function<void(const string &peerIde
 // Set on transaction callback
 void Node::setOnTransactionCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionCallback) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
 	// Set on transaction callback
 	this->onTransactionCallback = onTransactionCallback;
 }
@@ -328,11 +410,21 @@ void Node::setOnTransactionCallback(const function<void(const Transaction &trans
 // Start
 void Node::start(const char *customDnsSeed, const uint64_t baseFee) {
 
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
+	// Set started to true
+	started = true;
+	
 	// Check if custom DNS seed exists
 	if(customDnsSeed) {
 	
 		// Set custom DNS seed
-		customDnsSeeds.emplace(customDnsSeed);
+		customDnsSeeds.insert(customDnsSeed);
 	}
 	
 	// Set base fee to base fee
@@ -345,6 +437,13 @@ void Node::start(const char *customDnsSeed, const uint64_t baseFee) {
 // Stop
 void Node::stop() {
 
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
 	// Set stop monitoring to true
 	stopMonitoring.store(true);
 	
@@ -355,6 +454,31 @@ void Node::stop() {
 // Get peers
 list<Peer> &Node::getPeers() {
 
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
+	// Check if main thread is running
+	if(mainThread.joinable()) {
+	
+		// Throw exception
+		throw runtime_error("Node is running");
+	}
+	
+	// Go through all peers
+	for(Peer &peer : peers) {
+	
+		// Check if current thread is the peer's thread
+		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
+		
+			// Throw exception
+			throw runtime_error("Can't get peers from current thread");
+		}
+	}
+	
 	// Return peers
 	return peers;
 }
@@ -362,6 +486,31 @@ list<Peer> &Node::getPeers() {
 // Disconnect
 void Node::disconnect() {
 
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
+	// Check if main thread is running
+	if(mainThread.joinable()) {
+	
+		// Throw exception
+		throw runtime_error("Node is running");
+	}
+	
+	// Go through all peers
+	for(Peer &peer : peers) {
+	
+		// Check if current thread is the peer's thread
+		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
+		
+			// Throw exception
+			throw runtime_error("Can't disconnect from current thread");
+		}
+	}
+	
 	// Go through all peers
 	for(Peer &peer : peers) {
 		
@@ -426,20 +575,23 @@ void Node::disconnect() {
 	
 	// Disconnect from peers
 	peers.clear();
+	
+	// Set disconnected to true
+	disconnected = true;
 }
 
 // Get thread
 thread &Node::getThread() {
 
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
 	// Return main thread
 	return mainThread;
-}
-
-// Get lock
-shared_mutex &Node::getLock() {
-
-	// Return lock
-	return lock;
 }
 
 // Get total difficulty
@@ -484,275 +636,14 @@ const MerkleMountainRange<Rangeproof> &Node::getRangeproofs() const {
 	return rangeproofs;
 }
 
-// Add unused peer candidate
-void Node::addUnusedPeerCandidate(string &&peerCandidate) {
-
-	// Add peer candidate to list of unused peer candidates
-	unusedPeerCandidates[move(peerCandidate)] = chrono::steady_clock::now();
-}
-
-// Is unused peer candidate valid
-bool Node::isUnusedPeerCandidateValid(const string &peerCandidate) const {
-
-	// Return if unused peer candidate is valid
-	return unusedPeerCandidates.contains(peerCandidate) && chrono::steady_clock::now() - unusedPeerCandidates.at(peerCandidate) <= UNUSED_PEER_CANDIDATE_VALID_DURATION;
-}
-
-// Get currently used peer candidates
-unordered_set<string> &Node::getCurrentlyUsedPeerCandidates() {
-
-	// Return currently used peer candidates
-	return currentlyUsedPeerCandidates;
-}
-
-// Add recently attempted peer candidate
-void Node::addRecentlyAttemptedPeerCandidate(const string &peerCandidate) {
-
-	// Add peer candidate to list of recently attempted peer candidates
-	recentlyAttemptedPeerCandidates[peerCandidate] = chrono::steady_clock::now();
-}
-
-// Is peer candidate recently attempted
-bool Node::isPeerCandidateRecentlyAttempted(const string &peerCandidate) const {
-
-	// Return if peer candidate was recently attempted
-	return recentlyAttemptedPeerCandidates.contains(peerCandidate) && chrono::steady_clock::now() - recentlyAttemptedPeerCandidates.at(peerCandidate) <= RECENTLY_ATTEMPTED_PEER_CANDIDATE_DURATION;
-}
-
-// Get healthy peers
-unordered_map<string, pair<chrono::time_point<chrono::steady_clock>, Node::Capabilities>> &Node::getHealthyPeers() {
-
-	// Return healthy peers
-	return healthyPeers;
-}
-
-// Add healthy peer
-void Node::addHealthyPeer(const string &peer, const Capabilities capabilities) {
-
-	// Add peer to list of healthy peers
-	healthyPeers[peer] = {chrono::steady_clock::now(), capabilities};
-}
-
-// Is peer healthy
-bool Node::isPeerHealthy(const string &peer) const {
-
-	// Return if peer is healthy
-	return healthyPeers.contains(peer) && (currentlyUsedPeerCandidates.contains(peer) || chrono::steady_clock::now() - healthyPeers.at(peer).first <= HEALTHY_PEER_DURATION);
-}
-
-// Add banned peer
-void Node::addBannedPeer(const string &peer) {
-
-	// Add peer to list of banned peers
-	bannedPeers[peer] = chrono::steady_clock::now();
-	
-	// Check if peer is healthy
-	if(healthyPeers.contains(peer)) {
-	
-		// Remove peer from healthy peers
-		healthyPeers.erase(peer);
-	}
-}
-
-// Is peer banned
-bool Node::isPeerBanned(const string &peer) const {
-
-	// Return if peer is banned
-	return bannedPeers.contains(peer) && chrono::steady_clock::now() - bannedPeers.at(peer) <= BANNED_PEER_DURATION;
-}
-
-// Set sync state
-void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &transactionHashSetArchiveHeader, MerkleMountainRange<Kernel> &&kernels, MerkleMountainRange<Output> &&outputs, MerkleMountainRange<Rangeproof> &&rangeproofs) {
-
-	// Check if on transaction hash set callback exists
-	if(onTransactionHashSetCallback) {
-	
-		// Check if running on transaction hash set callback failed
-		if(!onTransactionHashSetCallback(headers, transactionHashSetArchiveHeader, kernels, outputs, rangeproofs)) {
-		
-			// Set is syncing to false
-			isSyncing = false;
-			
-			// Return
-			return;
-		}
-	}
-	
-	// Check if pruning rangeproofs
-	#ifdef PRUNE_RANGEPROOFS
-	
-		// Go through all rangeproofs
-		for(MerkleMountainRange<Rangeproof>::const_iterator i = rangeproofs.cbegin(); i != rangeproofs.cend();) {
-		
-			// Get rangeproof
-			const pair<uint64_t, Rangeproof> &rangeproof = *i;
-			
-			// Go to next rangeproof
-			++i;
-			
-			// Prune rangeproof
-			rangeproofs.pruneLeaf(rangeproof.first, true);
-		}
-	#endif
-	
-	// Check if pruning kernels
-	#ifdef PRUNE_KERNELS
-	
-		// Go through all kernels
-		for(MerkleMountainRange<Kernel>::const_iterator i = kernels.cbegin(); i != kernels.cend();) {
-		
-			// Get kernel
-			const pair<uint64_t, Kernel> &kernel = *i;
-			
-			// Go to next kernel
-			++i;
-			
-			// Prune kernel
-			kernels.pruneLeaf(kernel.first, true);
-		}
-	
-		// Set kernels minimum size to the transaction hash set archive header
-		kernels.setMinimumSize(transactionHashSetArchiveHeader.getKernelMerkleMountainRangeSize());
-	#endif
-	
-	// Check if pruning headers
-	#ifdef PRUNE_HEADERS
-	
-		// Loop while headers can be pruned
-		while(transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() >= Consensus::COINBASE_MATURITY) {
-		
-			// Prune oldest header
-			headers.pruneLeaf(headers.front().getHeight(), true);
-		}
-	
-		// Set headers minimum size to the transaction hash set archive header
-		headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(transactionHashSetArchiveHeader.getHeight() + 1));
-	#endif
-	
-	// Check if headers minimum size can be updated
-	if(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1) > headers.getMinimumSize()) {
-	
-		// Set headers minimum size to the first header
-		headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1));
-	}
-	
-	// Check if kernels minimum size can be updated
-	if(headers.front().getKernelMerkleMountainRangeSize() > kernels.getMinimumSize()) {
-	
-		// Set kernels minimum size to the first header
-		kernels.setMinimumSize(headers.front().getKernelMerkleMountainRangeSize());
-	}
-	
-	// Check if outputs minimum size can be updated
-	if(headers.front().getOutputMerkleMountainRangeSize() > outputs.getMinimumSize()) {
-	
-		// Set outputs minimum size to the first header
-		outputs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
-	}
-	
-	// Check if rangeproofs minimum size can be updated
-	if(headers.front().getOutputMerkleMountainRangeSize() > rangeproofs.getMinimumSize()) {
-	
-		// Set rangeproofs minimum size to the first header
-		rangeproofs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
-	}
-	
-	// Free memory
-	Common::freeMemory();
-	
-	// Set headers to headers
-	this->headers = move(headers);
-	
-	// Set synced header index to the transaction hash set archive header's height
-	this->syncedHeaderIndex = transactionHashSetArchiveHeader.getHeight();
-	
-	// Set kernels to kernels
-	this->kernels = move(kernels);
-	
-	// Set outputs to outputs
-	this->outputs = move(outputs);
-	
-	// Set rangeproofs to rangeproofs
-	this->rangeproofs = move(rangeproofs);
-	
-	// Clear mempool
-	mempool.clear();
-	
-	// Set is syncing to false
-	isSyncing = false;
-	
-	// Set is synced to false
-	isSynced = false;
-}
-
-// Update sync state
-bool Node::updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, const Block &block) {
-
-	// Set headers to headers
-	this->headers = move(headers);
-	
-	// Return applying block to sync state
-	return applyBlockToSyncState(syncedHeaderIndex, block);
-}
-
-// Update sync state
-bool Node::updateSyncState(const uint64_t syncedHeaderIndex, const Block &block) {
-
-	// Return applying block to sync state
-	return applyBlockToSyncState(syncedHeaderIndex, block);
-}
-
-// Peer connected
-void Node::peerConnected(const string &peerIdentifier) {
-
-	// Check if on peer connect callback exists
-	if(onPeerConnectCallback) {
-	
-		// Run on peer connect callback
-		onPeerConnectCallback(peerIdentifier);
-	}
-}
-
-// Get Tor proxy address
-const string &Node::getTorProxyAddress() const {
-
-	// Return Tor proxy address
-	return torProxyAddress;
-}
-
-// Get Tor proxy port
-const string &Node::getTorProxyPort() const {
-
-	// Return Tor proxy port
-	return torProxyPort;
-}
-
-// Get DNS seeds
-const unordered_set<string> &Node::getDnsSeeds() const {
-
-	// Check if uisng custom DNS seeds
-	if(!customDnsSeeds.empty()) {
-	
-		// Return custom DNS seeds
-		return customDnsSeeds;
-	}
-	
-	// Otherwise
-	else {
-	
-		// Return default DNS seeds
-		return DEFAULT_DNS_SEEDS;
-	}
-}
-
 // Broadcast transaction
-void Node::broadcastTransaction(const Transaction &transaction) {
+void Node::broadcastTransaction(Transaction &&transaction) {
 
 	// Lock for writing
 	lock_guard writeLock(lock);
 	
 	// Add transaction to list of pending transactions
-	pendingTransactions.push_back(transaction);
+	pendingTransactions.push_back(move(transaction));
 	
 	// Notify that an event occurred
 	peerEventOccurred.notify_one();
@@ -776,327 +667,6 @@ const Mempool &Node::getMempool() const {
 
 	// Return mempool
 	return mempool;
-}
-
-// Add to mempool
-void Node::addToMempool(Transaction &&transaction) {
-
-	// Check if mempool is enabled
-	#ifdef ENABLE_MEMPOOL
-	
-		// Lock for writing
-		lock_guard writeLock(lock);
-		
-		// Check if synced
-		if(isSynced) {
-		
-			// Check if transaction can be added to a block with a coinbase output and kernel
-			if(transaction.getOutputs().size() <= Message::MAXIMUM_OUTPUTS_LENGTH - 1 && transaction.getKernels().size() <= Message::MAXIMUM_KERNELS_LENGTH - 1 && Consensus::getBlockWeight(transaction.getInputs().size(), transaction.getOutputs().size() + 1, transaction.getKernels().size() + 1) <= Consensus::MAXIMUM_BLOCK_WEIGHT) {
-		
-				// Go through all of the transaction's inputs
-				for(Input &input : transaction.getInputs()) {
-				
-					// Check if input's features are the same as the output's
-					if(input.getFeatures() == Input::Features::SAME_AS_OUTPUT) {
-					
-						// Check if output doesn't exist
-						const vector inputLookupValue = input.getLookupValue();
-						const Output *output = outputs.getLeafByLookupValue(inputLookupValue);
-						if(!output) {
-						
-							// Check if output doesn't exist in the mempool
-							output = mempool.getOutput(inputLookupValue);
-							if(!output) {
-							
-								// Return
-								return;
-							}
-						}
-						
-						// Set input's features to the output's features
-						input.setFeatures(static_cast<Input::Features>(output->getFeatures()));
-					}
-				}
-				
-				// Check if transaction isn't already in the mempool
-				if(!mempool.contains(transaction)) {
-				
-					// Check if transaction's fees are less than the required fees
-					if(transaction.getFees() < transaction.getRequiredFees(baseFee)) {
-					
-						// Return
-						return;
-					}
-					
-					// Initialize replaced fees to zero
-					uint64_t replacedFees = 0;
-					
-					// Initialize replaced transactions
-					unordered_set<const Transaction *> replacedTransactions;
-					
-					// Initialize removed outputs
-					unordered_set<vector<uint8_t>, Common::Uint8VectorHash> removedOutputs;
-			
-					// Go through all of the transaction's outputs
-					for(const Output &output : transaction.getOutputs()) {
-					
-						// Check if output already exists
-						const vector outputLookupValue = output.getLookupValue().value();
-						if(outputs.leafWithLookupValueExists(outputLookupValue)) {
-						
-							// Return
-							return;
-						}
-						
-						// Check if output already exists in the mempool
-						const Transaction *existingTransaction = mempool.getTransaction(outputLookupValue);
-						if(existingTransaction) {
-						
-							// Add existing transaction's fees to replaced fees
-							replacedFees = SaturateMath::add(replacedFees, existingTransaction->getFees());
-							
-							// Add existing transaction to list of transactions to replace
-							replacedTransactions.emplace(existingTransaction);
-							
-							// Go through all of the existing transaction's outputs
-							for(const Output &existingOutput : existingTransaction->getOutputs()) {
-							
-								// Add existing output to list of removed outputs
-								removedOutputs.emplace(existingOutput.getLookupValue().value());
-							}
-						}
-					}
-					
-					// Check if transaction replaces other transactions
-					if(!replacedTransactions.empty()) {
-					
-						// Go through all of the transaction's outputs
-						for(const Output &output : transaction.getOutputs()) {
-						
-							// Remove output from list of removed outputs
-							removedOutputs.erase(output.getLookupValue().value());
-						}
-						
-						// Go through all transactions in the mempool
-						unordered_set<vector<uint8_t>, Common::Uint8VectorHash> inputDependencies;
-						for(Mempool::const_iterator i = mempool.cbegin(); i != mempool.cend();) {
-						
-							// Get existing transaction
-							const Transaction &existingTransaction = *i;
-							
-							// Check if existing transaction isn't already being replaced
-							if(!replacedTransactions.contains(&existingTransaction)) {
-							
-								// Initialize remove transaction to false
-								bool removeTransaction = false;
-								
-								// Go through all of the existing transactions inputs
-								for(const Input &input : existingTransaction.getInputs()) {
-								
-									// Check if output doesn't exist
-									vector inputLookupValue = input.getLookupValue();
-									if(!outputs.leafWithLookupValueExists(inputLookupValue)) {
-									
-										// Check if output will be removed
-										if(removedOutputs.contains(inputLookupValue)) {
-										
-											// Set remove transaction to true
-											removeTransaction = true;
-											
-											// Break
-											break;
-										}
-										
-										// Add output to input dependencies
-										inputDependencies.emplace(move(inputLookupValue));
-									}
-								}
-								
-								// Check if removing transaction
-								if(removeTransaction) {
-								
-									// Add existing transaction's fees to replaced fees
-									replacedFees = SaturateMath::add(replacedFees, existingTransaction.getFees());
-									
-									// Add existing transaction to list of transactions to replace
-									replacedTransactions.emplace(&existingTransaction);
-									
-									// Initialize recheck transactions to false
-									bool recheckTransactions = false;
-									
-									// Go through all of the existing transaction's outputs
-									for(const Output &existingOutput : existingTransaction.getOutputs()) {
-									
-										// Check if existing output is the input to another transaction
-										vector outputLookupValue = existingOutput.getLookupValue().value();
-										if(inputDependencies.contains(outputLookupValue)) {
-										
-											// Set recheck transactions to true
-											recheckTransactions = true;
-										}
-										
-										// Add existing output to list of removed outputs
-										removedOutputs.emplace(move(outputLookupValue));
-									}
-									
-									// Check if rechecking transactions
-									if(recheckTransactions) {
-									
-										// Go to first transaction
-										i = mempool.cbegin();
-										
-										// Clear input dependencies
-										inputDependencies.clear();
-									}
-									
-									// Otherwise
-									else {
-									
-										// Go to next transaction
-										++i;
-									}
-								}
-								
-								// Otherwise
-								else {
-								
-									// Go to next transaction
-									++i;
-								}
-							}
-							
-							// Otherwise
-							else {
-							
-								// Go to next transaction
-								++i;
-							}
-						}
-						
-						// Check if transaction's fees aren't greater than the fees of the transactions it replaces
-						if(transaction.getFees() <= replacedFees) {
-						
-							// Return
-							return;
-						}
-					}
-					
-					// Get next header height
-					const uint64_t nextHeaderHeight = SaturateMath::add(syncedHeaderIndex, 1);
-					
-					// Get unspendable coinbase outputs starting index at the next header's height
-					const uint64_t unspendableCoinbaseOutputsStartingIndex = MerkleMountainRange<Header>::getNumberOfLeavesAtSize(headers.getLeaf(SaturateMath::subtract(nextHeaderHeight, Consensus::COINBASE_MATURITY))->getOutputMerkleMountainRangeSize());
-					
-					// Go through all of the transaction's inputs
-					for(const Input &input : transaction.getInputs()) {
-					
-						// Check if output doesn't exist
-						const vector inputLookupValue = input.getLookupValue();
-						const Output *output = outputs.getLeafByLookupValue(inputLookupValue);
-						if(!output) {
-						
-							// Check if output doesn't exist in the mempool, it has coinbase features, or it will be replaced
-							output = mempool.getOutput(inputLookupValue);
-							if(!output || output->getFeatures() == Output::Features::COINBASE || replacedTransactions.contains(mempool.getTransaction(inputLookupValue))) {
-							
-								// Return
-								return;
-							}
-						}
-						
-						// Otherwise check if output has coinbase features
-						else if(output->getFeatures() == Output::Features::COINBASE) {
-						
-							// Check if output won't reach maturity by the next header's height
-							if(nextHeaderHeight < Consensus::COINBASE_MATURITY || outputs.getLeafIndexByLookupValue(inputLookupValue) >= unspendableCoinbaseOutputsStartingIndex) {
-							
-								// Return
-								return;
-							}
-						}
-						
-						// Check if input's features don't match the output's features
-						if(static_cast<underlying_type_t<Input::Features>>(input.getFeatures()) != static_cast<underlying_type_t<Output::Features>>(output->getFeatures())) {
-						
-							// Return
-							return;
-						}
-					}
-					
-					// Go through all of the transaction's kernels
-					for(const Kernel &kernel : transaction.getKernels()) {
-					
-						// Check kernel's features
-						switch(kernel.getFeatures()) {
-						
-							// Height locked
-							case Kernel::Features::HEIGHT_LOCKED:
-							
-								// Check if kernel's lock height is greater than the next header's height
-								if(kernel.getLockHeight() > nextHeaderHeight) {
-								
-									// Return
-									return;
-								}
-								
-								// Break
-								break;
-							
-							// No recent duplicate
-							case Kernel::Features::NO_RECENT_DUPLICATE:
-							
-								// Check if header version at next header's height is less than four
-								if(Consensus::getHeaderVersion(nextHeaderHeight) < 4) {
-								
-									// Return
-									return;
-								}
-								
-								// TODO Support NRD kernels
-								return;
-								
-								// Break
-								break;
-							
-							// Default
-							default:
-							
-								// Break
-								break;
-						}
-					}
-					
-					// Check if on transaction callback exists
-					if(onTransactionCallback) {
-					
-						// Run on transaction callback
-						onTransactionCallback(transaction, replacedTransactions);
-					}
-					
-					// Try
-					try {
-					
-						// Go through all replaced transactions
-						for(const Transaction *replacedTransaction : replacedTransactions) {
-						
-							// Remove transaction from mempool
-							mempool.erase(*replacedTransaction);
-						}
-						
-						// Insert transaction into mempool
-						mempool.insert(move(transaction));
-					}
-					
-					// Catch errors
-					catch(...) {
-					
-						// Clear mempool
-						mempool.clear();
-					}
-				}
-			}
-		}
-	#endif
 }
 
 // Get next block
@@ -1184,7 +754,7 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 										includeTransaction = false;
 										
 										// Add output to pending outputs
-										pendingOutputs.emplace(move(inputLookupValue));
+										pendingOutputs.insert(move(inputLookupValue));
 										
 										// Break
 										break;
@@ -1196,7 +766,7 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 							if(includeTransaction) {
 							
 								// Add transaction to list of included transactions
-								includedTransactions.emplace(transaction);
+								includedTransactions.insert(transaction);
 								
 								// Check if transaction's offset isn't zero
 								if(any_of(transaction->getOffset(), transaction->getOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH, [](const uint8_t value) {
@@ -1505,10 +1075,10 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 		for(pair<Output, Rangeproof> &outputAndRangeproof : sortedOutputsAndRangeproofs) {
 		
 			// Add output to sorted outputs
-			sortedOutputs.emplace_back(move(outputAndRangeproof.first));
+			sortedOutputs.insert_back(move(outputAndRangeproof.first));
 			
 			// Add rangeproof to sorted rangeproofs
-			sortedRangeproofs.emplace_back(move(outputAndRangeproof.second));
+			sortedRangeproofs.insert_back(move(outputAndRangeproof.second));
 		}
 		
 		// Go through all of the block's kernels
@@ -1520,7 +1090,7 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 		}
 		
 		// Add coinbase kernel to sorted kernels
-		sortedKernels.emplace_back(move(get<2>(coinbase.value())));
+		sortedKernels.insert_back(move(get<2>(coinbase.value())));
 		
 		// Sort sorted kernels
 		sortedKernels.sort([](const Kernel &firstKernel, const Kernel &secondKernel) -> bool {
@@ -1716,6 +1286,630 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 	
 		// Throw exception
 		throw runtime_error("Mempool isn't enabled");
+	#endif
+}
+
+// Get lock
+shared_mutex &Node::getLock() {
+
+	// Return lock
+	return lock;
+}
+
+// Add unused peer candidate
+void Node::addUnusedPeerCandidate(string &&peerCandidate) {
+
+	// Add peer candidate to list of unused peer candidates
+	unusedPeerCandidates[move(peerCandidate)] = chrono::steady_clock::now();
+}
+
+// Is unused peer candidate valid
+bool Node::isUnusedPeerCandidateValid(const string &peerCandidate) const {
+
+	// Return if unused peer candidate is valid
+	return unusedPeerCandidates.contains(peerCandidate) && chrono::steady_clock::now() - unusedPeerCandidates.at(peerCandidate) <= UNUSED_PEER_CANDIDATE_VALID_DURATION;
+}
+
+// Get currently used peer candidates
+unordered_set<string> &Node::getCurrentlyUsedPeerCandidates() {
+
+	// Return currently used peer candidates
+	return currentlyUsedPeerCandidates;
+}
+
+// Add recently attempted peer candidate
+void Node::addRecentlyAttemptedPeerCandidate(const string &peerCandidate) {
+
+	// Add peer candidate to list of recently attempted peer candidates
+	recentlyAttemptedPeerCandidates[peerCandidate] = chrono::steady_clock::now();
+}
+
+// Is peer candidate recently attempted
+bool Node::isPeerCandidateRecentlyAttempted(const string &peerCandidate) const {
+
+	// Return if peer candidate was recently attempted
+	return recentlyAttemptedPeerCandidates.contains(peerCandidate) && chrono::steady_clock::now() - recentlyAttemptedPeerCandidates.at(peerCandidate) <= RECENTLY_ATTEMPTED_PEER_CANDIDATE_DURATION;
+}
+
+// Get healthy peers
+const unordered_map<string, pair<chrono::time_point<chrono::steady_clock>, Node::Capabilities>> &Node::getHealthyPeers() const {
+
+	// Return healthy peers
+	return healthyPeers;
+}
+
+// Add healthy peer
+void Node::addHealthyPeer(const string &peer, const Capabilities capabilities) {
+
+	// Add peer to list of healthy peers
+	healthyPeers[peer] = {chrono::steady_clock::now(), capabilities};
+}
+
+// Is peer healthy
+bool Node::isPeerHealthy(const string &peer) const {
+
+	// Return if peer is healthy
+	return healthyPeers.contains(peer) && (currentlyUsedPeerCandidates.contains(peer) || chrono::steady_clock::now() - healthyPeers.at(peer).first <= HEALTHY_PEER_DURATION);
+}
+
+// Add banned peer
+void Node::addBannedPeer(const string &peer) {
+
+	// Add peer to list of banned peers
+	bannedPeers[peer] = chrono::steady_clock::now();
+	
+	// Check if peer is healthy
+	if(healthyPeers.contains(peer)) {
+	
+		// Remove peer from healthy peers
+		healthyPeers.erase(peer);
+	}
+}
+
+// Is peer banned
+bool Node::isPeerBanned(const string &peer) const {
+
+	// Return if peer is banned
+	return bannedPeers.contains(peer) && chrono::steady_clock::now() - bannedPeers.at(peer) <= BANNED_PEER_DURATION;
+}
+
+// Set sync state
+void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &transactionHashSetArchiveHeader, MerkleMountainRange<Kernel> &&kernels, MerkleMountainRange<Output> &&outputs, MerkleMountainRange<Rangeproof> &&rangeproofs) {
+
+	// Check if on transaction hash set callback exists
+	if(onTransactionHashSetCallback) {
+	
+		// Try
+		try {
+		
+			// Check if running on transaction hash set callback failed
+			if(!onTransactionHashSetCallback(headers, transactionHashSetArchiveHeader, kernels, outputs, rangeproofs)) {
+			
+				// Set is syncing to false
+				isSyncing = false;
+				
+				// Return
+				return;
+			}
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Set is syncing to false
+			isSyncing = false;
+			
+			// Return
+			return;
+		}
+	}
+	
+	// Check if pruning rangeproofs
+	#ifdef PRUNE_RANGEPROOFS
+	
+		// Go through all rangeproofs
+		for(MerkleMountainRange<Rangeproof>::const_iterator i = rangeproofs.cbegin(); i != rangeproofs.cend();) {
+		
+			// Get rangeproof
+			const pair<uint64_t, Rangeproof> &rangeproof = *i;
+			
+			// Go to next rangeproof
+			++i;
+			
+			// Prune rangeproof
+			rangeproofs.pruneLeaf(rangeproof.first, true);
+		}
+	#endif
+	
+	// Check if pruning kernels
+	#ifdef PRUNE_KERNELS
+	
+		// Go through all kernels
+		for(MerkleMountainRange<Kernel>::const_iterator i = kernels.cbegin(); i != kernels.cend();) {
+		
+			// Get kernel
+			const pair<uint64_t, Kernel> &kernel = *i;
+			
+			// Go to next kernel
+			++i;
+			
+			// Prune kernel
+			kernels.pruneLeaf(kernel.first, true);
+		}
+	
+		// Set kernels minimum size to the transaction hash set archive header
+		kernels.setMinimumSize(transactionHashSetArchiveHeader.getKernelMerkleMountainRangeSize());
+	#endif
+	
+	// Check if pruning headers
+	#ifdef PRUNE_HEADERS
+	
+		// Loop while headers can be pruned
+		while(transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() > Consensus::DIFFICULTY_ADJUSTMENT_WINDOW && transactionHashSetArchiveHeader.getHeight() - headers.front().getHeight() >= Consensus::COINBASE_MATURITY) {
+		
+			// Prune oldest header
+			headers.pruneLeaf(headers.front().getHeight(), true);
+		}
+	
+		// Set headers minimum size to the transaction hash set archive header
+		headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(transactionHashSetArchiveHeader.getHeight() + 1));
+	#endif
+	
+	// Check if headers minimum size can be updated
+	if(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1) > headers.getMinimumSize()) {
+	
+		// Set headers minimum size to the first header
+		headers.setMinimumSize(MerkleMountainRange<Header>::getSizeAtNumberOfLeaves(headers.front().getHeight() + 1));
+	}
+	
+	// Check if kernels minimum size can be updated
+	if(headers.front().getKernelMerkleMountainRangeSize() > kernels.getMinimumSize()) {
+	
+		// Set kernels minimum size to the first header
+		kernels.setMinimumSize(headers.front().getKernelMerkleMountainRangeSize());
+	}
+	
+	// Check if outputs minimum size can be updated
+	if(headers.front().getOutputMerkleMountainRangeSize() > outputs.getMinimumSize()) {
+	
+		// Set outputs minimum size to the first header
+		outputs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
+	}
+	
+	// Check if rangeproofs minimum size can be updated
+	if(headers.front().getOutputMerkleMountainRangeSize() > rangeproofs.getMinimumSize()) {
+	
+		// Set rangeproofs minimum size to the first header
+		rangeproofs.setMinimumSize(headers.front().getOutputMerkleMountainRangeSize());
+	}
+	
+	// Free memory
+	Common::freeMemory();
+	
+	// Set headers to headers
+	this->headers = move(headers);
+	
+	// Set synced header index to the transaction hash set archive header's height
+	this->syncedHeaderIndex = transactionHashSetArchiveHeader.getHeight();
+	
+	// Set kernels to kernels
+	this->kernels = move(kernels);
+	
+	// Set outputs to outputs
+	this->outputs = move(outputs);
+	
+	// Set rangeproofs to rangeproofs
+	this->rangeproofs = move(rangeproofs);
+	
+	// Clear mempool
+	mempool.clear();
+	
+	// Set is syncing to false
+	isSyncing = false;
+	
+	// Set is synced to false
+	isSynced = false;
+}
+
+// Update sync state
+bool Node::updateSyncState(MerkleMountainRange<Header> &&headers, const uint64_t syncedHeaderIndex, const Block &block) {
+
+	// Set headers to headers
+	this->headers = move(headers);
+	
+	// Return applying block to sync state
+	return applyBlockToSyncState(syncedHeaderIndex, block);
+}
+
+// Update sync state
+bool Node::updateSyncState(const uint64_t syncedHeaderIndex, const Block &block) {
+
+	// Return applying block to sync state
+	return applyBlockToSyncState(syncedHeaderIndex, block);
+}
+
+// Peer connected
+void Node::peerConnected(const string &peerIdentifier) {
+
+	// Check if on peer connect callback exists
+	if(onPeerConnectCallback) {
+	
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Try
+		try {
+		
+			// Run on peer connect callback
+			onPeerConnectCallback(peerIdentifier);
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+		}
+	}
+}
+
+// Get Tor proxy address
+const string &Node::getTorProxyAddress() const {
+
+	// Return Tor proxy address
+	return torProxyAddress;
+}
+
+// Get Tor proxy port
+const string &Node::getTorProxyPort() const {
+
+	// Return Tor proxy port
+	return torProxyPort;
+}
+
+// Get DNS seeds
+const unordered_set<string> &Node::getDnsSeeds() const {
+
+	// Check if uisng custom DNS seeds
+	if(!customDnsSeeds.empty()) {
+	
+		// Return custom DNS seeds
+		return customDnsSeeds;
+	}
+	
+	// Otherwise
+	else {
+	
+		// Return default DNS seeds
+		return DEFAULT_DNS_SEEDS;
+	}
+}
+
+// Add to mempool
+void Node::addToMempool(Transaction &&transaction) {
+
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
+	
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Check if synced
+		if(isSynced) {
+		
+			// Check if transaction can be added to a block with a coinbase output and kernel
+			if(transaction.getOutputs().size() <= Message::MAXIMUM_OUTPUTS_LENGTH - 1 && transaction.getKernels().size() <= Message::MAXIMUM_KERNELS_LENGTH - 1 && Consensus::getBlockWeight(transaction.getInputs().size(), transaction.getOutputs().size() + 1, transaction.getKernels().size() + 1) <= Consensus::MAXIMUM_BLOCK_WEIGHT) {
+		
+				// Go through all of the transaction's inputs
+				for(Input &input : transaction.getInputs()) {
+				
+					// Check if input's features are the same as the output's
+					if(input.getFeatures() == Input::Features::SAME_AS_OUTPUT) {
+					
+						// Check if output doesn't exist
+						const vector inputLookupValue = input.getLookupValue();
+						const Output *output = outputs.getLeafByLookupValue(inputLookupValue);
+						if(!output) {
+						
+							// Check if output doesn't exist in the mempool
+							output = mempool.getOutput(inputLookupValue);
+							if(!output) {
+							
+								// Return
+								return;
+							}
+						}
+						
+						// Set input's features to the output's features
+						input.setFeatures(static_cast<Input::Features>(output->getFeatures()));
+					}
+				}
+				
+				// Check if transaction isn't already in the mempool
+				if(!mempool.contains(transaction)) {
+				
+					// Check if transaction's fees are less than the required fees
+					if(transaction.getFees() < transaction.getRequiredFees(baseFee)) {
+					
+						// Return
+						return;
+					}
+					
+					// Initialize replaced fees to zero
+					uint64_t replacedFees = 0;
+					
+					// Initialize replaced transactions
+					unordered_set<const Transaction *> replacedTransactions;
+					
+					// Initialize removed outputs
+					unordered_set<vector<uint8_t>, Common::Uint8VectorHash> removedOutputs;
+			
+					// Go through all of the transaction's outputs
+					for(const Output &output : transaction.getOutputs()) {
+					
+						// Check if output already exists
+						const vector outputLookupValue = output.getLookupValue().value();
+						if(outputs.leafWithLookupValueExists(outputLookupValue)) {
+						
+							// Return
+							return;
+						}
+						
+						// Check if output already exists in the mempool
+						const Transaction *existingTransaction = mempool.getTransaction(outputLookupValue);
+						if(existingTransaction) {
+						
+							// Add existing transaction's fees to replaced fees
+							replacedFees = SaturateMath::add(replacedFees, existingTransaction->getFees());
+							
+							// Add existing transaction to list of transactions to replace
+							replacedTransactions.insert(existingTransaction);
+							
+							// Go through all of the existing transaction's outputs
+							for(const Output &existingOutput : existingTransaction->getOutputs()) {
+							
+								// Add existing output to list of removed outputs
+								removedOutputs.insert(existingOutput.getLookupValue().value());
+							}
+						}
+					}
+					
+					// Check if transaction replaces other transactions
+					if(!replacedTransactions.empty()) {
+					
+						// Go through all of the transaction's outputs
+						for(const Output &output : transaction.getOutputs()) {
+						
+							// Remove output from list of removed outputs
+							removedOutputs.erase(output.getLookupValue().value());
+						}
+						
+						// Go through all transactions in the mempool
+						unordered_set<vector<uint8_t>, Common::Uint8VectorHash> inputDependencies;
+						for(Mempool::const_iterator i = mempool.cbegin(); i != mempool.cend();) {
+						
+							// Get existing transaction
+							const Transaction &existingTransaction = *i;
+							
+							// Check if existing transaction isn't already being replaced
+							if(!replacedTransactions.contains(&existingTransaction)) {
+							
+								// Initialize remove transaction to false
+								bool removeTransaction = false;
+								
+								// Go through all of the existing transactions inputs
+								for(const Input &input : existingTransaction.getInputs()) {
+								
+									// Check if output doesn't exist
+									vector inputLookupValue = input.getLookupValue();
+									if(!outputs.leafWithLookupValueExists(inputLookupValue)) {
+									
+										// Check if output will be removed
+										if(removedOutputs.contains(inputLookupValue)) {
+										
+											// Set remove transaction to true
+											removeTransaction = true;
+											
+											// Break
+											break;
+										}
+										
+										// Add output to input dependencies
+										inputDependencies.insert(move(inputLookupValue));
+									}
+								}
+								
+								// Check if removing transaction
+								if(removeTransaction) {
+								
+									// Add existing transaction's fees to replaced fees
+									replacedFees = SaturateMath::add(replacedFees, existingTransaction.getFees());
+									
+									// Add existing transaction to list of transactions to replace
+									replacedTransactions.insert(&existingTransaction);
+									
+									// Initialize recheck transactions to false
+									bool recheckTransactions = false;
+									
+									// Go through all of the existing transaction's outputs
+									for(const Output &existingOutput : existingTransaction.getOutputs()) {
+									
+										// Check if existing output is the input to another transaction
+										vector outputLookupValue = existingOutput.getLookupValue().value();
+										if(inputDependencies.contains(outputLookupValue)) {
+										
+											// Set recheck transactions to true
+											recheckTransactions = true;
+										}
+										
+										// Add existing output to list of removed outputs
+										removedOutputs.insert(move(outputLookupValue));
+									}
+									
+									// Check if rechecking transactions
+									if(recheckTransactions) {
+									
+										// Go to first transaction
+										i = mempool.cbegin();
+										
+										// Clear input dependencies
+										inputDependencies.clear();
+									}
+									
+									// Otherwise
+									else {
+									
+										// Go to next transaction
+										++i;
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Go to next transaction
+									++i;
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Go to next transaction
+								++i;
+							}
+						}
+						
+						// Check if transaction's fees aren't greater than the fees of the transactions it replaces
+						if(transaction.getFees() <= replacedFees) {
+						
+							// Return
+							return;
+						}
+					}
+					
+					// Get next header height
+					const uint64_t nextHeaderHeight = SaturateMath::add(syncedHeaderIndex, 1);
+					
+					// Get unspendable coinbase outputs starting index at the next header's height
+					const uint64_t unspendableCoinbaseOutputsStartingIndex = MerkleMountainRange<Header>::getNumberOfLeavesAtSize(headers.getLeaf(SaturateMath::subtract(nextHeaderHeight, Consensus::COINBASE_MATURITY))->getOutputMerkleMountainRangeSize());
+					
+					// Go through all of the transaction's inputs
+					for(const Input &input : transaction.getInputs()) {
+					
+						// Check if output doesn't exist
+						const vector inputLookupValue = input.getLookupValue();
+						const Output *output = outputs.getLeafByLookupValue(inputLookupValue);
+						if(!output) {
+						
+							// Check if output doesn't exist in the mempool, it has coinbase features, or it will be replaced
+							output = mempool.getOutput(inputLookupValue);
+							if(!output || output->getFeatures() == Output::Features::COINBASE || replacedTransactions.contains(mempool.getTransaction(inputLookupValue))) {
+							
+								// Return
+								return;
+							}
+						}
+						
+						// Otherwise check if output has coinbase features
+						else if(output->getFeatures() == Output::Features::COINBASE) {
+						
+							// Check if output won't reach maturity by the next header's height
+							if(nextHeaderHeight < Consensus::COINBASE_MATURITY || outputs.getLeafIndexByLookupValue(inputLookupValue) >= unspendableCoinbaseOutputsStartingIndex) {
+							
+								// Return
+								return;
+							}
+						}
+						
+						// Check if input's features don't match the output's features
+						if(static_cast<underlying_type_t<Input::Features>>(input.getFeatures()) != static_cast<underlying_type_t<Output::Features>>(output->getFeatures())) {
+						
+							// Return
+							return;
+						}
+					}
+					
+					// Go through all of the transaction's kernels
+					for(const Kernel &kernel : transaction.getKernels()) {
+					
+						// Check kernel's features
+						switch(kernel.getFeatures()) {
+						
+							// Height locked
+							case Kernel::Features::HEIGHT_LOCKED:
+							
+								// Check if kernel's lock height is greater than the next header's height
+								if(kernel.getLockHeight() > nextHeaderHeight) {
+								
+									// Return
+									return;
+								}
+								
+								// Break
+								break;
+							
+							// No recent duplicate
+							case Kernel::Features::NO_RECENT_DUPLICATE:
+							
+								// Check if header version at next header's height is less than four
+								if(Consensus::getHeaderVersion(nextHeaderHeight) < 4) {
+								
+									// Return
+									return;
+								}
+								
+								// TODO Support NRD kernels
+								return;
+								
+								// Break
+								break;
+							
+							// Default
+							default:
+							
+								// Break
+								break;
+						}
+					}
+					
+					// Check if on transaction callback exists
+					if(onTransactionCallback) {
+					
+						// Try
+						try {
+						
+							// Run on transaction callback
+							onTransactionCallback(transaction, replacedTransactions);
+						}
+						
+						// Catch errors
+						catch(...) {
+						
+						}
+					}
+					
+					// Try
+					try {
+					
+						// Go through all replaced transactions
+						for(const Transaction *replacedTransaction : replacedTransactions) {
+						
+							// Remove transaction from mempool
+							mempool.erase(*replacedTransaction);
+						}
+						
+						// Insert transaction into mempool
+						mempool.insert(move(transaction));
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+						// Clear mempool
+						mempool.clear();
+					}
+				}
+			}
+		}
 	#endif
 }
 
@@ -1916,7 +2110,7 @@ void Node::cleanupMempool() {
 							else {
 							
 								// Add output to input dependencies
-								inputDependencies.emplace(move(inputLookupValue));
+								inputDependencies.insert(move(inputLookupValue));
 							}
 						}
 					}
@@ -2191,8 +2385,22 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 		// Check if on block callback exists
 		if(onBlockCallback) {
 		
-			// Check if running on block callback failed
-			if(!onBlockCallback(*header, block, oldSyncedHeaderIndex)) {
+			// Try
+			try {
+			
+				// Check if running on block callback failed
+				if(!onBlockCallback(*header, block, oldSyncedHeaderIndex)) {
+				
+					// Set callback failed to true
+					callbackFailed = true;
+					
+					// Throw exception
+					throw runtime_error("Running on block callback failed");
+				}
+			}
+			
+			// Catch errors
+			catch(...) {
 			
 				// Set callback failed to true
 				callbackFailed = true;
@@ -2501,8 +2709,31 @@ void Node::monitor() {
 		// Check if on error callback exists
 		if(onErrorCallback) {
 		
-			// Run on error callback
-			onErrorCallback();
+			// Try
+			try {
+			
+				// Lock for writing
+				lock_guard writeLock(lock);
+				
+				// Try
+				try {
+				
+					// Run on error callback
+					onErrorCallback();
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+				}
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+				// Set closing
+				Common::setClosing();
+			}
 		}
 	}
 }
@@ -2704,8 +2935,20 @@ void Node::removeDisconnectedPeers() {
 					// Check if on peer disconnect callback exists
 					if(onPeerDisconnectCallback) {
 					
-						// Run on peer disconnect callback
-						onPeerDisconnectCallback(peer.getIdentifier());
+						// Lock for writing
+						lock_guard writeLock(lock);
+						
+						// Try
+						try {
+						
+							// Run on peer disconnect callback
+							onPeerDisconnectCallback(peer.getIdentifier());
+						}
+						
+						// Catch errors
+						catch(...) {
+						
+						}
 					}
 				}
 			}
@@ -2854,8 +3097,20 @@ void Node::removeRandomPeer() {
 					// Check if on peer disconnect callback exists
 					if(onPeerDisconnectCallback) {
 					
-						// Run on peer disconnect callback
-						onPeerDisconnectCallback(peer->getIdentifier());
+						// Lock for writing
+						lock_guard writeLock(lock);
+						
+						// Try
+						try {
+						
+							// Run on peer disconnect callback
+							onPeerDisconnectCallback(peer->getIdentifier());
+						}
+						
+						// Catch errors
+						catch(...) {
+						
+						}
 					}
 				}
 			}
@@ -3092,8 +3347,17 @@ void Node::sync() {
 				// Check if on start syncing callback exists
 				if(onStartSyncingCallback) {
 				
-					// Run on start syncing callback
-					onStartSyncingCallback();
+					// Try
+					try {
+					
+						// Run on start syncing callback
+						onStartSyncingCallback();
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+					}
 					
 					// Remove on start syncing callback
 					onStartSyncingCallback = nullptr;
@@ -3107,8 +3371,17 @@ void Node::sync() {
 			// Check if on start syncing callback exists
 			if(onStartSyncingCallback) {
 			
-				// Run on start syncing callback
-				onStartSyncingCallback();
+				// Try
+				try {
+				
+					// Run on start syncing callback
+					onStartSyncingCallback();
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+				}
 				
 				// Remove on start syncing callback
 				onStartSyncingCallback = nullptr;
@@ -3120,8 +3393,17 @@ void Node::sync() {
 			// Check if on synced callback exists
 			if(onSyncedCallback) {
 			
-				// Run on synced callback
-				onSyncedCallback();
+				// Try
+				try {
+				
+					// Run on synced callback
+					onSyncedCallback();
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+				}
 				
 				// Check if still is synced
 				if(isSynced) {

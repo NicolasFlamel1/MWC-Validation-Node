@@ -42,7 +42,7 @@ bool Mempool::contains(const Transaction &transaction) const {
 void Mempool::insert(Transaction &&transaction) {
 	
 	// Add transaction to transactions
-	const unordered_set<Transaction, TransactionHash>::const_iterator value = transactions.emplace(move(transaction)).first;
+	const unordered_set<Transaction, TransactionHash>::const_iterator value = transactions.insert(move(transaction)).first;
 	
 	// Go through all of the transaction's outputs
 	for(const Output &output : value->getOutputs()) {
@@ -52,7 +52,7 @@ void Mempool::insert(Transaction &&transaction) {
 	}
 	
 	// Add transaction's fees to fees
-	fees[value->getFees()].emplace(&*value);
+	fees[value->getFees()].insert(&*value);
 }
 
 // Erase

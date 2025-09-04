@@ -3717,7 +3717,7 @@ bool Peer::processRequestsAndOrResponses() {
 										if(isIpv4) {
 										
 											// Append IPv4 address to list and get it
-											addresses.emplace_back(in_addr());
+											addresses.push_back(in_addr());
 											in_addr &ipv4Address = get<in_addr>(addresses.back());
 											
 											// Check if parsing ip address was successful
@@ -3748,7 +3748,7 @@ bool Peer::processRequestsAndOrResponses() {
 										else {
 										
 											// Append IPv6 address to list and get it
-											addresses.emplace_back(in6_addr());
+											addresses.push_back(in6_addr());
 											in6_addr &ipv6Address = get<in6_addr>(addresses.back());
 											
 											// Check if parsing ip address was successful
@@ -3783,7 +3783,7 @@ bool Peer::processRequestsAndOrResponses() {
 										else if(capabilities & Node::Capabilities::TOR_ADDRESS) {
 										
 											// Append Tor address to list and get it
-											addresses.emplace_back(healthyPeer.first);
+											addresses.push_back(healthyPeer.first);
 											const string &torAddress = get<string>(addresses.back());
 										
 											// Set network address's family to Onion service

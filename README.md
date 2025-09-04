@@ -30,9 +30,6 @@ This node can be embedded into other applications and it provides a callback int
 // Main function
 int main() {
 
-	// Initialize common (if not using your own signal handler)
-	MwcValidationNode::Common::initialize();
-	
 	// Create node
 	MwcValidationNode::Node node;
 	
@@ -90,15 +87,28 @@ int main() {
 		// Do something when a transaction is added to the node's mempool (this happens everytime a transaction is added to the node's mempool)
 	});
 	
+	// At this point all node functions are allowed in this thread. The node's state can be restored with node.restore("state_file")
+	
 	// Start node
 	node.start();
 	
-	// Other things can be done here since the node is running in its own thread
+	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), and calling the node's destructor. All other node functions must happen in the callback functions
 	
-	// Wait for node to finish
+	// Stop node
+	node.stop();
+	
+	// Wait for node to stop running
 	node.getThread().join();
+	
+	// The node has stopped running, however it remains connected to any existing peers. Additional node functions that are allowed in this thread now are node.getPeers() and node.disconnect(). All other node functions must happen in the callback functions
+	
+	// Disconnect from node's peers and wait for the operation to complete
+	node.disconnect();
+	
+	// At this point the node's state won't change and the node can't be started again. All node functions are allowed in this thread now. The node's state can be saved with node.save("state_file")
 	
 	// Return success
 	return EXIT_SUCCESS;
 }
 ```
+All node functions throw an runtime exception if they fail. All callback functions may be running in a separate thread so make sure any variables access in them are thread safe. Don't call a node's destructor, node.broadcastTransaction(), or node.broadcastBlock() inside the callback functions.

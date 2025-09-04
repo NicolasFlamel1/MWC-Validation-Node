@@ -32,7 +32,7 @@ class Peer;
 
 // Node class
 class Node final {
-
+	
 	// Public
 	public:
 	
@@ -127,9 +127,6 @@ class Node final {
 		
 		// Get thread
 		thread &getThread();
-		
-		// Get lock
-		shared_mutex &getLock();
 	
 		// Get total difficulty
 		uint64_t getTotalDifficulty() const;
@@ -149,6 +146,27 @@ class Node final {
 		// Get rangeproofs
 		const MerkleMountainRange<Rangeproof> &getRangeproofs() const;
 		
+		// Broadcast transaction
+		void broadcastTransaction(Transaction &&transaction);
+		
+		// Broadcast block
+		void broadcastBlock(Header &&header, Block &&block);
+		
+		// Get mempool
+		const Mempool &getMempool() const;
+		
+		// Get next block
+		tuple<Header, Block> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
+		
+	// Public for peer class
+	private:
+	
+		// Peer friend class
+		friend class Peer;
+		
+		// Get lock
+		shared_mutex &getLock();
+		
 		// Add unused peer candidate
 		void addUnusedPeerCandidate(string &&peerCandidate);
 		
@@ -165,7 +183,7 @@ class Node final {
 		bool isPeerCandidateRecentlyAttempted(const string &peerCandidate) const;
 		
 		// Get healthy peers
-		unordered_map<string, pair<chrono::time_point<chrono::steady_clock>, Capabilities>> &getHealthyPeers();
+		const unordered_map<string, pair<chrono::time_point<chrono::steady_clock>, Capabilities>> &getHealthyPeers() const;
 		
 		// Add healthy peer
 		void addHealthyPeer(const string &peer, const Capabilities capabilities);
@@ -200,20 +218,8 @@ class Node final {
 		// Get DNS seeds
 		const unordered_set<string> &getDnsSeeds() const;
 		
-		// Broadcast transaction
-		void broadcastTransaction(const Transaction &transaction);
-		
-		// Broadcast block
-		void broadcastBlock(Header &&header, Block &&block);
-		
-		// Get mempool
-		const Mempool &getMempool() const;
-		
 		// Add to mempool
 		void addToMempool(Transaction &&transaction);
-		
-		// Get next block
-		tuple<Header, Block> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
 		
 		// Get base fee
 		uint64_t getBaseFee() const;
@@ -400,6 +406,12 @@ class Node final {
 		
 		// Stop monitoring
 		atomic_bool stopMonitoring;
+		
+		// Started
+		bool started;
+		
+		// Disconnected
+		bool disconnected;
 		
 		// Main thread
 		thread mainThread;

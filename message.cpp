@@ -2625,7 +2625,7 @@ void Message::writeTransactionBody(vector<uint8_t> &buffer, const list<Input> &i
 	for(const Input &input : inputs) {
 	
 		// Add input to list of sorted inputs
-		sortedInputs.emplace_back(&input);
+		sortedInputs.push_back(&input);
 	}
 	
 	// Sort sorted inputs

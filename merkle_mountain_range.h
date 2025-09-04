@@ -500,7 +500,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 							if(lookupTable.contains(lookupValue.value())) {
 							
 								// Add leaf to lookup value in the lookup table
-								lookupTable.at(lookupValue.value()).emplace(prunedLeafIndex);
+								lookupTable.at(lookupValue.value()).insert(prunedLeafIndex);
 							}
 							
 							// Otherwise
@@ -972,7 +972,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<Merkl
 				file.read(reinterpret_cast<char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
 				
 				// Add leaf index to leaves
-				leaves.emplace(Common::bigEndianToHostByteOrder(serializedLeafIndex));
+				leaves.insert(Common::bigEndianToHostByteOrder(serializedLeafIndex));
 			}
 			
 			// Add lookup value to lookup table
@@ -1071,7 +1071,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> MerkleMountainRange<Merkl
 			file.read(reinterpret_cast<char *>(&serializedLeafIndex), sizeof(serializedLeafIndex));
 			
 			// Add leaf index to pruned leaves
-			prunedLeaves.emplace(Common::bigEndianToHostByteOrder(serializedLeafIndex));
+			prunedLeaves.insert(Common::bigEndianToHostByteOrder(serializedLeafIndex));
 		}
 		
 		// Add prune history event to prune history events
@@ -1790,7 +1790,7 @@ template<typename MerkleMountainRangeLeafDerivedClass> void MerkleMountainRange<
 				if(MerkleMountainRangeLeafDerivedClass::ALLOW_DUPLICATE_LOOKUP_VALUES) {
 				
 					// Add leaf to lookup value in the lookup table
-					lookupTable.at(lookupValue.value()).emplace(numberOfLeaves);
+					lookupTable.at(lookupValue.value()).insert(numberOfLeaves);
 				}
 				
 				// Otherwise
