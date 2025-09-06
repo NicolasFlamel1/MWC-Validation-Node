@@ -38,6 +38,13 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 	relativeHeight(relativeHeight)
 {
 
+	// Check if fee is invalid
+	if(fee > Consensus::MAXIMUM_FEE) {
+	
+		// Throw exception
+		throw runtime_error("Fee is invalid");
+	}
+	
 	// Check features
 	switch(features) {
 	

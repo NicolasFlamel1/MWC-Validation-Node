@@ -68,7 +68,7 @@ int main() {
 		#ifdef _WIN32
 		
 			// Create Windows socket
-			WindowsSocket windowsSocket;
+			const WindowsSocket windowsSocket;
 		#endif
 		
 		// Create node

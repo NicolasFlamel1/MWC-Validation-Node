@@ -115,6 +115,9 @@ class Consensus final {
 		// Coinbase maturity
 		static const uint64_t COINBASE_MATURITY;
 		
+		// Maximum fee
+		static const uint64_t MAXIMUM_FEE;
+		
 		// C31 hard fork height
 		static const uint64_t C31_HARD_FORK_HEIGHT;
 		

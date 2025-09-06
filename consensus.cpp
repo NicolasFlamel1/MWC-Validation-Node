@@ -304,6 +304,9 @@ const uint64_t Consensus::CUT_THROUGH_HORIZON = WEEK_HEIGHT;
 // Coinbase maturity
 const uint64_t Consensus::COINBASE_MATURITY = DAY_HEIGHT;
 
+// Maximum fee
+const uint64_t Consensus::MAXIMUM_FEE = 0xFFFFFFFFFF;
+
 // Check if floonet
 #ifdef FLOONET
 
