@@ -69,8 +69,11 @@ class Kernel final : public MerkleMountainRangeLeaf<Kernel, sizeof(uint8_t) + si
 		// Get features
 		Features getFeatures() const;
 		
-		// Get fee
-		uint64_t getFee() const;
+		// Get masked fee
+		uint64_t getMaskedFee() const;
+		
+		// Get unmasked fee
+		uint64_t getUnmaskedFee() const;
 		
 		// Get lock height
 		uint64_t getLockHeight() const;

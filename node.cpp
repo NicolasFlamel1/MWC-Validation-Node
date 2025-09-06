@@ -822,7 +822,7 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 									blockKernels.emplace(kernel.serialize(), &kernel);
 									
 									// Add kernel's fees to fees
-									fees = SaturateMath::add(fees, kernel.getFee());
+									fees = SaturateMath::add(fees, kernel.getMaskedFee());
 								}
 								
 								// Check if rechecking transactions

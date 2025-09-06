@@ -2218,7 +2218,7 @@ void Message::writeKernel(vector<uint8_t> &buffer, const Kernel &kernel, const u
 		case 1:
 		
 			// Append kernel's fee to buffer
-			Common::writeUint64(buffer, kernel.getFee());
+			Common::writeUint64(buffer, kernel.getUnmaskedFee());
 			
 			// Check kernel's features
 			switch(kernel.getFeatures()) {
@@ -2268,7 +2268,7 @@ void Message::writeKernel(vector<uint8_t> &buffer, const Kernel &kernel, const u
 				case Kernel::Features::PLAIN:
 				
 					// Append kernel's fee to buffer
-					Common::writeUint64(buffer, kernel.getFee());
+					Common::writeUint64(buffer, kernel.getUnmaskedFee());
 					
 					// Break
 					break;
@@ -2283,7 +2283,7 @@ void Message::writeKernel(vector<uint8_t> &buffer, const Kernel &kernel, const u
 				case Kernel::Features::HEIGHT_LOCKED:
 				
 					// Append kernel's fee to buffer
-					Common::writeUint64(buffer, kernel.getFee());
+					Common::writeUint64(buffer, kernel.getUnmaskedFee());
 					
 					// Append kernel's lock height to buffer
 					Common::writeUint64(buffer, kernel.getLockHeight());
@@ -2295,7 +2295,7 @@ void Message::writeKernel(vector<uint8_t> &buffer, const Kernel &kernel, const u
 				case Kernel::Features::NO_RECENT_DUPLICATE:
 				
 					// Append kernel's fee to buffer
-					Common::writeUint64(buffer, kernel.getFee());
+					Common::writeUint64(buffer, kernel.getUnmaskedFee());
 					
 					// Append kernel's relative height to buffer
 					Common::writeUint16(buffer, kernel.getRelativeHeight());
@@ -2884,7 +2884,7 @@ tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTr
 			case 1:
 			
 				// Update offset
-				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+				offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getUnmaskedFee()) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 				
 				// Break
 				break;
@@ -2901,7 +2901,7 @@ tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTr
 					case Kernel::Features::PLAIN:
 					
 						// Update offset
-						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getUnmaskedFee()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 					
 						// Break
 						break;
@@ -2919,7 +2919,7 @@ tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTr
 					case Kernel::Features::HEIGHT_LOCKED:
 					
 						// Update offset
-						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(kernel.getLockHeight()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getUnmaskedFee()) + sizeof(kernel.getLockHeight()) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 						
 						// Break
 						break;
@@ -2928,7 +2928,7 @@ tuple<list<Input>, list<Output>, list<Rangeproof>, list<Kernel>> Message::readTr
 					case Kernel::Features::NO_RECENT_DUPLICATE:
 					
 						// Update offset
-						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getFee()) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
+						offset += sizeof(kernel.getFeatures()) + sizeof(kernel.getUnmaskedFee()) + sizeof(uint16_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH;
 					
 						// Break
 						break;

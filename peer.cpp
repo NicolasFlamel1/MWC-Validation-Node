@@ -5865,7 +5865,7 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 		const Kernel &kernel = *i;
 	
 		// Add kernel's fee to the fees
-		fees = SaturateMath::add(fees, kernel.getFee());
+		fees = SaturateMath::add(fees, kernel.getMaskedFee());
 		
 		// Check if kernel has coinbase features
 		if(kernel.getFeatures() == Kernel::Features::COINBASE) {

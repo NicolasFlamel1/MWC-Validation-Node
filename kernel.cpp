@@ -38,13 +38,6 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 	relativeHeight(relativeHeight)
 {
 
-	// Check if fee is invalid
-	if(fee > Consensus::MAXIMUM_FEE) {
-	
-		// Throw exception
-		throw runtime_error("Fee is invalid");
-	}
-	
 	// Check features
 	switch(features) {
 	
@@ -65,7 +58,7 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 		case Features::COINBASE:
 		
 			// Check if fee, lock height, and/or relative height are invalid
-			if(fee || lockHeight || relativeHeight) {
+			if(getMaskedFee() || lockHeight || relativeHeight) {
 			
 				// Throw exception
 				throw runtime_error("Fee, lock height, and/or relative height are invalid");
@@ -492,8 +485,15 @@ Kernel::Features Kernel::getFeatures() const {
 	return features;
 }
 
-// Get fee
-uint64_t Kernel::getFee() const {
+// Get masked fee
+uint64_t Kernel::getMaskedFee() const {
+
+	// Return fee limited by the fee mask
+	return fee & Consensus::FEE_MASK;
+}
+
+// Get unmasked fee
+uint64_t Kernel::getUnmaskedFee() const {
 
 	// Return fee
 	return fee;
@@ -558,7 +558,7 @@ uint32_t Kernel::getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIA
 	const uint64_t fee = Common::readUint64(serializedKernel, sizeof(features));
 	
 	// Return version based on if the fee exists
-	return (fee == Consensus::GENESIS_BLOCK_KERNEL.getFee()) ? 0 : 2;
+	return (fee == Consensus::GENESIS_BLOCK_KERNEL.getUnmaskedFee()) ? 0 : 2;
 }
 
 // Unserialize

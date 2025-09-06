@@ -48,7 +48,7 @@ Transaction::Transaction(const uint8_t offset[Crypto::SECP256K1_PRIVATE_KEY_LENG
 		positiveExcesses[i++] = &kernel.getExcess();
 		
 		// Add kernel's fee to the fees
-		fees = SaturateMath::add(fees, kernel.getFee());
+		fees = SaturateMath::add(fees, kernel.getMaskedFee());
 	}
 	
 	// Check if offset isn't zero
