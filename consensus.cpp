@@ -268,7 +268,7 @@ const uint64_t Consensus::BLOCK_KERNEL_WEIGHT = 3;
 // Coinbase weight
 const uint64_t Consensus::COINBASE_WEIGHT = BLOCK_OUTPUT_WEIGHT + BLOCK_KERNEL_WEIGHT;
 
-// Block output length (mwc-node uses 1 + 33 + 674 instead of 1 + 33 + 675)
+// Block output length (mwc-node uses this value instead of sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + Crypto::BULLETPROOF_LENGTH https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L101)
 const size_t Consensus::BLOCK_OUTPUT_LENGTH = sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + Crypto::BULLETPROOF_LENGTH - 1;
 
 // Maximum block length

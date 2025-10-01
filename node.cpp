@@ -2379,9 +2379,6 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			throw runtime_error("Verifying kernel sums failed");
 		}
 		
-		// Clean up mempool
-		cleanupMempool();
-		
 		// Check if on block callback exists
 		if(onBlockCallback) {
 		
@@ -2419,6 +2416,9 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 				return true;
 			}
 		}
+		
+		// Clean up mempool
+		cleanupMempool();
 	}
 	
 	// Catch errors

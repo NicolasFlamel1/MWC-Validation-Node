@@ -1259,139 +1259,139 @@ vector<uint8_t>::size_type Message::getMaximumPayloadLength(const Type type) {
 		// Error response
 		case Type::ERROR_RESPONSE:
 		
-			// Return maximum payload length (mwc-node uses this value)
+			// Return maximum payload length
 			return 0;
 
 		// Hand
 		case Type::HAND:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 136;
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint32_t) + sizeof(Node::Capabilities) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(NetworkAddress::Family) + sizeof(uint64_t) + MAXIMUM_ADDRESS_LENGTH + sizeof(NetworkAddress::Family) + sizeof(uint64_t) + MAXIMUM_ADDRESS_LENGTH + sizeof(uint64_t) + MAXIMUM_USER_AGENT_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + sizeof(uint64_t) https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L113)
+			return sizeof(uint32_t) + sizeof(Node::Capabilities) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(NetworkAddress::Family) + sizeof(in6_addr) + sizeof(sockaddr_in::sin_port) + sizeof(NetworkAddress::Family) + sizeof(in6_addr) + sizeof(sockaddr_in::sin_port) + sizeof(uint64_t) + 26 + Crypto::BLAKE2B_HASH_LENGTH + sizeof(uint64_t);
 		
 		// Shake
 		case Type::SHAKE:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 96;
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint32_t) + sizeof(Node::Capabilities) + sizeof(uint64_t) + sizeof(uint64_t) + MAXIMUM_USER_AGENT_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + sizeof(uint64_t) https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L114)
+			return sizeof(uint32_t) + sizeof(Node::Capabilities) + sizeof(uint64_t) + sizeof(uint64_t) + 32 + Crypto::BLAKE2B_HASH_LENGTH + sizeof(uint64_t);
 		
 		// Ping
 		case Type::PING:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 16;
+			// Return maximum payload length
+			return sizeof(uint64_t) + sizeof(uint64_t);
 		
 		// Pong
 		case Type::PONG:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 16;
+			// Return maximum payload length
+			return sizeof(uint64_t) + sizeof(uint64_t);
 		
 		// Get peer addresses
 		case Type::GET_PEER_ADDRESSES:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 4;
+			// Return maximum payload length
+			return sizeof(Node::Capabilities);
 		
 		// Peer addresses
 		case Type::PEER_ADDRESSES:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 4 + (1 + 16 + 2) * MAXIMUM_NUMBER_OF_PEER_ADDRESSES;
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint32_t) + (sizeof(NetworkAddress::Family) + sizeof(uint64_t) + MAXIMUM_ADDRESS_LENGTH) * MAXIMUM_NUMBER_OF_PEER_ADDRESSES https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L118)
+			return sizeof(uint32_t) + (sizeof(NetworkAddress::Family) + sizeof(in6_addr) + sizeof(sockaddr_in::sin_port)) * MAXIMUM_NUMBER_OF_PEER_ADDRESSES;
 		
 		// Get headers
 		case Type::GET_HEADERS:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 1 + 32 * MAXIMUM_NUMBER_OF_BLOCK_HASHES;
+			// Return maximum payload length
+			return sizeof(uint8_t) + Crypto::BLAKE2B_HASH_LENGTH * MAXIMUM_NUMBER_OF_BLOCK_HASHES;
 		
 		// Header
 		case Type::HEADER:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 365;
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint8_t) + (Consensus::MAXIMUM_EDGE_BITS * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES + Common::BITS_IN_A_BYTE - 1) / Common::BITS_IN_A_BYTE https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L120)
+			return sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint8_t) + (22 * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES + Common::BITS_IN_A_BYTE - 1) / Common::BITS_IN_A_BYTE + 2;
 		
 		// Headers
 		case Type::HEADERS:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 2 + 365 * MAXIMUM_NUMBER_OF_HEADERS;
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint16_t) + (sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint8_t) + (Consensus::MAXIMUM_EDGE_BITS * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES + Common::BITS_IN_A_BYTE - 1) / Common::BITS_IN_A_BYTE) * MAXIMUM_NUMBER_OF_HEADERS https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L121)
+			return sizeof(uint16_t) + (sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint8_t) + (22 * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES + Common::BITS_IN_A_BYTE - 1) / Common::BITS_IN_A_BYTE + 2) * MAXIMUM_NUMBER_OF_HEADERS;
 		
 		// Get block
 		case Type::GET_BLOCK:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 32;
+			// Return maximum payload length
+			return Crypto::BLAKE2B_HASH_LENGTH;
 		
 		// Block
 		case Type::BLOCK:
 		
-			// Return maximum payload length (mwc-node uses this value)
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint8_t) + (Consensus::MAXIMUM_EDGE_BITS * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES + Common::BITS_IN_A_BYTE - 1) / Common::BITS_IN_A_BYTE + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + (sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH) * MAXIMUM_INPUTS_LENGTH + (sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(uint64_t) + Crypto::BULLETPROOF_LENGTH) * MAXIMUM_OUTPUTS_LENGTH + (sizeof(Kernel::Features) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) * MAXIMUM_KERNELS_LENGTH https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L123)
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 		
 		// Get compact block
 		case Type::GET_COMPACT_BLOCK:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 32;
+			// Return maximum payload length
+			return Crypto::BLAKE2B_HASH_LENGTH;
 		
 		// Compact block
 		case Type::COMPACT_BLOCK:
 		
-			// Return maximum payload length (mwc-node uses this value)
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint8_t) + (Consensus::MAXIMUM_EDGE_BITS * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES + Common::BITS_IN_A_BYTE - 1) / Common::BITS_IN_A_BYTE + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + (sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(uint64_t) + Crypto::BULLETPROOF_LENGTH) * MAXIMUM_OUTPUTS_LENGTH + (sizeof(Kernel::Features) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) * MAXIMUM_KERNELS_LENGTH + Peer::SHORT_BLOCK_HASH_LENGTH * MAXIMUM_KERNELS_LENGTH https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L125)
 			return Consensus::MAXIMUM_BLOCK_LENGTH / 10;
 		
 		// Stem transaction
 		case Type::STEM_TRANSACTION:
 		
-			// Return maximum payload length (mwc-node uses this value)
+			// Return maximum payload length (mwc-node uses this value instead of Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + (sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH) * MAXIMUM_INPUTS_LENGTH + (sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(uint64_t) + Crypto::BULLETPROOF_LENGTH) * MAXIMUM_OUTPUTS_LENGTH + (sizeof(Kernel::Features) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) * MAXIMUM_KERNELS_LENGTH https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L126)
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 		
 		// Transaction
 		case Type::TRANSACTION:
 		
-			// Return maximum payload length (mwc-node uses this value)
+			// Return maximum payload length (mwc-node uses this value instead of Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + (sizeof(Input::Features) + Crypto::COMMITMENT_LENGTH) * MAXIMUM_INPUTS_LENGTH + (sizeof(Output::Features) + Crypto::COMMITMENT_LENGTH + sizeof(uint64_t) + Crypto::BULLETPROOF_LENGTH) * MAXIMUM_OUTPUTS_LENGTH + (sizeof(Kernel::Features) + sizeof(uint64_t) + sizeof(uint64_t) + Crypto::COMMITMENT_LENGTH + Crypto::SINGLE_SIGNER_SIGNATURE_LENGTH) * MAXIMUM_KERNELS_LENGTH https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L127)
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 		
 		// Transaction hash set request
 		case Type::TRANSACTION_HASH_SET_REQUEST:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 40;
+			// Return maximum payload length
+			return Crypto::BLAKE2B_HASH_LENGTH + sizeof(uint64_t);
 		
 		// Transaction hash set archive
 		case Type::TRANSACTION_HASH_SET_ARCHIVE:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 64;
+			// Return maximum payload length (mwc-node uses this value instead of Crypto::BLAKE2B_HASH_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L129)
+			return Crypto::BLAKE2B_HASH_LENGTH + sizeof(uint64_t) + sizeof(uint64_t) + 16;
 		
 		// Ban reason
 		case Type::BAN_REASON:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 64;
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(int32_t) https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L130)
+			return sizeof(int32_t) + 60;
 		
 		// Get transaction
 		case Type::GET_TRANSACTION:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 32;
+			// Return maximum payload length
+			return Crypto::BLAKE2B_HASH_LENGTH;
 		
 		// Transaction kernel
 		case Type::TRANSACTION_KERNEL:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 32;
+			// Return maximum payload length
+			return Crypto::BLAKE2B_HASH_LENGTH;
 		
 		// Tor address
 		case Type::TOR_ADDRESS:
 		
-			// Return maximum payload length (mwc-node uses this value)
-			return 128;
+			// Return maximum payload length (mwc-node uses this value instead of sizeof(uint64_t) + MAXIMUM_ADDRESS_LENGTH https://github.com/mwcproject/mwc-node/blob/master/p2p/src/msg.rs#L133)
+			return sizeof(uint64_t) + MAXIMUM_ADDRESS_LENGTH + 20;
 		
 		// Default
 		default:
 		
-			// Return maximum payload length (mwc-node uses this value)
+			// Return maximum payload length
 			return Consensus::MAXIMUM_BLOCK_LENGTH;
 	}
 }
@@ -1444,7 +1444,7 @@ void Message::writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress 
 			// Append network address's address to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(networkAddress.address), reinterpret_cast<const uint8_t *>(networkAddress.address) + networkAddress.addressLength);
 			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L156)
 			if(!networkAddress.port) {
 			
 				// Throw exception
@@ -1473,7 +1473,7 @@ void Message::writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress 
 			// Append network address's address to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(networkAddress.address), reinterpret_cast<const uint8_t *>(networkAddress.address) + networkAddress.addressLength);
 			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L164)
 			if(!networkAddress.port) {
 			
 				// Throw exception
@@ -1578,7 +1578,7 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 			// Set network address's port
 			memcpy(&networkAddress.port, &buffer[offset + sizeof(networkAddress.family) + networkAddress.addressLength], sizeof(networkAddress.port));
 			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L187-L191)
 			if(!networkAddress.port) {
 			
 				// Throw exception
@@ -1614,7 +1614,7 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 			// Set network address's port
 			memcpy(&networkAddress.port, &buffer[offset + sizeof(networkAddress.family) + networkAddress.addressLength], sizeof(networkAddress.port));
 			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero)
+			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L195-L202)
 			if(!networkAddress.port) {
 			
 				// Throw exception
@@ -1951,6 +1951,13 @@ Header Message::readHeader(const vector<uint8_t> &buffer, const vector<uint8_t>:
 	// Get edge bits from header
 	const uint8_t edgeBits = Common::readUint8(buffer, offset + sizeof(version) + sizeof(height) + sizeof(timestamp) + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::BLAKE2B_HASH_LENGTH + Crypto::SECP256K1_PRIVATE_KEY_LENGTH + sizeof(outputMerkleMountainRangeSize) + sizeof(kernelMerkleMountainRangeSize) + sizeof(totalDifficulty) + sizeof(secondaryScaling) + sizeof(nonce));
 	
+	// Check if edge bits is invalid
+	if(!edgeBits || edgeBits > Consensus::MAXIMUM_EDGE_BITS) {
+	
+		// Throw exception
+		throw runtime_error("Edge bits is invalid");
+	}
+	
 	// Set number of proof nonces bytes
 	const uint64_t numberOfProofNoncesBytes = Common::numberOfBytesRequired(edgeBits * Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES);
 	
@@ -2189,6 +2196,13 @@ Rangeproof Message::readRangeproof(const vector<uint8_t> &buffer, const vector<u
 	
 	// Get length from rangeproof
 	const uint64_t length = Common::readUint64(buffer, offset);
+	
+	// Check if length is invald
+	if(length != Crypto::BULLETPROOF_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Length is invalid");
+	}
 	
 	// Check if rangeproof doesn't contain a proof
 	if(buffer.size() < offset + sizeof(length) + length) {

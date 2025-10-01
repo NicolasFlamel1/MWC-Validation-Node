@@ -132,7 +132,7 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 		throw runtime_error("Excess isn't a valid public key");
 	}
 	
-	// Check if public key is invalid (mwc-node only checks first 32 bytes)
+	// Check if public key is invalid (mwc-node only checks if the first 256 bits are zero https://github.com/mwcproject/rust-secp256k1-zkp/blob/master/src/aggsig.rs#L168)
 	if(all_of(reinterpret_cast<uint8_t *>(&publicKey), reinterpret_cast<uint8_t *>(&publicKey) + 256 / Common::BITS_IN_A_BYTE, [](const uint8_t value) {
 	
 		// Return if value is zero
@@ -143,7 +143,7 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 		throw runtime_error("Public key is invalid");
 	}
 	
-	// Check if signature is invalid (mwc-node only checks first 32 bytes)
+	// Check if signature is invalid (mwc-node only checks if the first 256 bits are zero https://github.com/mwcproject/rust-secp256k1-zkp/blob/master/src/aggsig.rs#L168)
 	if(all_of(signature, signature + 256 / Common::BITS_IN_A_BYTE, [](const uint8_t value) {
 	
 		// Return if value is zero
