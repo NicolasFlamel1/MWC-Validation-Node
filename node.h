@@ -55,7 +55,7 @@ class Node final {
 			TRANSACTION_KERNEL_HASH = 1 << 3,
 			
 			// Check if Tor is enabled
-			#ifdef TOR_ENABLE
+			#ifdef ENABLE_TOR
 			
 				// Tor address
 				TOR_ADDRESS = 1 << 4,
@@ -99,7 +99,7 @@ class Node final {
 		void setOnErrorCallback(const function<void()> &onErrorCallback);
 		
 		// Set on transaction hash set callback
-		void setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> &onTransactionHashSetCallback);
+		void setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> &onTransactionHashSetCallback);
 		
 		// Set on block callback
 		void setOnBlockCallback(const function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback);
@@ -107,11 +107,23 @@ class Node final {
 		// Set on peer connect callback
 		void setOnPeerConnectCallback(const function<void(const string &peerIdentifier)> &onPeerConnectCallback);
 		
+		// Set on peer info callback
+		void setOnPeerInfoCallback(const function<void(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback);
+		
+		// Set on peer update callback
+		void setOnPeerUpdateCallback(const function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerUpdateCallback);
+		
 		// Set on peer disconnect callback
 		void setOnPeerDisconnectCallback(const function<void(const string &peerIdentifier)> &onPeerDisconnectCallback);
 		
-		// Set on transaction callback
-		void setOnTransactionCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionCallback);
+		// Set on transaction added to mempool callback
+		void setOnTransactionAddedToMempoolCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionAddedToMempoolCallback);
+		
+		// Set on transaction removed from mempool callback
+		void setOnTransactionRemovedFromMempoolCallback(const function<void(const Transaction &transaction)> &onTransactionRemovedFromMempoolCallback);
+		
+		// Set on mempool clear callback
+		void setOnMempoolClearCallback(const function<void()> &onMempoolClearCallback);
 		
 		// Start
 		void start(const char *customDnsSeed = nullptr, const uint64_t baseFee = DEFAULT_BASE_FEE);
@@ -151,9 +163,6 @@ class Node final {
 		
 		// Broadcast block
 		void broadcastBlock(Header &&header, Block &&block);
-		
-		// Get mempool
-		const Mempool &getMempool() const;
 		
 		// Get next block
 		tuple<Header, Block> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
@@ -208,6 +217,12 @@ class Node final {
 		
 		// Peer connected
 		void peerConnected(const string &peerIdentifier);
+		
+		// Peer info
+		void peerInfo(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty);
+		
+		// Peer updated
+		void peerUpdated(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height);
 		
 		// Get Tor proxy address
 		const string &getTorProxyAddress() const;
@@ -321,7 +336,7 @@ class Node final {
 		function<void()> onErrorCallback;
 		
 		// On transaction hash set callback
-		function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> onTransactionHashSetCallback;
+		function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> onTransactionHashSetCallback;
 		
 		// On block callback
 		function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> onBlockCallback;
@@ -329,11 +344,23 @@ class Node final {
 		// On peer connect callback
 		function<void(const string &peerIdentifier)> onPeerConnectCallback;
 		
+		// On peer info callback
+		function<void(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> onPeerInfoCallback;
+		
+		// On peer update callback
+		function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> onPeerUpdateCallback;
+		
 		// On peer disconnect callback
 		function<void(const string &peerIdentifier)> onPeerDisconnectCallback;
 		
-		// On transaction callback
-		function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> onTransactionCallback;
+		// On transaction added to mempool callback
+		function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> onTransactionAddedToMempoolCallback;
+		
+		// On transaction removed from mempool callback
+		function<void(const Transaction &transaction)> onTransactionRemovedFromMempoolCallback;
+		
+		// On mempool clear callback
+		function<void()> onMempoolClearCallback;
 		
 		// Tor proxy address
 		const string torProxyAddress;

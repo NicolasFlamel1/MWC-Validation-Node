@@ -84,7 +84,7 @@ Kernel::Kernel(const Features features, const uint64_t fee, const uint64_t lockH
 		case Features::NO_RECENT_DUPLICATE:
 		
 			// Check if not floonet
-			#ifndef FLOONET
+			#ifndef ENABLE_FLOONET
 			
 				// Throw exception
 				throw runtime_error("No recent duplicate features aren't enabled");

@@ -41,7 +41,7 @@ const uint8_t Consensus::C31_EDGE_BITS = 31;
 const uint8_t Consensus::MAXIMUM_EDGE_BITS = 63;
 
 // Check if floonet
-#ifdef FLOONET
+#ifdef ENABLE_FLOONET
 
 	// Genesis block header
 	const Header Consensus::GENESIS_BLOCK_HEADER(
@@ -308,7 +308,7 @@ const uint64_t Consensus::COINBASE_MATURITY = DAY_HEIGHT;
 const uint64_t Consensus::FEE_MASK = 0xFFFFFFFFFF;
 
 // Check if floonet
-#ifdef FLOONET
+#ifdef ENABLE_FLOONET
 
 	// C31 hard fork height
 	const uint64_t Consensus::C31_HARD_FORK_HEIGHT = 270000;
@@ -845,7 +845,7 @@ uint64_t Consensus::getEpochBlockOffset(const uint8_t epoch) {
 	if(epoch >= 2) {
 	
 		// Check if floonet
-		#ifdef FLOONET
+		#ifdef ENABLE_FLOONET
 		
 			// Add day height to the epoch block offset
 			epochBlockOffset += DAY_HEIGHT;
@@ -879,7 +879,7 @@ uint64_t Consensus::getEpochDuration(const uint8_t epoch) {
 		case 2:
 		
 			// Check if floonet
-			#ifdef FLOONET
+			#ifdef ENABLE_FLOONET
 			
 				// Return epoch duration
 				return DAY_HEIGHT;
@@ -898,7 +898,7 @@ uint64_t Consensus::getEpochDuration(const uint8_t epoch) {
 		case 3:
 		
 			// Check if floonet
-			#ifdef FLOONET
+			#ifdef ENABLE_FLOONET
 			
 				// Return epoch duration
 				return DAY_HEIGHT;

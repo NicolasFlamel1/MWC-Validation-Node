@@ -14,7 +14,7 @@ using namespace MwcValidationNode;
 // Constants
 
 // Check if floonet
-#ifdef FLOONET
+#ifdef ENABLE_FLOONET
 
 	// Magic numbers
 	const uint8_t Message::MAGIC_NUMBERS[] = {17, 36};
@@ -613,7 +613,7 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readSha
 }
 
 // Read ping message
-uint64_t Message::readPingMessage(const vector<uint8_t> &pingMessage) {
+tuple<uint64_t, uint64_t> Message::readPingMessage(const vector<uint8_t> &pingMessage) {
 
 	// Check if ping message doesn't contain a total difficulty
 	if(pingMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint64_t)) {
@@ -649,12 +649,12 @@ uint64_t Message::readPingMessage(const vector<uint8_t> &pingMessage) {
 		throw runtime_error("Height is invalid");
 	}
 	
-	// Return total difficulty
-	return totalDifficulty;
+	// Return total difficulty and height
+	return {totalDifficulty, height};
 }
 
 // Read pong message
-uint64_t Message::readPongMessage(const vector<uint8_t> &pongMessage) {
+tuple<uint64_t, uint64_t> Message::readPongMessage(const vector<uint8_t> &pongMessage) {
 
 	// Check if pong message doesn't contain a total difficulty
 	if(pongMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint64_t)) {
@@ -690,8 +690,8 @@ uint64_t Message::readPongMessage(const vector<uint8_t> &pongMessage) {
 		throw runtime_error("Height is invalid");
 	}
 	
-	// Return total difficulty
-	return totalDifficulty;
+	// Return total difficulty and height
+	return {totalDifficulty, height};
 }
 
 // Read get peer addresses message

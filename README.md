@@ -33,30 +33,39 @@ int main() {
 	// Create node
 	MwcValidationNode::Node node;
 	
+	// Check if initializing common failed
+	if(!MwcValidationNode::Common::initialize()) {
+	
+		// Return failure
+		return EXIT_FAILURE;
+	}
+	
+	// At this point all node functions are allowed in this thread. The node's state can be restored with node.restore("state_file")
+	
 	// Set node's on start syncing callback
 	node.setOnStartSyncingCallback([]() -> void {
 	
-		// Do something when node starts syncing (this happens once when the node start syncing)
+		// Do something when the node starts syncing (this happens once when the node starts syncing)
 	});
 	
 	// Set node's on synced syncing callback
 	node.setOnSyncedCallback([]() -> void {
 	
-		// Do something when node is synced (this happens once when the node is done syncing if syncing isn't interrupted in this callback)
+		// Do something when the node is synced (this happens once when the node is done syncing if syncing isn't interrupted in this callback)
 	});
 	
 	// Set node's on error callback
 	node.setOnErrorCallback([]() -> void {
 	
-		// Do something when node fails (this happens once if the node fails and cannot recover)
+		// Do something when the node fails (this happens once if the node fails and cannot recover)
 	});
 	
 	// Set node's on transaction hash set callback
-	node.setOnTransactionHashSetCallback([](const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Header> &headers, const MwcValidationNode::Header &transactionHashSetArchiveHeader, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Kernel> &kernels, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Output> &outputs, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Rangeproof> &rangeproofs) -> bool {
+	node.setOnTransactionHashSetCallback([](const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Header> &headers, const MwcValidationNode::Header &transactionHashSetArchiveHeader, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Kernel> &kernels, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Output> &outputs, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Rangeproof> &rangeproofs, const uint64_t oldHeight) -> bool {
 	
-		// Do something when a transaction hash set is received from a peer (this happens everytime a transaction hash set is obtained)
+		// Do something when a transaction hash set is received from a peer (this happens everytime a transaction hash set is received)
 		
-		// Return true if the transaction hash set should be used otherwise return false
+		// Return true if the transaction hash set should be used otherwise return false or throw an exception
 		return true;
 	});
 	
@@ -65,34 +74,56 @@ int main() {
 	
 		// Do something when a block is added to the blockchain (this happens everytime a block is added to the blockchain)
 		
-		// Return true if the block should be kept otherwise return false
+		// Return true if the block should be kept otherwise return false or throw an exception
 		return true;
 	});
 	
 	// Set node's on peer connect callback
 	node.setOnPeerConnectCallback([](const string &peerIdentifier) -> void {
 	
-		// Do something when node connects to a peer (this happens everytime the node connects to a peer)
+		// Do something when the node connects to a peer (this happens everytime the node connects to a peer)
+	});
+	
+	// Set node's on peer info callback
+	node.setOnPeerInfoCallback([](const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) -> void {
+	
+		// Do something when a connected peer's info becomes known (this happens once per connected peer when that peer's info first becomes known)
+	});
+	
+	// Set node's on peer update callback
+	node.setOnPeerUpdateCallback([](const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height) -> void {
+	
+		// Do something when a connected peer's total difficulty changes (this happens everytime a connected peer's total difficulty changes)
 	});
 	
 	// Set node's on peer disconnect callback
 	node.setOnPeerDisconnectCallback([](const string &peerIdentifier) -> void {
 	
-		// Do something when node disconnects from a peer (this happens everytime the node disconnects from a peer)
+		// Do something when the node disconnects from a peer (this happens everytime the node disconnects from a peer)
 	});
 	
-	// Set node's on transaction callback
-	node.setOnTransactionCallback([](const MwcValidationNode::Transaction &transaction, const unordered_set<const MwcValidationNode::Transaction *> &replacedTransactions) -> void {
+	// Set node's on transaction added to mempool callback
+	node.setOnTransactionAddedToMempoolCallback([](const MwcValidationNode::Transaction &transaction, const unordered_set<const MwcValidationNode::Transaction *> &replacedTransactions) -> void {
 	
 		// Do something when a transaction is added to the node's mempool (this happens everytime a transaction is added to the node's mempool)
 	});
 	
-	// At this point all node functions are allowed in this thread. The node's state can be restored with node.restore("state_file")
+	// Set node's on transaction removed from mempool callback
+	node.setOnTransactionRemovedFromMempoolCallback([](const MwcValidationNode::Transaction &transaction) -> void {
+	
+		// Do something when a transaction is removed from the node's mempool (this happens everytime a transaction is removed from the node's mempool which can be caused by it being replaced by fee or it being added to a block)
+	});
+	
+	// Set node's on mempool clear callback
+	node.setOnMempoolClearCallback([]() -> void {
+	
+		// Do something when the node's mempool is cleared (this happens everytime the node's mempool is cleared which can be caused when the node uses a new transaction hash set or when it recovers from an error)
+	});
 	
 	// Start node
 	node.start();
 	
-	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), and calling the node's destructor. All other node functions must happen in the callback functions
+	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), node.broadcastTransaction(), node.broadcastBlock(), and calling the node's destructor. All other node functions must happen in the callback functions
 	
 	// Stop node
 	node.stop();
@@ -100,15 +131,24 @@ int main() {
 	// Wait for node to stop running
 	node.getThread().join();
 	
-	// The node has stopped running, however it remains connected to any existing peers. Additional node functions that are allowed in this thread now are node.getPeers() and node.disconnect(). All other node functions must happen in the callback functions
+	// The node has stopped running, however it remains connected to any existing peers. Additional node functions that are allowed in this thread now are node.getPeers() and node.disconnect(). All other node functions must happen in the callback functions. The only peer functions that can be called in this thread are peer.stop(), peer.getThread(), and calling a peer's destructor.
 	
 	// Disconnect from node's peers and wait for the operation to complete
 	node.disconnect();
 	
-	// At this point the node's state won't change and the node can't be started again. All node functions are allowed in this thread now. The node's state can be saved with node.save("state_file")
+	// At this point the node's state won't change, it's disconnected from all peers, and it can't be started again. All node functions are allowed in this thread now. The node's state can be saved with node.save("state_file")
 	
 	// Return success
 	return EXIT_SUCCESS;
 }
 ```
-All node functions throw an runtime exception if they fail. All callback functions may be running in a separate thread so make sure any variables access in them are thread safe. Don't call a node's destructor, node.broadcastTransaction(), or node.broadcastBlock() inside the callback functions.
+All node functions throw a runtime exception if they fail. All callback functions may be running in a separate thread so make sure any variables access in them are thread safe. Don't call a node's destructor, node.broadcastTransaction(), or node.broadcastBlock() inside the callback functions.
+
+The following flags can be defined before `#include "./mwc_validation_node.h"` to enable or change certain features:
+* `#define DISABLE_SIGNAL_HANDLER`: Don't use builtin signal handler for SIGINT that stops the node.
+* `#define ENABLE_FLOONET`: Uses floonet instead of mainnet.
+* `#define ENABLE_TOR`: Uses the Tor SOCKS5 proxy listening at localhost:9050 for all peer communication. This address can be changed by providing an address and port to the node's constructor.
+* `#define ENABLE_MEMPOOL`: Enables keeping track of transactions in the node's mempool. Mempool related node callback functions and node.getNextBlock() can be used with this enabled.
+* `#define PRUNE_HEADERS`: Removes headers after they are no longer needed to verify the blockchain.
+* `#define PRUNE_KERNELS`: Removes kernels after they are no longer needed to verify the blockchain.
+* `#define PRUNE_RANGEPROOFS`: Removes rangeproofs after they are no longer needed to verify the blockchain.

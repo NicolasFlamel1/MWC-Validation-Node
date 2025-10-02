@@ -11,15 +11,15 @@ PROGRAM_NAME = $(subst $\",,$(NAME))
 # Check if using floonet
 ifeq ($(FLOONET),1)
 
-	# Compile for floonet
-	CFLAGS += -D FLOONET
+	# Enable floonet
+	CFLAGS += -D ENABLE_FLOONET
 endif
 
 # Check if using tor
 ifeq ($(TOR),1)
 
-	# Compile for tor
-	CFLAGS += -D TOR_ENABLE
+	# Enable tor
+	CFLAGS += -D ENABLE_TOR
 endif
 
 # Make

@@ -171,10 +171,10 @@ class Message final {
 		static tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> readShakeMessage(const vector<uint8_t> &shakeMessage);
 		
 		// Read ping message
-		static uint64_t readPingMessage(const vector<uint8_t> &pingMessage);
+		static tuple<uint64_t, uint64_t> readPingMessage(const vector<uint8_t> &pingMessage);
 		
 		// Read pong message
-		static uint64_t readPongMessage(const vector<uint8_t> &pongMessage);
+		static tuple<uint64_t, uint64_t> readPongMessage(const vector<uint8_t> &pongMessage);
 		
 		// Read get peer addresses message
 		static Node::Capabilities readGetPeerAddressesMessage(const vector<uint8_t> &getPeerAddressesMessage);

@@ -57,13 +57,6 @@ int main() {
 	// Try
 	try {
 
-		// Check if initializing common failed
-		if(!MwcValidationNode::Common::initialize()) {
-		
-			// Return failure
-			return EXIT_FAILURE;
-		}
-		
 		// Check if Windows
 		#ifdef _WIN32
 		
@@ -73,6 +66,13 @@ int main() {
 		
 		// Create node
 		MwcValidationNode::Node node;
+		
+		// Check if initializing common failed
+		if(!MwcValidationNode::Common::initialize()) {
+		
+			// Return failure
+			return EXIT_FAILURE;
+		}
 		
 		// Try
 		try {
@@ -177,6 +177,25 @@ int main() {
 				
 				// Display message
 				cout << "Connected to peer: " << peerIdentifier << endl;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+		});
+		
+		// Set node's on peer info callback
+		node.setOnPeerInfoCallback([&messageLock](const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) -> void {
+		
+			// Try
+			try {
+			
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Display message
+				cout << "Peer " << peerIdentifier << " is " << userAgent << endl;
 			}
 			
 			// Catch errors

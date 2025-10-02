@@ -614,7 +614,7 @@ void Peer::connect(const string &address) {
 		if(isOnionService) {
 		
 			// Check if Tor is enabled
-			#ifdef TOR_ENABLE
+			#ifdef ENABLE_TOR
 			
 				// Set current address to the address
 				currentAddress = address;
@@ -682,7 +682,7 @@ void Peer::connect(const string &address) {
 		addrinfo *addressInfo;
 		
 		// Check if Tor is enabled
-		#ifdef TOR_ENABLE
+		#ifdef ENABLE_TOR
 		
 			// Check if getting address info for the node's Tor proxy failed
 			if(getaddrinfo(node.getTorProxyAddress().c_str(), node.getTorProxyPort().c_str(), &hints, &addressInfo)) {
@@ -765,7 +765,7 @@ void Peer::connect(const string &address) {
 			};
 			
 			// Check if Tor is enabled
-			#ifdef TOR_ENABLE
+			#ifdef ENABLE_TOR
 			
 				// Initialize current server
 				sockaddr_storage currentServer;
@@ -797,7 +797,7 @@ void Peer::connect(const string &address) {
 				else {
 				
 					// Check if Tor is disabled
-					#ifndef TOR_ENABLE
+					#ifndef ENABLE_TOR
 			
 						// Check server family
 						switch(server->ai_family) {
@@ -936,7 +936,7 @@ void Peer::connect(const string &address) {
 				else {
 				
 					// Check if Tor is disabled
-					#ifndef TOR_ENABLE
+					#ifndef ENABLE_TOR
 					
 						// Check if no more servers exist
 						if(!server->ai_next) {
@@ -1078,7 +1078,7 @@ void Peer::connect(const string &address) {
 										bool invalidServer = false;
 									
 										// Check if Tor is enabled
-										#ifdef TOR_ENABLE
+										#ifdef ENABLE_TOR
 										
 											// Check if Windows
 											#ifdef _WIN32
@@ -3454,6 +3454,9 @@ bool Peer::processRequestsAndOrResponses() {
 						}
 					}
 					
+					// Let node know about a peer's info
+					node.peerInfo(identifier, shakeCapabilities, shakeUserAgent, shakeProtocolVersion, shakeBaseFee, shakeTotalDifficulty);
+					
 					// Set last ping time to now
 					lastPingTime = chrono::steady_clock::now();
 					
@@ -3480,14 +3483,14 @@ bool Peer::processRequestsAndOrResponses() {
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
 				
-					// Initialize current total difficulty
-					uint64_t currentTotalDifficulty;
+					// Initialize ping components
+					tuple<uint64_t, uint64_t> pingComponents;
 					
 					// Try
 					try {
 					
 						// Read ping message
-						currentTotalDifficulty = Message::readPingMessage(readBuffer);
+						pingComponents = Message::readPingMessage(readBuffer);
 					}
 		
 					// Catch errors
@@ -3499,6 +3502,10 @@ bool Peer::processRequestsAndOrResponses() {
 						// Break
 						break;
 					}
+					
+					// Get total difficulty and height from ping components
+					const uint64_t &pingTotalDifficulty = get<0>(pingComponents);
+					const uint64_t &pingHeight = get<1>(pingComponents);
 					
 					// Initialize node's total difficulty and height
 					uint64_t nodesTotalDifficulty;
@@ -3526,10 +3533,10 @@ bool Peer::processRequestsAndOrResponses() {
 						lock_guard writeLock(lock);
 						
 						// Set total difficulty changed to if the total difficulty changed
-						totalDifficultyChanged = totalDifficulty != currentTotalDifficulty;
+						totalDifficultyChanged = totalDifficulty != pingTotalDifficulty;
 				
-						// Set total difficulty to the current total difficulty
-						totalDifficulty = currentTotalDifficulty;
+						// Set total difficulty to the ping's total difficulty
+						totalDifficulty = pingTotalDifficulty;
 						
 						// Check if messages can be sent
 						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
@@ -3540,6 +3547,13 @@ bool Peer::processRequestsAndOrResponses() {
 							// Increment number of messages sent
 							++numberOfMessagesSent;
 						}
+					}
+					
+					// Check if total difficulty changed
+					if(totalDifficultyChanged) {
+					
+						// Let node know that a peer updated
+						node.peerUpdated(identifier, pingTotalDifficulty, pingHeight);
 					}
 					
 					// Set last ping time to now
@@ -3572,14 +3586,14 @@ bool Peer::processRequestsAndOrResponses() {
 				// Check if shake was received
 				if(communicationState > CommunicationState::HAND_SENT) {
 				
-					// Initialize current total difficulty
-					uint64_t currentTotalDifficulty;
+					// Initialize pong components
+					tuple<uint64_t, uint64_t> pongComponents;
 					
 					// Try
 					try {
 					
 						// Read pong message
-						currentTotalDifficulty = Message::readPongMessage(readBuffer);
+						pongComponents = Message::readPongMessage(readBuffer);
 					}
 		
 					// Catch errors
@@ -3592,6 +3606,10 @@ bool Peer::processRequestsAndOrResponses() {
 						break;
 					}
 					
+					// Get total difficulty and height from pong components
+					const uint64_t &pongTotalDifficulty = get<0>(pongComponents);
+					const uint64_t &pongHeight = get<1>(pongComponents);
+					
 					// Initialize total difficulty changed
 					bool totalDifficultyChanged;
 					
@@ -3600,10 +3618,17 @@ bool Peer::processRequestsAndOrResponses() {
 						lock_guard writeLock(lock);
 						
 						// Set total difficulty changed to if the total difficulty changed
-						totalDifficultyChanged = totalDifficulty != currentTotalDifficulty;
+						totalDifficultyChanged = totalDifficulty != pongTotalDifficulty;
 				
-						// Set total difficulty to the current total difficulty
-						totalDifficulty = currentTotalDifficulty;
+						// Set total difficulty to the pong's total difficulty
+						totalDifficulty = pongTotalDifficulty;
+					}
+					
+					// Check if total difficulty changed
+					if(totalDifficultyChanged) {
+					
+						// Let node know that a peer updated
+						node.peerUpdated(identifier, pongTotalDifficulty, pongHeight);
 					}
 					
 					// Set last ping time to now
@@ -3673,7 +3698,7 @@ bool Peer::processRequestsAndOrResponses() {
 							if(node.isPeerHealthy(healthyPeer.first)) {
 						
 								// Check if Tor is enabled
-								#ifdef TOR_ENABLE
+								#ifdef ENABLE_TOR
 							
 									// Check if healthy peer has the desired capabilities
 									if((healthyPeer.second.second & (desiredCapabilities & ~Node::Capabilities::TOR_ADDRESS)) == (desiredCapabilities & ~Node::Capabilities::TOR_ADDRESS)) {
@@ -3777,7 +3802,7 @@ bool Peer::processRequestsAndOrResponses() {
 									}
 									
 									// Check if Tor is enabled
-									#ifdef TOR_ENABLE
+									#ifdef ENABLE_TOR
 								
 										// Otherwise check if capabilities includes Tor address
 										else if(capabilities & Node::Capabilities::TOR_ADDRESS) {
@@ -3946,7 +3971,7 @@ bool Peer::processRequestsAndOrResponses() {
 								break;
 							
 							// Check if Tor is enabled
-							#ifdef TOR_ENABLE
+							#ifdef ENABLE_TOR
 							
 								// Onion service
 								case NetworkAddress::Family::ONION_SERVICE:
@@ -4003,7 +4028,7 @@ bool Peer::processRequestsAndOrResponses() {
 						}
 						
 						// Check if Tor is enabled
-						#ifdef TOR_ENABLE
+						#ifdef ENABLE_TOR
 						
 							// Check if capabilities isn't a full node
 							if((capabilities & (Node::Capabilities::FULL_NODE & ~Node::Capabilities::TOR_ADDRESS)) != (Node::Capabilities::FULL_NODE & ~Node::Capabilities::TOR_ADDRESS)) {
@@ -4119,6 +4144,13 @@ bool Peer::processRequestsAndOrResponses() {
 				
 						// Set total difficulty to the header's total difficulty
 						totalDifficulty = header.value().getTotalDifficulty();
+					}
+					
+					// Check if total difficulty changed
+					if(totalDifficultyChanged) {
+					
+						// Let node know that a peer updated
+						node.peerUpdated(identifier, header.value().getTotalDifficulty(), header.value().getHeight());
 					}
 					
 					// Set last ping time to now
@@ -4536,6 +4568,13 @@ bool Peer::processRequestsAndOrResponses() {
 						totalDifficulty = header.value().getTotalDifficulty();
 					}
 					
+					// Check if total difficulty changed
+					if(totalDifficultyChanged) {
+					
+						// Let node know that a peer updated
+						node.peerUpdated(identifier, header.value().getTotalDifficulty(), header.value().getHeight());
+					}
+					
 					// Set last ping time to now
 					lastPingTime = chrono::steady_clock::now();
 					
@@ -4654,6 +4693,9 @@ bool Peer::processRequestsAndOrResponses() {
 					// Try
 					try {
 					
+						// Lock node for writing
+						lock_guard nodeWriteLock(node.getLock());
+						
 						// Add transaction to node's mempool
 						node.addToMempool(move(transaction.value()));
 					}

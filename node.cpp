@@ -17,7 +17,7 @@ using namespace MwcValidationNode;
 // Constants
 
 // Check if Tor is enabled
-#ifdef TOR_ENABLE
+#ifdef ENABLE_TOR
 
 	// Capabilities
 	const Node::Capabilities Node::CAPABILITIES = static_cast<MwcValidationNode::Node::Capabilities>(Node::Capabilities::PEER_LIST | Node::Capabilities::TOR_ADDRESS);
@@ -30,7 +30,7 @@ using namespace MwcValidationNode;
 #endif
 
 // Check if floonet
-#ifdef FLOONET
+#ifdef ENABLE_FLOONET
 
 	// Default DNS seeds
 	const unordered_set<string> Node::DEFAULT_DNS_SEEDS = {
@@ -38,7 +38,7 @@ using namespace MwcValidationNode;
 		"seed2.mwc.mw:13414",
 		
 		// Check if Tor is enabled
-		#ifdef TOR_ENABLE
+		#ifdef ENABLE_TOR
 		
 			"wt635fgwmhokk25lv7y2jvrg63mokg7nfni5owrtzalz3nx22dgjytid.onion",
 			"kin4i3wohlsqlzrdwdlowh2kaa7wtkxsvp6asn7vttspnrwowgquglyd.onion",
@@ -58,7 +58,7 @@ using namespace MwcValidationNode;
 		"mwcseed.ddns.net:3414",
 		
 		// Check if Tor is enabled
-		#ifdef TOR_ENABLE
+		#ifdef ENABLE_TOR
 		
 			"uukwrgtxogz6kkpcejssb7aenb7ey7pr3h5i4llhse445dfpbp63osyd.onion",
 			"xsjhexie5v7gxmdkvzkzb4qifywnolb6v22wzvppscs2gog6ljribuad.onion",
@@ -339,7 +339,7 @@ void Node::setOnErrorCallback(const function<void()> &onErrorCallback) {
 }
 
 // Set on transaction hash set callback
-void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs)> &onTransactionHashSetCallback) {
+void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> &onTransactionHashSetCallback) {
 
 	// Check if started
 	if(started) {
@@ -375,8 +375,37 @@ void Node::setOnPeerConnectCallback(const function<void(const string &peerIdenti
 		// Throw exception
 		throw runtime_error("Node is started");
 	}
+	
 	// Set on peer connect callback
 	this->onPeerConnectCallback = onPeerConnectCallback;
+}
+
+// Set on peer info callback
+void Node::setOnPeerInfoCallback(const function<void(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback) {
+
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
+	// Set on peer info callback
+	this->onPeerInfoCallback = onPeerInfoCallback;
+}
+
+// Set on peer update callback
+void Node::setOnPeerUpdateCallback(const function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerInfoCallback) {
+
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
+	// Set on peer update callback
+	this->onPeerUpdateCallback = onPeerUpdateCallback;
 }
 
 // Set on peer disconnect callback
@@ -393,8 +422,8 @@ void Node::setOnPeerDisconnectCallback(const function<void(const string &peerIde
 	this->onPeerDisconnectCallback = onPeerDisconnectCallback;
 }
 
-// Set on transaction callback
-void Node::setOnTransactionCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionCallback) {
+// Set on transaction added to mempool callback
+void Node::setOnTransactionAddedToMempoolCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionAddedToMempoolCallback) {
 
 	// Check if started
 	if(started) {
@@ -403,8 +432,66 @@ void Node::setOnTransactionCallback(const function<void(const Transaction &trans
 		throw runtime_error("Node is started");
 	}
 	
-	// Set on transaction callback
-	this->onTransactionCallback = onTransactionCallback;
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
+	
+		// Set on transaction added to mempool callback
+		this->onTransactionAddedToMempoolCallback = onTransactionAddedToMempoolCallback;
+		
+	// Otherwise
+	#else
+	
+		// Throw exception
+		throw runtime_error("Mempool isn't enabled");
+	#endif
+}
+
+// Set on transaction removed from mempool callback
+void Node::setOnTransactionRemovedFromMempoolCallback(const function<void(const Transaction &transaction)> &onTransactionRemovedFromMempoolCallback) {
+
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
+	
+		// Set on transaction removed from mempool callback
+		this->onTransactionRemovedFromMempoolCallback = onTransactionRemovedFromMempoolCallback;
+		
+	// Otherwise
+	#else
+	
+		// Throw exception
+		throw runtime_error("Mempool isn't enabled");
+	#endif
+}
+
+// Set on mempool clear callback
+void Node::setOnMempoolClearCallback(const function<void()> &onMempoolClearCallback) {
+
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
+	
+		// Set on mempool clear callback
+		this->onMempoolClearCallback = onMempoolClearCallback;
+		
+	// Otherwise
+	#else
+	
+		// Throw exception
+		throw runtime_error("Mempool isn't enabled");
+	#endif
 }
 
 // Start
@@ -660,13 +747,6 @@ void Node::broadcastBlock(Header &&header, Block &&block) {
 	
 	// Notify that an event occurred
 	peerEventOccurred.notify_one();
-}
-
-// Get mempool
-const Mempool &Node::getMempool() const {
-
-	// Return mempool
-	return mempool;
 }
 
 // Get next block
@@ -1075,10 +1155,10 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 		for(pair<Output, Rangeproof> &outputAndRangeproof : sortedOutputsAndRangeproofs) {
 		
 			// Add output to sorted outputs
-			sortedOutputs.insert_back(move(outputAndRangeproof.first));
+			sortedOutputs.push_back(move(outputAndRangeproof.first));
 			
 			// Add rangeproof to sorted rangeproofs
-			sortedRangeproofs.insert_back(move(outputAndRangeproof.second));
+			sortedRangeproofs.push_back(move(outputAndRangeproof.second));
 		}
 		
 		// Go through all of the block's kernels
@@ -1090,7 +1170,7 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 		}
 		
 		// Add coinbase kernel to sorted kernels
-		sortedKernels.insert_back(move(get<2>(coinbase.value())));
+		sortedKernels.push_back(move(get<2>(coinbase.value())));
 		
 		// Sort sorted kernels
 		sortedKernels.sort([](const Kernel &firstKernel, const Kernel &secondKernel) -> bool {
@@ -1174,8 +1254,28 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 			rangeproofs.clear();
 			rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
 			
-			// Clear mempool
-			mempool.clear();
+			// Check if mempool is enabled
+			#ifdef ENABLE_MEMPOOL
+			
+				// Clear mempool
+				mempool.clear();
+				
+				// Check if on mempool clear callback exists
+				if(onMempoolClearCallback) {
+				
+					// Try
+					try {
+					
+						// Run on mempool clear callback
+						onMempoolClearCallback();
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+					}
+				}
+			#endif
 			
 			// Set is synced to false
 			isSynced = false;
@@ -1226,8 +1326,28 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 				rangeproofs.clear();
 				rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
 				
-				// Clear mempool
-				mempool.clear();
+				// Check if mempool is enabled
+				#ifdef ENABLE_MEMPOOL
+				
+					// Clear mempool
+					mempool.clear();
+					
+					// Check if on mempool clear callback exists
+					if(onMempoolClearCallback) {
+					
+						// Try
+						try {
+						
+							// Run on mempool clear callback
+							onMempoolClearCallback();
+						}
+						
+						// Catch errors
+						catch(...) {
+						
+						}
+					}
+				#endif
 				
 				// Set is synced to false
 				isSynced = false;
@@ -1268,8 +1388,28 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 			rangeproofs.clear();
 			rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
 			
-			// Clear mempool
-			mempool.clear();
+			// Check if mempool is enabled
+			#ifdef ENABLE_MEMPOOL
+			
+				// Clear mempool
+				mempool.clear();
+				
+				// Check if on mempool clear callback exists
+				if(onMempoolClearCallback) {
+				
+					// Try
+					try {
+					
+						// Run on mempool clear callback
+						onMempoolClearCallback();
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+					}
+				}
+			#endif
 			
 			// Set is synced to false
 			isSynced = false;
@@ -1383,7 +1523,7 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 		try {
 		
 			// Check if running on transaction hash set callback failed
-			if(!onTransactionHashSetCallback(headers, transactionHashSetArchiveHeader, kernels, outputs, rangeproofs)) {
+			if(!onTransactionHashSetCallback(headers, transactionHashSetArchiveHeader, kernels, outputs, rangeproofs, syncedHeaderIndex)) {
 			
 				// Set is syncing to false
 				isSyncing = false;
@@ -1490,7 +1630,7 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 	this->headers = move(headers);
 	
 	// Set synced header index to the transaction hash set archive header's height
-	this->syncedHeaderIndex = transactionHashSetArchiveHeader.getHeight();
+	syncedHeaderIndex = transactionHashSetArchiveHeader.getHeight();
 	
 	// Set kernels to kernels
 	this->kernels = move(kernels);
@@ -1501,8 +1641,28 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 	// Set rangeproofs to rangeproofs
 	this->rangeproofs = move(rangeproofs);
 	
-	// Clear mempool
-	mempool.clear();
+	// Check if mempool is enabled
+	#ifdef ENABLE_MEMPOOL
+	
+		// Clear mempool
+		mempool.clear();
+		
+		// Check if on mempool clear callback exists
+		if(onMempoolClearCallback) {
+		
+			// Try
+			try {
+			
+				// Run on mempool clear callback
+				onMempoolClearCallback();
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+		}
+	#endif
 	
 	// Set is syncing to false
 	isSyncing = false;
@@ -1551,6 +1711,52 @@ void Node::peerConnected(const string &peerIdentifier) {
 	}
 }
 
+// Peer info
+void Node::peerInfo(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) {
+
+	// Check if on peer info callback exists
+	if(onPeerInfoCallback) {
+	
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Try
+		try {
+		
+			// Run on peer info callback
+			onPeerInfoCallback(peerIdentifier, capabilities, userAgent, protocolVersion, baseFee, totalDifficulty);
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+		}
+	}
+}
+
+// Peer updated
+void Node::peerUpdated(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height) {
+
+	// Check if on peer update callback exists
+	if(onPeerUpdateCallback) {
+	
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Try
+		try {
+		
+			// Run on peer update callback
+			onPeerUpdateCallback(peerIdentifier, totalDifficulty, height);
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+		}
+	}
+}
+
 // Get Tor proxy address
 const string &Node::getTorProxyAddress() const {
 
@@ -1589,9 +1795,6 @@ void Node::addToMempool(Transaction &&transaction) {
 	// Check if mempool is enabled
 	#ifdef ENABLE_MEMPOOL
 	
-		// Lock for writing
-		lock_guard writeLock(lock);
-		
 		// Check if synced
 		if(isSynced) {
 		
@@ -1871,14 +2074,14 @@ void Node::addToMempool(Transaction &&transaction) {
 						}
 					}
 					
-					// Check if on transaction callback exists
-					if(onTransactionCallback) {
+					// Check if on transaction added to mempool callback exists
+					if(onTransactionAddedToMempoolCallback) {
 					
 						// Try
 						try {
 						
-							// Run on transaction callback
-							onTransactionCallback(transaction, replacedTransactions);
+							// Run on transaction added to mempool callback
+							onTransactionAddedToMempoolCallback(transaction, replacedTransactions);
 						}
 						
 						// Catch errors
@@ -1893,6 +2096,22 @@ void Node::addToMempool(Transaction &&transaction) {
 						// Go through all replaced transactions
 						for(const Transaction *replacedTransaction : replacedTransactions) {
 						
+							// Check if on transaction removed from mempool callback exists
+							if(onTransactionRemovedFromMempoolCallback) {
+							
+								// Try
+								try {
+								
+									// Run on transaction removed from mempool callback
+									onTransactionRemovedFromMempoolCallback(*replacedTransaction);
+								}
+								
+								// Catch errors
+								catch(...) {
+								
+								}
+							}
+							
 							// Remove transaction from mempool
 							mempool.erase(*replacedTransaction);
 						}
@@ -1904,8 +2123,28 @@ void Node::addToMempool(Transaction &&transaction) {
 					// Catch errors
 					catch(...) {
 					
-						// Clear mempool
-						mempool.clear();
+						// Check if mempool is enabled
+						#ifdef ENABLE_MEMPOOL
+						
+							// Clear mempool
+							mempool.clear();
+							
+							// Check if on mempool clear callback exists
+							if(onMempoolClearCallback) {
+							
+								// Try
+								try {
+								
+									// Run on mempool clear callback
+									onMempoolClearCallback();
+								}
+								
+								// Catch errors
+								catch(...) {
+								
+								}
+							}
+						#endif
 					}
 				}
 			}
@@ -2067,6 +2306,22 @@ void Node::cleanupMempool() {
 					// Check if removing transaction
 					if(removeTransaction) {
 					
+						// Check if on transaction removed from mempool callback exists
+						if(onTransactionRemovedFromMempoolCallback) {
+						
+							// Try
+							try {
+							
+								// Run on transaction removed from mempool callback
+								onTransactionRemovedFromMempoolCallback(*i);
+							}
+							
+							// Catch errors
+							catch(...) {
+							
+							}
+						}
+						
 						// Remove transaction from mempool and go to next transaction
 						i = mempool.erase(i);
 					}
@@ -2135,6 +2390,22 @@ void Node::cleanupMempool() {
 							}
 						}
 						
+						// Check if on transaction removed from mempool callback exists
+						if(onTransactionRemovedFromMempoolCallback) {
+						
+							// Try
+							try {
+							
+								// Run on transaction removed from mempool callback
+								onTransactionRemovedFromMempoolCallback(*i);
+							}
+							
+							// Catch errors
+							catch(...) {
+							
+							}
+						}
+						
 						// Check if rechecking transactions
 						if(recheckTransactions) {
 						
@@ -2168,8 +2439,28 @@ void Node::cleanupMempool() {
 			// Catch errors
 			catch(...) {
 			
-				// Clear mempool
-				mempool.clear();
+				// Check if mempool is enabled
+				#ifdef ENABLE_MEMPOOL
+				
+					// Clear mempool
+					mempool.clear();
+					
+					// Check if on mempool clear callback exists
+					if(onMempoolClearCallback) {
+					
+						// Try
+						try {
+						
+							// Run on mempool clear callback
+							onMempoolClearCallback();
+						}
+						
+						// Catch errors
+						catch(...) {
+						
+						}
+					}
+				#endif
 			}
 		}
 	#endif
@@ -2379,6 +2670,9 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			throw runtime_error("Verifying kernel sums failed");
 		}
 		
+		// Clean up mempool
+		cleanupMempool();
+		
 		// Check if on block callback exists
 		if(onBlockCallback) {
 		
@@ -2416,9 +2710,6 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 				return true;
 			}
 		}
-		
-		// Clean up mempool
-		cleanupMempool();
 	}
 	
 	// Catch errors
@@ -2475,8 +2766,28 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			rangeproofs.clear();
 			rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
 			
-			// Clear mempool
-			mempool.clear();
+			// Check if mempool is enabled
+			#ifdef ENABLE_MEMPOOL
+			
+				// Clear mempool
+				mempool.clear();
+				
+				// Check if on mempool clear callback exists
+				if(onMempoolClearCallback) {
+				
+					// Try
+					try {
+					
+						// Run on mempool clear callback
+						onMempoolClearCallback();
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+					}
+				}
+			#endif
 			
 			// Set is syncing to false
 			isSyncing = false;
@@ -2551,6 +2862,34 @@ void Node::monitor() {
 	// Try
 	try {
 	
+		// Check if mempool is enabled
+		#ifdef ENABLE_MEMPOOL
+		
+			{
+				// Lock for writing
+				lock_guard writeLock(lock);
+				
+				// Clear mempool
+				mempool.clear();
+				
+				// Check if on mempool clear callback exists
+				if(onMempoolClearCallback) {
+					
+					// Try
+					try {
+					
+						// Run on mempool clear callback
+						onMempoolClearCallback();
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+					}
+				}
+			}
+		#endif
+		
 		// Set start monitoring time to now
 		const chrono::time_point startMonitoringTime = chrono::steady_clock::now();
 	
@@ -2748,7 +3087,7 @@ void Node::broadcastPendingTransactions() {
 		lock_guard writeLock(lock);
 		
 		// Go through all pending transactions
-		for(list<Transaction>::const_iterator i = pendingTransactions.cbegin(); i != pendingTransactions.cend(); i = pendingTransactions.erase(i)) {
+		for(list<Transaction>::iterator i = pendingTransactions.begin(); i != pendingTransactions.end(); i = pendingTransactions.erase(i)) {
 		
 			// Initialize transaction messages
 			unordered_map<uint32_t, vector<uint8_t>> transactionMessages;
@@ -2798,6 +3137,22 @@ void Node::broadcastPendingTransactions() {
 			
 				// Break
 				break;
+			}
+			
+			// Otherwise
+			else {
+			
+				// Try
+				try {
+				
+					// Add transaction to mempool
+					addToMempool(move(*i));
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+				}
 			}
 		}
 	}
