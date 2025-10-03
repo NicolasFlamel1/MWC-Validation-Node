@@ -3722,8 +3722,25 @@ void Node::connectToMorePeers() {
 			// Try
 			try {
 			
-				// Create peer from peer candidate
-				peers.emplace_back(peerEventOccurred, randomNumberGenerator()).start(peerCandidate.first, this);
+				// Create new peer from peer candidate
+				Peer &newPeer = peers.emplace_back(peerEventOccurred, randomNumberGenerator());
+				
+				// Try
+				try {
+				
+					// Start new peer
+					newPeer.start(peerCandidate.first, this);
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+					// Remove new peer
+					peers.pop_back();
+					
+					// Rethrow error
+					throw;
+				}
 			}
 			
 			// Catch errors
