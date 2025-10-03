@@ -304,7 +304,7 @@ void Node::restore(ifstream &file) {
 }
 
 // Set on start syncing callback
-void Node::setOnStartSyncingCallback(const function<void()> &onStartSyncingCallback) {
+void Node::setOnStartSyncingCallback(const function<void(Node &node)> &onStartSyncingCallback) {
 
 	// Check if started
 	if(started) {
@@ -318,7 +318,7 @@ void Node::setOnStartSyncingCallback(const function<void()> &onStartSyncingCallb
 }
 
 // Set on synced callback
-void Node::setOnSyncedCallback(const function<void()> &onSyncedCallback) {
+void Node::setOnSyncedCallback(const function<void(Node &node)> &onSyncedCallback) {
 
 	// Check if started
 	if(started) {
@@ -332,7 +332,7 @@ void Node::setOnSyncedCallback(const function<void()> &onSyncedCallback) {
 }
 
 // Set on error callback
-void Node::setOnErrorCallback(const function<void()> &onErrorCallback) {
+void Node::setOnErrorCallback(const function<void(Node &node)> &onErrorCallback) {
 
 	// Check if started
 	if(started) {
@@ -346,7 +346,7 @@ void Node::setOnErrorCallback(const function<void()> &onErrorCallback) {
 }
 
 // Set on transaction hash set callback
-void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> &onTransactionHashSetCallback) {
+void Node::setOnTransactionHashSetCallback(const function<bool(Node &node, const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> &onTransactionHashSetCallback) {
 
 	// Check if started
 	if(started) {
@@ -360,7 +360,7 @@ void Node::setOnTransactionHashSetCallback(const function<bool(const MerkleMount
 }
 
 // Set on block callback
-void Node::setOnBlockCallback(const function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback) {
+void Node::setOnBlockCallback(const function<bool(Node &node, const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback) {
 
 	// Check if started
 	if(started) {
@@ -374,7 +374,7 @@ void Node::setOnBlockCallback(const function<bool(const Header &header, const Bl
 }
 
 // Set on peer connect callback
-void Node::setOnPeerConnectCallback(const function<void(const string &peerIdentifier)> &onPeerConnectCallback) {
+void Node::setOnPeerConnectCallback(const function<void(Node &node, const string &peerIdentifier)> &onPeerConnectCallback) {
 
 	// Check if started
 	if(started) {
@@ -388,7 +388,7 @@ void Node::setOnPeerConnectCallback(const function<void(const string &peerIdenti
 }
 
 // Set on peer info callback
-void Node::setOnPeerInfoCallback(const function<void(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback) {
+void Node::setOnPeerInfoCallback(const function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback) {
 
 	// Check if started
 	if(started) {
@@ -402,7 +402,7 @@ void Node::setOnPeerInfoCallback(const function<void(const string &peerIdentifie
 }
 
 // Set on peer update callback
-void Node::setOnPeerUpdateCallback(const function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerUpdateCallback) {
+void Node::setOnPeerUpdateCallback(const function<void(Node &node, const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerUpdateCallback) {
 
 	// Check if started
 	if(started) {
@@ -416,7 +416,7 @@ void Node::setOnPeerUpdateCallback(const function<void(const string &peerIdentif
 }
 
 // Set on peer disconnect callback
-void Node::setOnPeerDisconnectCallback(const function<void(const string &peerIdentifier)> &onPeerDisconnectCallback) {
+void Node::setOnPeerDisconnectCallback(const function<void(Node &node, const string &peerIdentifier)> &onPeerDisconnectCallback) {
 
 	// Check if started
 	if(started) {
@@ -430,7 +430,7 @@ void Node::setOnPeerDisconnectCallback(const function<void(const string &peerIde
 }
 
 // Set on transaction added to mempool callback
-void Node::setOnTransactionAddedToMempoolCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionAddedToMempoolCallback) {
+void Node::setOnTransactionAddedToMempoolCallback(const function<void(Node &node, const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionAddedToMempoolCallback) {
 
 	// Check if started
 	if(started) {
@@ -454,7 +454,7 @@ void Node::setOnTransactionAddedToMempoolCallback(const function<void(const Tran
 }
 
 // Set on transaction removed from mempool callback
-void Node::setOnTransactionRemovedFromMempoolCallback(const function<void(const Transaction &transaction)> &onTransactionRemovedFromMempoolCallback) {
+void Node::setOnTransactionRemovedFromMempoolCallback(const function<void(Node &node, const Transaction &transaction)> &onTransactionRemovedFromMempoolCallback) {
 
 	// Check if started
 	if(started) {
@@ -478,7 +478,7 @@ void Node::setOnTransactionRemovedFromMempoolCallback(const function<void(const 
 }
 
 // Set on mempool clear callback
-void Node::setOnMempoolClearCallback(const function<void()> &onMempoolClearCallback) {
+void Node::setOnMempoolClearCallback(const function<void(Node &node)> &onMempoolClearCallback) {
 
 	// Check if started
 	if(started) {
@@ -1381,7 +1381,7 @@ tuple<Header, Block, uint64_t> Node::getNextBlock(const function<tuple<Output, R
 					try {
 					
 						// Run on mempool clear callback
-						onMempoolClearCallback();
+						onMempoolClearCallback(*this);
 					}
 					
 					// Catch errors
@@ -1455,7 +1455,7 @@ tuple<Header, Block, uint64_t> Node::getNextBlock(const function<tuple<Output, R
 						try {
 						
 							// Run on mempool clear callback
-							onMempoolClearCallback();
+							onMempoolClearCallback(*this);
 						}
 						
 						// Catch errors
@@ -1526,7 +1526,7 @@ tuple<Header, Block, uint64_t> Node::getNextBlock(const function<tuple<Output, R
 							try {
 							
 								// Run on mempool clear callback
-								onMempoolClearCallback();
+								onMempoolClearCallback(*this);
 							}
 							
 							// Catch errors
@@ -1654,7 +1654,7 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 		try {
 		
 			// Check if running on transaction hash set callback failed
-			if(!onTransactionHashSetCallback(headers, transactionHashSetArchiveHeader, kernels, outputs, rangeproofs, syncedHeaderIndex)) {
+			if(!onTransactionHashSetCallback(*this, headers, transactionHashSetArchiveHeader, kernels, outputs, rangeproofs, syncedHeaderIndex)) {
 			
 				// Set is syncing to false
 				isSyncing = false;
@@ -1785,7 +1785,7 @@ void Node::setSyncState(MerkleMountainRange<Header> &&headers, const Header &tra
 			try {
 			
 				// Run on mempool clear callback
-				onMempoolClearCallback();
+				onMempoolClearCallback(*this);
 			}
 			
 			// Catch errors
@@ -1832,7 +1832,7 @@ void Node::peerConnected(const string &peerIdentifier) {
 		try {
 		
 			// Run on peer connect callback
-			onPeerConnectCallback(peerIdentifier);
+			onPeerConnectCallback(*this, peerIdentifier);
 		}
 		
 		// Catch errors
@@ -1855,7 +1855,7 @@ void Node::peerInfo(const string &peerIdentifier, const Capabilities capabilitie
 		try {
 		
 			// Run on peer info callback
-			onPeerInfoCallback(peerIdentifier, capabilities, userAgent, protocolVersion, baseFee, totalDifficulty);
+			onPeerInfoCallback(*this, peerIdentifier, capabilities, userAgent, protocolVersion, baseFee, totalDifficulty);
 		}
 		
 		// Catch errors
@@ -1878,7 +1878,7 @@ void Node::peerUpdated(const string &peerIdentifier, const uint64_t totalDifficu
 		try {
 		
 			// Run on peer update callback
-			onPeerUpdateCallback(peerIdentifier, totalDifficulty, height);
+			onPeerUpdateCallback(*this, peerIdentifier, totalDifficulty, height);
 		}
 		
 		// Catch errors
@@ -2212,7 +2212,7 @@ void Node::addToMempool(Transaction &&transaction) {
 						try {
 						
 							// Run on transaction added to mempool callback
-							onTransactionAddedToMempoolCallback(transaction, replacedTransactions);
+							onTransactionAddedToMempoolCallback(*this, transaction, replacedTransactions);
 						}
 						
 						// Catch errors
@@ -2234,7 +2234,7 @@ void Node::addToMempool(Transaction &&transaction) {
 								try {
 								
 									// Run on transaction removed from mempool callback
-									onTransactionRemovedFromMempoolCallback(*replacedTransaction);
+									onTransactionRemovedFromMempoolCallback(*this, *replacedTransaction);
 								}
 								
 								// Catch errors
@@ -2267,7 +2267,7 @@ void Node::addToMempool(Transaction &&transaction) {
 								try {
 								
 									// Run on mempool clear callback
-									onMempoolClearCallback();
+									onMempoolClearCallback(*this);
 								}
 								
 								// Catch errors
@@ -2444,7 +2444,7 @@ void Node::cleanupMempool() {
 							try {
 							
 								// Run on transaction removed from mempool callback
-								onTransactionRemovedFromMempoolCallback(*i);
+								onTransactionRemovedFromMempoolCallback(*this, *i);
 							}
 							
 							// Catch errors
@@ -2528,7 +2528,7 @@ void Node::cleanupMempool() {
 							try {
 							
 								// Run on transaction removed from mempool callback
-								onTransactionRemovedFromMempoolCallback(*i);
+								onTransactionRemovedFromMempoolCallback(*this, *i);
 							}
 							
 							// Catch errors
@@ -2583,7 +2583,7 @@ void Node::cleanupMempool() {
 						try {
 						
 							// Run on mempool clear callback
-							onMempoolClearCallback();
+							onMempoolClearCallback(*this);
 						}
 						
 						// Catch errors
@@ -2811,7 +2811,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 			try {
 			
 				// Check if running on block callback failed
-				if(!onBlockCallback(*header, block, oldSyncedHeaderIndex)) {
+				if(!onBlockCallback(*this, *header, block, oldSyncedHeaderIndex)) {
 				
 					// Set callback failed to true
 					callbackFailed = true;
@@ -2910,7 +2910,7 @@ bool Node::applyBlockToSyncState(const uint64_t syncedHeaderIndex, const Block &
 					try {
 					
 						// Run on mempool clear callback
-						onMempoolClearCallback();
+						onMempoolClearCallback(*this);
 					}
 					
 					// Catch errors
@@ -3010,7 +3010,7 @@ void Node::monitor() {
 					try {
 					
 						// Run on mempool clear callback
-						onMempoolClearCallback();
+						onMempoolClearCallback(*this);
 					}
 					
 					// Catch errors
@@ -3189,7 +3189,7 @@ void Node::monitor() {
 				try {
 				
 					// Run on error callback
-					onErrorCallback();
+					onErrorCallback(*this);
 				}
 				
 				// Catch errors
@@ -3428,7 +3428,7 @@ void Node::removeDisconnectedPeers() {
 						try {
 						
 							// Run on peer disconnect callback
-							onPeerDisconnectCallback(peer.getIdentifier());
+							onPeerDisconnectCallback(*this, peer.getIdentifier());
 						}
 						
 						// Catch errors
@@ -3590,7 +3590,7 @@ void Node::removeRandomPeer() {
 						try {
 						
 							// Run on peer disconnect callback
-							onPeerDisconnectCallback(peer->getIdentifier());
+							onPeerDisconnectCallback(*this, peer->getIdentifier());
 						}
 						
 						// Catch errors
@@ -3854,7 +3854,7 @@ void Node::sync() {
 					try {
 					
 						// Run on start syncing callback
-						onStartSyncingCallback();
+						onStartSyncingCallback(*this);
 					}
 					
 					// Catch errors
@@ -3878,7 +3878,7 @@ void Node::sync() {
 				try {
 				
 					// Run on start syncing callback
-					onStartSyncingCallback();
+					onStartSyncingCallback(*this);
 				}
 				
 				// Catch errors
@@ -3900,7 +3900,7 @@ void Node::sync() {
 				try {
 				
 					// Run on synced callback
-					onSyncedCallback();
+					onSyncedCallback(*this);
 				}
 				
 				// Catch errors

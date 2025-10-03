@@ -84,40 +84,40 @@ class Node final {
 		void restore(ifstream &file);
 		
 		// Set on start syncing callback
-		void setOnStartSyncingCallback(const function<void()> &onStartSyncingCallback);
+		void setOnStartSyncingCallback(const function<void(Node &node)> &onStartSyncingCallback);
 		
 		// Set on synced callback
-		void setOnSyncedCallback(const function<void()> &onSyncedCallback);
+		void setOnSyncedCallback(const function<void(Node &node)> &onSyncedCallback);
 		
 		// Set on error callback
-		void setOnErrorCallback(const function<void()> &onErrorCallback);
+		void setOnErrorCallback(const function<void(Node &node)> &onErrorCallback);
 		
 		// Set on transaction hash set callback
-		void setOnTransactionHashSetCallback(const function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> &onTransactionHashSetCallback);
+		void setOnTransactionHashSetCallback(const function<bool(Node &node, const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> &onTransactionHashSetCallback);
 		
 		// Set on block callback
-		void setOnBlockCallback(const function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback);
+		void setOnBlockCallback(const function<bool(Node &node, const Header &header, const Block &block, const uint64_t oldHeight)> &onBlockCallback);
 		
 		// Set on peer connect callback
-		void setOnPeerConnectCallback(const function<void(const string &peerIdentifier)> &onPeerConnectCallback);
+		void setOnPeerConnectCallback(const function<void(Node &node, const string &peerIdentifier)> &onPeerConnectCallback);
 		
 		// Set on peer info callback
-		void setOnPeerInfoCallback(const function<void(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback);
+		void setOnPeerInfoCallback(const function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback);
 		
 		// Set on peer update callback
-		void setOnPeerUpdateCallback(const function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerUpdateCallback);
+		void setOnPeerUpdateCallback(const function<void(Node &node, const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerUpdateCallback);
 		
 		// Set on peer disconnect callback
-		void setOnPeerDisconnectCallback(const function<void(const string &peerIdentifier)> &onPeerDisconnectCallback);
+		void setOnPeerDisconnectCallback(const function<void(Node &node, const string &peerIdentifier)> &onPeerDisconnectCallback);
 		
 		// Set on transaction added to mempool callback
-		void setOnTransactionAddedToMempoolCallback(const function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionAddedToMempoolCallback);
+		void setOnTransactionAddedToMempoolCallback(const function<void(Node &node, const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> &onTransactionAddedToMempoolCallback);
 		
 		// Set on transaction removed from mempool callback
-		void setOnTransactionRemovedFromMempoolCallback(const function<void(const Transaction &transaction)> &onTransactionRemovedFromMempoolCallback);
+		void setOnTransactionRemovedFromMempoolCallback(const function<void(Node &node, const Transaction &transaction)> &onTransactionRemovedFromMempoolCallback);
 		
 		// Set on mempool clear callback
-		void setOnMempoolClearCallback(const function<void()> &onMempoolClearCallback);
+		void setOnMempoolClearCallback(const function<void(Node &node)> &onMempoolClearCallback);
 		
 		// Start
 		void start(const char *customDnsSeed = nullptr, const uint64_t baseFee = DEFAULT_BASE_FEE);
@@ -342,40 +342,40 @@ class Node final {
 		void removeUnbannedPeers();
 		
 		// On start syncing callback
-		function<void()> onStartSyncingCallback;
+		function<void(Node &node)> onStartSyncingCallback;
 		
 		// On synced callback
-		function<void()> onSyncedCallback;
+		function<void(Node &node)> onSyncedCallback;
 		
 		// On error callback
-		function<void()> onErrorCallback;
+		function<void(Node &node)> onErrorCallback;
 		
 		// On transaction hash set callback
-		function<bool(const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> onTransactionHashSetCallback;
+		function<bool(Node &node, const MerkleMountainRange<Header> &headers, const Header &transactionHashSetArchiveHeader, const MerkleMountainRange<Kernel> &kernels, const MerkleMountainRange<Output> &outputs, const MerkleMountainRange<Rangeproof> &rangeproofs, const uint64_t oldHeight)> onTransactionHashSetCallback;
 		
 		// On block callback
-		function<bool(const Header &header, const Block &block, const uint64_t oldHeight)> onBlockCallback;
+		function<bool(Node &node, const Header &header, const Block &block, const uint64_t oldHeight)> onBlockCallback;
 		
 		// On peer connect callback
-		function<void(const string &peerIdentifier)> onPeerConnectCallback;
+		function<void(Node &node, const string &peerIdentifier)> onPeerConnectCallback;
 		
 		// On peer info callback
-		function<void(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> onPeerInfoCallback;
+		function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> onPeerInfoCallback;
 		
 		// On peer update callback
-		function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> onPeerUpdateCallback;
+		function<void(Node &node, const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> onPeerUpdateCallback;
 		
 		// On peer disconnect callback
-		function<void(const string &peerIdentifier)> onPeerDisconnectCallback;
+		function<void(Node &node, const string &peerIdentifier)> onPeerDisconnectCallback;
 		
 		// On transaction added to mempool callback
-		function<void(const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> onTransactionAddedToMempoolCallback;
+		function<void(Node &node, const Transaction &transaction, const unordered_set<const Transaction *> &replacedTransactions)> onTransactionAddedToMempoolCallback;
 		
 		// On transaction removed from mempool callback
-		function<void(const Transaction &transaction)> onTransactionRemovedFromMempoolCallback;
+		function<void(Node &node, const Transaction &transaction)> onTransactionRemovedFromMempoolCallback;
 		
 		// On mempool clear callback
-		function<void()> onMempoolClearCallback;
+		function<void(Node &node)> onMempoolClearCallback;
 		
 		// Tor proxy address
 		const string torProxyAddress;

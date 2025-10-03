@@ -1,7 +1,6 @@
 // Header files
 #include "./mwc_validation_node.h"
 #include <iostream>
-#include <mutex>
 
 using namespace std;
 
@@ -89,160 +88,73 @@ int main() {
 		
 		}
 		
-		// Create message lock
-		mutex messageLock;
-		
 		// Set node's on start syncing callback
-		node.setOnStartSyncingCallback([&messageLock]() -> void {
+		node.setOnStartSyncingCallback([](MwcValidationNode::Node &node) -> void {
 		
-			// Try
-			try {
-			
-				// Lock message lock
-				lock_guard lock(messageLock);
-				
-				// Display message
-				cout << "Syncing" << endl;
-			}
-			
-			// Catch errors
-			catch(...) {
-			
-			}
+			// Display message
+			cout << "Syncing" << endl;
 		});
 		
 		// Set node's on synced syncing callback
-		node.setOnSyncedCallback([&messageLock]() -> void {
+		node.setOnSyncedCallback([](MwcValidationNode::Node &node) -> void {
 		
-			// Try
-			try {
-			
-				// Lock message lock
-				lock_guard lock(messageLock);
-				
-				// Display message
-				cout << "Synced" << endl;
-			}
-			
-			// Catch errors
-			catch(...) {
-			
-			}
+			// Display message
+			cout << "Synced" << endl;
 		});
 		
 		// Set node's on transaction hash set callback
-		node.setOnTransactionHashSetCallback([&messageLock](const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Header> &headers, const MwcValidationNode::Header &transactionHashSetArchiveHeader, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Kernel> &kernels, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Output> &outputs, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Rangeproof> &rangeproofs, const uint64_t oldHeight) -> bool {
+		node.setOnTransactionHashSetCallback([](MwcValidationNode::Node &node, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Header> &headers, const MwcValidationNode::Header &transactionHashSetArchiveHeader, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Kernel> &kernels, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Output> &outputs, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Rangeproof> &rangeproofs, const uint64_t oldHeight) -> bool {
 		
-			// Try
-			try {
+			// Check if a reorg occurred
+			if(oldHeight >= transactionHashSetArchiveHeader.getHeight()) {
 			
-				// Lock message lock
-				lock_guard lock(messageLock);
-				
-				// Check if a reorg occurred
-				if(oldHeight >= transactionHashSetArchiveHeader.getHeight()) {
-				
-					// Display message
-					cout << "Reorg occurred with depth: " << (oldHeight - transactionHashSetArchiveHeader.getHeight() + 1) << endl;
-				}
-				
 				// Display message
-				cout << "Transaction hash set height: " << transactionHashSetArchiveHeader.getHeight() << " at " << chrono::duration_cast<chrono::seconds>(transactionHashSetArchiveHeader.getTimestamp().time_since_epoch()).count() << endl;
+				cout << "Reorg occurred with depth: " << (oldHeight - transactionHashSetArchiveHeader.getHeight() + 1) << endl;
 			}
 			
-			// Catch errors
-			catch(...) {
-			
-			}
+			// Display message
+			cout << "Transaction hash set height: " << transactionHashSetArchiveHeader.getHeight() << " at " << chrono::duration_cast<chrono::seconds>(transactionHashSetArchiveHeader.getTimestamp().time_since_epoch()).count() << endl;
 			
 			// Return true
 			return true;
 		});
 		
 		// Set node's on block callback
-		node.setOnBlockCallback([&messageLock](const MwcValidationNode::Header &header, const MwcValidationNode::Block &block, const uint64_t oldHeight) -> bool {
+		node.setOnBlockCallback([](MwcValidationNode::Node &node, const MwcValidationNode::Header &header, const MwcValidationNode::Block &block, const uint64_t oldHeight) -> bool {
 		
-			// Try
-			try {
+			// Check if a reorg occurred
+			if(oldHeight >= header.getHeight()) {
 			
-				// Lock message lock
-				lock_guard lock(messageLock);
-				
-				// Check if a reorg occurred
-				if(oldHeight >= header.getHeight()) {
-				
-					// Display message
-					cout << "Reorg occurred with depth: " << (oldHeight - header.getHeight() + 1) << endl;
-				}
-				
 				// Display message
-				cout << "Block height: " << header.getHeight() << " at " << chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count() << endl;
+				cout << "Reorg occurred with depth: " << (oldHeight - header.getHeight() + 1) << endl;
 			}
 			
-			// Catch errors
-			catch(...) {
-			
-			}
+			// Display message
+			cout << "Block height: " << header.getHeight() << " at " << chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count() << endl;
 			
 			// Return true
 			return true;
 		});
 		
 		// Set node's on peer connect callback
-		node.setOnPeerConnectCallback([&messageLock](const string &peerIdentifier) -> void {
+		node.setOnPeerConnectCallback([](MwcValidationNode::Node &node, const string &peerIdentifier) -> void {
 		
-			// Try
-			try {
-			
-				// Lock message lock
-				lock_guard lock(messageLock);
-				
-				// Display message
-				cout << "Connected to peer: " << peerIdentifier << endl;
-			}
-			
-			// Catch errors
-			catch(...) {
-			
-			}
+			// Display message
+			cout << "Connected to peer: " << peerIdentifier << endl;
 		});
 		
 		// Set node's on peer info callback
-		node.setOnPeerInfoCallback([&messageLock](const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) -> void {
+		node.setOnPeerInfoCallback([](MwcValidationNode::Node &node, const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) -> void {
 		
-			// Try
-			try {
-			
-				// Lock message lock
-				lock_guard lock(messageLock);
-				
-				// Display message
-				cout << "Peer " << peerIdentifier << " is " << userAgent << endl;
-			}
-			
-			// Catch errors
-			catch(...) {
-			
-			}
+			// Display message
+			cout << "Peer " << peerIdentifier << " is " << userAgent << endl;
 		});
 		
 		// Set node's on peer disconnect callback
-		node.setOnPeerDisconnectCallback([&messageLock](const string &peerIdentifier) -> void {
+		node.setOnPeerDisconnectCallback([](MwcValidationNode::Node &node, const string &peerIdentifier) -> void {
 		
-			// Try
-			try {
-			
-				// Lock message lock
-				lock_guard lock(messageLock);
-				
-				// Display message
-				cout << "Disconnected from peer: " << peerIdentifier << endl;
-			}
-			
-			// Catch errors
-			catch(...) {
-			
-			}
+			// Display message
+			cout << "Disconnected from peer: " << peerIdentifier << endl;
 		});
 		
 		// Start node
