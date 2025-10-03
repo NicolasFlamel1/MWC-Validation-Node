@@ -191,7 +191,7 @@ int main() {
 		}
 		
 		// Check if an error occurred
-		if(node.errorOccurred()) {
+		if(MwcValidationNode::Common::errorOccurred()) {
 		
 			// Return failure
 			return EXIT_FAILURE;

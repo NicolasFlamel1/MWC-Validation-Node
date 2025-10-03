@@ -1553,13 +1553,6 @@ tuple<Header, Block, uint64_t> Node::getNextBlock(const function<tuple<Output, R
 	#endif
 }
 
-// Error occurred
-bool Node::errorOccurred() const {
-
-	// Return if an error occurred
-	return Common::errorOccurred();
-}
-
 // Get lock
 shared_mutex &Node::getLock() {
 

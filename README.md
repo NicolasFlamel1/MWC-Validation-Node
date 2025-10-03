@@ -116,7 +116,7 @@ int main() {
 	// Start node
 	node.start();
 	
-	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), node.broadcastTransaction(), node.broadcastBlock(), node.errorOccurred(), and calling the node's destructor. All other node functions must happen in the callback functions
+	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), node.broadcastTransaction(), node.broadcastBlock(), and calling the node's destructor. All other node functions must happen in the callback functions
 	
 	// Stop node
 	node.stop();

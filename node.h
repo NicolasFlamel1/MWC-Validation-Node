@@ -173,9 +173,6 @@ class Node final {
 		// Get next block
 		tuple<Header, Block, uint64_t> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
 		
-		// Error occurred
-		bool errorOccurred() const;
-		
 	// Public for peer class
 	private:
 	
