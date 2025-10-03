@@ -20,6 +20,12 @@ namespace MwcValidationNode {
 
 // Classes
 
+// Transaction class forward declaration
+class Transaction;
+
+// Node class forward declaration
+class Node;
+
 // Block class
 class Block final {
 
@@ -27,31 +33,37 @@ class Block final {
 	public:
 	
 		// Constructor
-		explicit Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction, const bool verify = true);
-		
-		// Get inputs
-		list<Input> &getInputs();
+		explicit Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels);
 		
 		// Get inputs
 		const list<Input> &getInputs() const;
 		
 		// Get outputs
-		list<Output> &getOutputs();
-		
-		// Get outputs
 		const list<Output> &getOutputs() const;
-		
-		// Get rangeproofs
-		list<Rangeproof> &getRangeproofs();
 		
 		// Get rangeproofs
 		const list<Rangeproof> &getRangeproofs() const;
 		
 		// Get kernels
-		list<Kernel> &getKernels();
-		
-		// Get kernels
 		const list<Kernel> &getKernels() const;
+		
+	// Public for transaction class
+	private:
+	
+		// Transaction friend class
+		friend class Transaction;
+	
+		// Get inputs
+		list<Input> &getInputs();
+		
+	// Public for node class
+	private:
+	
+		// Node friend class
+		friend class Node;
+		
+		// Constructor
+		explicit Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction, const bool verify = true);
 		
 	// Private
 	private:

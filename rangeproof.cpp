@@ -16,83 +16,11 @@ using namespace MwcValidationNode;
 // Supporting function implementation
 
 // Constructor
-Rangeproof::Rangeproof(const uint64_t length, const uint8_t proof[Crypto::BULLETPROOF_LENGTH], const bool isGenesisBlockRangeproof) :
+Rangeproof::Rangeproof(const uint64_t length, const uint8_t proof[Crypto::BULLETPROOF_LENGTH]) :
 
-	// Set length to length
-	length(length)
+	// Delegate constructor
+	Rangeproof(length, proof, false)
 {
-
-	// Check if length is invalid
-	if(length != sizeof(this->proof)) {
-	
-		// Throw exception
-		throw runtime_error("Length is invalid");
-	}
-
-	// Set proof to proof
-	memcpy(this->proof, proof, sizeof(this->proof));
-	
-	// Check if rangeproof doesn't match the genesis block rangeproof
-	if(isGenesisBlockRangeproof && *this != Consensus::GENESIS_BLOCK_RANGEPROOF) {
-	
-		// Throw exception
-		throw runtime_error("Rangeproof doesn't match the genesis block rangeproof");
-	}
-}
-
-// Serialize
-vector<uint8_t> Rangeproof::serialize() const {
-
-	// Initialize serialized rangeproof
-	vector<uint8_t> serializedRangeproof;
-	
-	// Append length to serialized rangeproof
-	Common::writeUint64(serializedRangeproof, length);
-	
-	// Append proof to serialized rangeproof
-	serializedRangeproof.insert(serializedRangeproof.cend(), cbegin(proof), cend(proof));
-	
-	// Return serialized rangeproof
-	return serializedRangeproof;
-}
-
-// Save
-void Rangeproof::save(ofstream &file) const {
-
-	// Write length to file
-	const uint64_t serializedLength = Common::hostByteOrderToBigEndian(length);
-	file.write(reinterpret_cast<const char *>(&serializedLength), sizeof(serializedLength));
-	
-	// Write proof to file
-	file.write(reinterpret_cast<const char *>(proof), sizeof(proof));
-}
-
-// Equality operator
-bool Rangeproof::operator==(const Rangeproof &other) const {
-
-	// Check if lengths differ
-	if(length != other.length) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if proofs differ
-	if(memcmp(proof, other.proof, sizeof(other.proof))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Return true
-	return true;
-}
-
-// Inequality operator
-bool Rangeproof::operator!=(const Rangeproof &other) const {
-
-	// Return if rangeproofs aren't equal
-	return !(*this == other);
 }
 
 // Get length
@@ -129,6 +57,62 @@ array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Rangeproof::getHash() const {
 	return hash;
 }
 
+// Equality operator
+bool Rangeproof::operator==(const Rangeproof &other) const {
+
+	// Check if lengths differ
+	if(length != other.length) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if proofs differ
+	if(memcmp(proof, other.proof, sizeof(other.proof))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Return true
+	return true;
+}
+
+// Inequality operator
+bool Rangeproof::operator!=(const Rangeproof &other) const {
+
+	// Return if rangeproofs aren't equal
+	return !(*this == other);
+}
+
+// Save
+void Rangeproof::save(ofstream &file) const {
+
+	// Write length to file
+	const uint64_t serializedLength = Common::hostByteOrderToBigEndian(length);
+	file.write(reinterpret_cast<const char *>(&serializedLength), sizeof(serializedLength));
+	
+	// Write proof to file
+	file.write(reinterpret_cast<const char *>(proof), sizeof(proof));
+}
+
+// Restore
+Rangeproof Rangeproof::restore(ifstream &file) {
+
+	// Return rangeproof created from file
+	return Rangeproof(file);
+}
+
+// Save sum
+void Rangeproof::saveSum(const int &sum, ofstream &file) {
+
+}
+
+// Restore sum
+void Rangeproof::restoreSum(int &sum, ifstream &file) {
+
+}
+
 // Get serialized protocol version
 uint32_t Rangeproof::getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedRangeproof, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedRangeproofLength, const uint32_t protocolVersion) {
 
@@ -156,21 +140,45 @@ pair<Rangeproof, array<uint8_t, Rangeproof::MAXIMUM_SERIALIZED_LENGTH>::size_typ
 	return {Rangeproof(length, proof, isGenesisBlockRangeproof), MAXIMUM_SERIALIZED_LENGTH};
 }
 
-// Restore
-Rangeproof Rangeproof::restore(ifstream &file) {
+// Serialize
+vector<uint8_t> Rangeproof::serialize() const {
 
-	// Return rangeproof created from file
-	return Rangeproof(file);
+	// Initialize serialized rangeproof
+	vector<uint8_t> serializedRangeproof;
+	
+	// Append length to serialized rangeproof
+	Common::writeUint64(serializedRangeproof, length);
+	
+	// Append proof to serialized rangeproof
+	serializedRangeproof.insert(serializedRangeproof.cend(), cbegin(proof), cend(proof));
+	
+	// Return serialized rangeproof
+	return serializedRangeproof;
 }
 
-// Save sum
-void Rangeproof::saveSum(const int &sum, ofstream &file) {
+// Constructor
+Rangeproof::Rangeproof(const uint64_t length, const uint8_t proof[Crypto::BULLETPROOF_LENGTH], const bool isGenesisBlockRangeproof) :
 
-}
+	// Set length to length
+	length(length)
+{
 
-// Restore sum
-void Rangeproof::restoreSum(int &sum, ifstream &file) {
+	// Check if length is invalid
+	if(length != sizeof(this->proof)) {
+	
+		// Throw exception
+		throw runtime_error("Length is invalid");
+	}
 
+	// Set proof to proof
+	memcpy(this->proof, proof, sizeof(this->proof));
+	
+	// Check if rangeproof doesn't match the genesis block rangeproof
+	if(isGenesisBlockRangeproof && *this != Consensus::GENESIS_BLOCK_RANGEPROOF) {
+	
+		// Throw exception
+		throw runtime_error("Rangeproof doesn't match the genesis block rangeproof");
+	}
 }
 
 // Constructor

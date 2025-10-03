@@ -27,7 +27,19 @@ class ProofOfWork final {
 		
 		// Has valid proof of work
 		static bool hasValidProofOfWork(const Header &header);
+		
+	// Public for header class
+	private:
 	
+		// Header friend class
+		friend class Header;
+		
+		// Has valid proof of work
+		static bool hasValidProofOfWork(const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> &proofOfWorkHash, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]);
+		
+		// Get proof of work hash
+		static array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getProofOfWorkHash(const Header &header, const uint64_t nonce);
+		
 	// Private
 	private:
 	
@@ -73,9 +85,6 @@ class ProofOfWork final {
 				// Values
 				uint64_t values[SIPHASH_KEYS_LENGTH];
 		};
-	
-		// Get proof of work hash
-		static array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getProofOfWorkHash(const Header &header);
 		
 		// SipHash block
 		static uint64_t sipHashBlock(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH], const uint64_t nonce, const uint8_t rotation);

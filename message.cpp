@@ -72,7 +72,7 @@ const uint64_t Message::BASE_FEE_BEFORE_PROTOCOL_VERSION_FOUR = 1000000;
 // Supporting function implementation
 
 // Create hand message
-vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress, const uint64_t baseFee) {
+vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress, const uint64_t baseFee, const Node::Capabilities capabilities, const char *userAgent) {
 
 	// Initialize payload
 	vector<uint8_t> payload;
@@ -81,7 +81,7 @@ vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t 
 	Common::writeUint32(payload, *COMPATIBLE_PROTOCOL_VERSIONS.crbegin());
 	
 	// Append capabilities to payload
-	Common::writeUint32(payload, Node::CAPABILITIES);
+	Common::writeUint32(payload, capabilities);
 	
 	// Append nonce to payload
 	Common::writeUint64(payload, nonce);
@@ -103,31 +103,31 @@ vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t 
 	writeNetworkAddress(payload, serverAddress);
 	
 	// Check if user agent length is invalid
-	if(sizeof(Node::USER_AGENT) - sizeof('\0') == 0) {
+	if(!userAgent || !*userAgent) {
 	
 		// Throw exception
 		throw runtime_error("User agent length is invalid");
 	}
 	
 	// Check if user agent length is too big
-	if(sizeof(Node::USER_AGENT) - sizeof('\0') > MAXIMUM_USER_AGENT_LENGTH) {
+	if(strlen(userAgent) > MAXIMUM_USER_AGENT_LENGTH) {
 	
 		// Throw exception
 		throw runtime_error("User agent length is too big");
 	}
 	
 	// Append user agent length to payload
-	Common::writeUint64(payload, sizeof(Node::USER_AGENT) - sizeof('\0'));
+	Common::writeUint64(payload, strlen(userAgent));
 	
 	// Check if user agent is invalid
-	if(!Common::isUtf8(Node::USER_AGENT, sizeof(Node::USER_AGENT) - sizeof('\0'))) {
+	if(!Common::isUtf8(userAgent, strlen(userAgent))) {
 	
 		// Throw exception
 		throw runtime_error("User agent is invalid");
 	}
 	
 	// Append user agent to payload
-	payload.insert(payload.cend(), cbegin(Node::USER_AGENT), cend(Node::USER_AGENT) - sizeof('\0'));
+	payload.insert(payload.cend(), userAgent, userAgent + strlen(userAgent));
 	
 	// Get genesis block's block hash
 	const array blockHash = Consensus::GENESIS_BLOCK_HEADER.getBlockHash();
@@ -850,7 +850,7 @@ tuple<Header, Block> Message::readBlockMessage(const vector<uint8_t> &blockMessa
 	tuple transactionBody = readTransactionBody(blockMessage, MESSAGE_HEADER_LENGTH + headerSize, protocolVersion, false, header.getHeight(), header.getVersion());
 	
 	// Create block
-	const Block block(move(get<0>(transactionBody)), move(get<1>(transactionBody)), move(get<2>(transactionBody)), move(get<3>(transactionBody)), false);
+	const Block block(move(get<0>(transactionBody)), move(get<1>(transactionBody)), move(get<2>(transactionBody)), move(get<3>(transactionBody)));
 	
 	// Return header and block
 	return {header, block};

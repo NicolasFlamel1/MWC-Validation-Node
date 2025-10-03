@@ -126,7 +126,7 @@ class Message final {
 		Message() = delete;
 		
 		// Create hand message
-		static vector<uint8_t> createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress, const uint64_t baseFee);
+		static vector<uint8_t> createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress, const uint64_t baseFee, const Node::Capabilities capabilities, const char *userAgent);
 		
 		// Create ping message
 		static vector<uint8_t> createPingMessage(const uint64_t totalDifficulty, const uint64_t height);

@@ -56,7 +56,7 @@ int main() {
 
 	// Try
 	try {
-
+	
 		// Check if Windows
 		#ifdef _WIN32
 		
@@ -66,13 +66,6 @@ int main() {
 		
 		// Create node
 		MwcValidationNode::Node node;
-		
-		// Check if initializing common failed
-		if(!MwcValidationNode::Common::initialize()) {
-		
-			// Return failure
-			return EXIT_FAILURE;
-		}
 		
 		// Try
 		try {
@@ -135,6 +128,35 @@ int main() {
 			catch(...) {
 			
 			}
+		});
+		
+		// Set node's on transaction hash set callback
+		node.setOnTransactionHashSetCallback([&messageLock](const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Header> &headers, const MwcValidationNode::Header &transactionHashSetArchiveHeader, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Kernel> &kernels, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Output> &outputs, const MwcValidationNode::MerkleMountainRange<MwcValidationNode::Rangeproof> &rangeproofs, const uint64_t oldHeight) -> bool {
+		
+			// Try
+			try {
+			
+				// Lock message lock
+				lock_guard lock(messageLock);
+				
+				// Check if a reorg occurred
+				if(oldHeight >= transactionHashSetArchiveHeader.getHeight()) {
+				
+					// Display message
+					cout << "Reorg occurred with depth: " << (oldHeight - transactionHashSetArchiveHeader.getHeight() + 1) << endl;
+				}
+				
+				// Display message
+				cout << "Transaction hash set height: " << transactionHashSetArchiveHeader.getHeight() << " at " << chrono::duration_cast<chrono::seconds>(transactionHashSetArchiveHeader.getTimestamp().time_since_epoch()).count() << endl;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+			}
+			
+			// Return true
+			return true;
 		});
 		
 		// Set node's on block callback
@@ -257,7 +279,7 @@ int main() {
 		}
 		
 		// Check if an error occurred
-		if(MwcValidationNode::Common::errorOccurred()) {
+		if(node.errorOccurred()) {
 		
 			// Return failure
 			return EXIT_FAILURE;

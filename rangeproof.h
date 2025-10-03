@@ -17,6 +17,15 @@ namespace MwcValidationNode {
 
 // Classes
 
+// Merkle mountain range class forward declaration
+template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange;
+
+// Transaction class forward declaration
+class Transaction;
+
+// Consensus class forward declaration
+class Consensus;
+
 // Rangeproof class
 class Rangeproof final : public MerkleMountainRangeLeaf<Rangeproof, sizeof(uint64_t) + Crypto::BULLETPROOF_LENGTH> {
 
@@ -24,19 +33,7 @@ class Rangeproof final : public MerkleMountainRangeLeaf<Rangeproof, sizeof(uint6
 	public:
 	
 		// Constructor
-		explicit Rangeproof(const uint64_t length, const uint8_t proof[Crypto::BULLETPROOF_LENGTH], const bool isGenesisBlockRangeproof = false);
-		
-		// Serialize
-		virtual vector<uint8_t> serialize() const override final;
-		
-		// Save
-		virtual void save(ofstream &file) const override final;
-		
-		// Equality operator
-		bool operator==(const Rangeproof &other) const;
-		
-		// Inequality operator
-		bool operator!=(const Rangeproof &other) const;
+		explicit Rangeproof(const uint64_t length, const uint8_t proof[Crypto::BULLETPROOF_LENGTH]);
 		
 		// Get length
 		uint64_t getLength() const;
@@ -47,11 +44,20 @@ class Rangeproof final : public MerkleMountainRangeLeaf<Rangeproof, sizeof(uint6
 		// Get hash
 		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getHash() const;
 		
-		// Get serialized protocol version
-		static uint32_t getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedRangeproof, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedRangeproofLength, const uint32_t protocolVersion);
+		// Equality operator
+		bool operator==(const Rangeproof &other) const;
 		
-		// Unserialize
-		static pair<Rangeproof, array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type> unserialize(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedRangeproof, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedRangeproofLength, const uint32_t protocolVersion, const bool isGenesisBlockRangeproof);
+		// Inequality operator
+		bool operator!=(const Rangeproof &other) const;
+		
+	// Public for Merkle mountain range class
+	private:
+	
+		// Merkle mountain range friend class
+		friend class MerkleMountainRange<Rangeproof>;
+		
+		// Save
+		virtual void save(ofstream &file) const override final;
 		
 		// Restore
 		static Rangeproof restore(ifstream &file);
@@ -61,10 +67,34 @@ class Rangeproof final : public MerkleMountainRangeLeaf<Rangeproof, sizeof(uint6
 		
 		// Restore sum
 		static void restoreSum(int &sum, ifstream &file);
+		
+		// Get serialized protocol version
+		static uint32_t getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedRangeproof, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedRangeproofLength, const uint32_t protocolVersion);
+		
+		// Unserialize
+		static pair<Rangeproof, array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type> unserialize(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedRangeproof, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedRangeproofLength, const uint32_t protocolVersion, const bool isGenesisBlockRangeproof);
+		
+	// Public for transaction class
+	private:
 	
+		// Transaction friend class
+		friend class Transaction;
+		
+		// Serialize
+		virtual vector<uint8_t> serialize() const override final;
+		
+	// Public for consensus class
+	private:
+	
+		// Consensus friend class
+		friend class Consensus;
+		
+		// Constructor
+		explicit Rangeproof(const uint64_t length, const uint8_t proof[Crypto::BULLETPROOF_LENGTH], const bool isGenesisBlockRangeproof);
+		
 	// Private
 	private:
-		
+	
 		// Constructor
 		explicit Rangeproof(ifstream &file);
 		

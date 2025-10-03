@@ -119,7 +119,7 @@ const chrono::milliseconds Peer::BEFORE_DISCONNECT_DELAY_DURATION = 1ms;
 // Supporting function implementation
 
 // Constructor
-Peer::Peer(const string &address, Node &node, condition_variable &eventOccurred, const mt19937_64::result_type randomSeed) :
+Peer::Peer(condition_variable &eventOccurred, const mt19937_64::result_type randomSeed) :
 
 	// Set stop read and write to false
 	stopReadAndWrite(false),
@@ -146,8 +146,8 @@ Peer::Peer(const string &address, Node &node, condition_variable &eventOccurred,
 		socket(-1),
 	#endif
 	
-	// Set node to node
-	node(node),
+	// Set node to nothing
+	node(nullptr),
 	
 	// Set event occurred to event occurred
 	eventOccurred(eventOccurred),
@@ -165,16 +165,20 @@ Peer::Peer(const string &address, Node &node, condition_variable &eventOccurred,
 	randomNumberGenerator(randomSeed),
 	
 	// Set nonce to a random value
-	nonce(randomNumberGenerator()),
-	
-	// Create main thread
-	mainThread(&Peer::connect, this, address)
+	nonce(randomNumberGenerator())
 {
 }
 
 // Destructor
 Peer::~Peer() {
 
+	// Check if not started
+	if(!node) {
+	
+		// Return
+		return;
+	}
+	
 	// Set stop read and write to true
 	stopReadAndWrite.store(true);
 	
@@ -452,13 +456,13 @@ Peer::~Peer() {
 		try {
 		
 			// Lock node for writing
-			lock_guard nodeWriteLock(node.getLock());
+			lock_guard nodeWriteLock(node->getLock());
 			
 			// Check if self is healthy
-			if(node.isPeerHealthy(identifier)) {
+			if(node->isPeerHealthy(identifier)) {
 			
 				// Add self to node's healthy peer
-				node.addHealthyPeer(identifier, capabilities);
+				node->addHealthyPeer(identifier, capabilities);
 			}
 		}
 		
@@ -472,6 +476,13 @@ Peer::~Peer() {
 // Stop
 void Peer::stop() {
 
+	// Check if not started
+	if(!node) {
+	
+		// Throw exception
+		throw runtime_error("Peer not started");
+	}
+	
 	// Set stop read and write to true
 	stopReadAndWrite.store(true);
 }
@@ -479,8 +490,53 @@ void Peer::stop() {
 // Get thread
 thread &Peer::getThread() {
 
+	// Check if not started
+	if(!node) {
+	
+		// Throw exception
+		throw runtime_error("Peer not started");
+	}
+	
 	// Return main thread
 	return mainThread;
+}
+
+// Get thread
+const thread &Peer::getThread() const {
+
+	// Check if not started
+	if(!node) {
+	
+		// Throw exception
+		throw runtime_error("Peer not started");
+	}
+	
+	// Return main thread
+	return mainThread;
+}
+
+// Is worker operation running
+bool Peer::isWorkerOperationRunning() const {
+
+	// Check if not started
+	if(!node) {
+	
+		// Throw exception
+		throw runtime_error("Peer not started");
+	}
+	
+	// Return if worker operation exists
+	return workerOperation.valid();
+}
+
+// Start
+void Peer::start(const string &address, Node *node) {
+
+	// Set node to node
+	this->node = node;
+	
+	// Create main thread
+	mainThread = thread(&Peer::connect, this, address);
 }
 
 // Get lock
@@ -576,13 +632,6 @@ MerkleMountainRange<Header> &Peer::getHeaders() {
 	return headers;
 }
 
-// Is worker operation running
-bool Peer::isWorkerOperationRunning() const {
-
-	// Return if worker operation exists
-	return workerOperation.valid();
-}
-
 // Send message
 void Peer::sendMessage(const vector<uint8_t> &message) {
 
@@ -634,7 +683,7 @@ void Peer::connect(const string &address) {
 				}
 				
 				// Check if address isn't a DNS seed
-				if(!node.getDnsSeeds().contains(address)) {
+				if(!node->getDnsSeeds().contains(address)) {
 				
 					// Notify peers that event occurred
 					eventOccurred.notify_one();
@@ -685,7 +734,7 @@ void Peer::connect(const string &address) {
 		#ifdef ENABLE_TOR
 		
 			// Check if getting address info for the node's Tor proxy failed
-			if(getaddrinfo(node.getTorProxyAddress().c_str(), node.getTorProxyPort().c_str(), &hints, &addressInfo)) {
+			if(getaddrinfo(node->getTorProxyAddress().c_str(), node->getTorProxyPort().c_str(), &hints, &addressInfo)) {
 		
 		// Otherwise
 		#else
@@ -706,7 +755,7 @@ void Peer::connect(const string &address) {
 			}
 			
 			// Check if address isn't a DNS seed
-			if(!node.getDnsSeeds().contains(address)) {
+			if(!node->getDnsSeeds().contains(address)) {
 			
 				// Notify peers that event occurred
 				eventOccurred.notify_one();
@@ -874,10 +923,10 @@ void Peer::connect(const string &address) {
 				
 					{
 						// Lock node for reading
-						shared_lock nodeReadLock(node.getLock());
+						shared_lock nodeReadLock(node->getLock());
 						
 						// Check if server is banned
-						if(node.isPeerBanned(serverIdentifier)) {
+						if(node->isPeerBanned(serverIdentifier)) {
 						
 							// Unlock node read lock
 							nodeReadLock.unlock();
@@ -893,10 +942,10 @@ void Peer::connect(const string &address) {
 					{
 					
 						// Lock node for writing
-						unique_lock nodeWriteLock(node.getLock());
+						unique_lock nodeWriteLock(node->getLock());
 						
 						// Check if server was recently connected
-						if(node.isPeerCandidateRecentlyAttempted(serverIdentifier)) {
+						if(node->isPeerCandidateRecentlyAttempted(serverIdentifier)) {
 						
 							// Unlock node write lock
 							nodeWriteLock.unlock();
@@ -909,7 +958,7 @@ void Peer::connect(const string &address) {
 						}
 						
 						// Check if server is currently used
-						if(node.getCurrentlyUsedPeerCandidates().contains(serverIdentifier)) {
+						if(node->getCurrentlyUsedPeerCandidates().contains(serverIdentifier)) {
 						
 							// Unlock node write lock
 							nodeWriteLock.unlock();
@@ -922,10 +971,10 @@ void Peer::connect(const string &address) {
 						}
 						
 						// Add server to node's recently attempted peer candidates
-						node.addRecentlyAttemptedPeerCandidate(serverIdentifier);
+						node->addRecentlyAttemptedPeerCandidate(serverIdentifier);
 						
 						// Add server to the node's list of currently used peer candidates
-						node.getCurrentlyUsedPeerCandidates().insert(serverIdentifier);
+						node->getCurrentlyUsedPeerCandidates().insert(serverIdentifier);
 					}
 					
 					// Set identifier to server identifier
@@ -1422,10 +1471,10 @@ void Peer::connect(const string &address) {
 																		
 																			{
 																				// Lock node for reading
-																				shared_lock nodeReadLock(node.getLock());
+																				shared_lock nodeReadLock(node->getLock());
 																				
 																				// Check if server is banned
-																				if(node.isPeerBanned(serverIdentifier)) {
+																				if(node->isPeerBanned(serverIdentifier)) {
 																				
 																					// Unlock node read lock
 																					nodeReadLock.unlock();
@@ -1444,10 +1493,10 @@ void Peer::connect(const string &address) {
 																				{
 																				
 																					// Lock node for writing
-																					unique_lock nodeWriteLock(node.getLock());
+																					unique_lock nodeWriteLock(node->getLock());
 																					
 																					// Check if server was recently connected
-																					if(node.isPeerCandidateRecentlyAttempted(serverIdentifier)) {
+																					if(node->isPeerCandidateRecentlyAttempted(serverIdentifier)) {
 																					
 																						// Unlock node write lock
 																						nodeWriteLock.unlock();
@@ -1460,7 +1509,7 @@ void Peer::connect(const string &address) {
 																					}
 																					
 																					// Otherwise check if server is currently used
-																					else if(node.getCurrentlyUsedPeerCandidates().contains(serverIdentifier)) {
+																					else if(node->getCurrentlyUsedPeerCandidates().contains(serverIdentifier)) {
 																					
 																						// Unlock node write lock
 																						nodeWriteLock.unlock();
@@ -1476,10 +1525,10 @@ void Peer::connect(const string &address) {
 																					else {
 																					
 																						// Add server to node's recently attempted peer candidates
-																						node.addRecentlyAttemptedPeerCandidate(serverIdentifier);
+																						node->addRecentlyAttemptedPeerCandidate(serverIdentifier);
 																						
 																						// Add server to the node's list of currently used peer candidates
-																						node.getCurrentlyUsedPeerCandidates().insert(serverIdentifier);
+																						node->getCurrentlyUsedPeerCandidates().insert(serverIdentifier);
 																					}
 																				}
 																				
@@ -2055,7 +2104,7 @@ void Peer::connect(const string &address) {
 											if(!invalidClient) {
 											
 												// Let node know that a peer connected
-												node.peerConnected(identifier);
+												node->peerConnected(identifier);
 											
 												// Set peer connected to true
 												peerConnected = true;
@@ -2125,10 +2174,10 @@ void Peer::connect(const string &address) {
 					try {
 					
 						// Lock node for writing
-						lock_guard nodeWriteLock(node.getLock());
+						lock_guard nodeWriteLock(node->getLock());
 						
 						// Remove server to the node's list of currently used peer candidates
-						node.getCurrentlyUsedPeerCandidates().erase(identifier);
+						node->getCurrentlyUsedPeerCandidates().erase(identifier);
 					}
 					
 					// Catch errors
@@ -2154,14 +2203,14 @@ void Peer::connect(const string &address) {
 					
 					{
 						// Lock node for reading
-						shared_lock nodeReadLock(node.getLock());
+						shared_lock nodeReadLock(node->getLock());
 				
 						// Set node's total difficulty to node's total difficulty
-						nodesTotalDifficulty = node.getTotalDifficulty();
+						nodesTotalDifficulty = node->getTotalDifficulty();
 					}
 				
 					// Create hand message
-					const vector handMessage = Message::createHandMessage(nonce, nodesTotalDifficulty, clientAddress, serverAddress, node.getBaseFee());
+					const vector handMessage = Message::createHandMessage(nonce, nodesTotalDifficulty, clientAddress, serverAddress, node->getBaseFee(), Node::CAPABILITIES, Node::USER_AGENT);
 					
 					// Append hand message to write buffer
 					writeBuffer.insert(writeBuffer.cend(), handMessage.cbegin(), handMessage.cend());
@@ -2253,7 +2302,7 @@ void Peer::connect(const string &address) {
 				}
 				
 				// Check if address isn't a DNS seed or it's not banned, not recently attempted, not currently used, and can be retried
-				if(!node.getDnsSeeds().contains(address) || (!banned && !recentlyAttempted && !currentlyUsed && !dontRetry)) {
+				if(!node->getDnsSeeds().contains(address) || (!banned && !recentlyAttempted && !currentlyUsed && !dontRetry)) {
 				
 					// Notify peers that event occurred
 					eventOccurred.notify_one();
@@ -2330,10 +2379,10 @@ void Peer::readAndWrite() {
 				
 					{
 						// Lock node for writing
-						lock_guard nodeWriteLock(node.getLock());
+						lock_guard nodeWriteLock(node->getLock());
 						
 						// Add self to node's list of banned peers
-						node.addBannedPeer(identifier);
+						node->addBannedPeer(identifier);
 					}
 					
 					// Disconnect
@@ -2358,10 +2407,10 @@ void Peer::readAndWrite() {
 					
 					{
 						// Lock node for writing
-						lock_guard nodeWriteLock(node.getLock());
+						lock_guard nodeWriteLock(node->getLock());
 						
 						// Add self to node's list of banned peers
-						node.addBannedPeer(identifier);
+						node->addBannedPeer(identifier);
 					}
 					
 					// Disconnect
@@ -2470,10 +2519,10 @@ void Peer::readAndWrite() {
 			
 					{
 						// Lock node for writing
-						lock_guard nodeWriteLock(node.getLock());
+						lock_guard nodeWriteLock(node->getLock());
 						
 						// Add self to node's list of banned peers
-						node.addBannedPeer(identifier);
+						node->addBannedPeer(identifier);
 					}
 					
 					// Disconnect
@@ -2514,10 +2563,10 @@ void Peer::readAndWrite() {
 							
 								{
 									// Lock node for reading
-									shared_lock nodeReadLock(node.getLock());
+									shared_lock nodeReadLock(node->getLock());
 									
 									// Set headers to node's headers
-									headers = node.getHeaders();
+									headers = node->getHeaders();
 								}
 								
 								// Set use node headers to false
@@ -2631,10 +2680,10 @@ void Peer::readAndWrite() {
 								if(useNodeHeaders) {
 								
 									// Lock node for reading
-									shared_lock nodeReadLock(node.getLock());
+									shared_lock nodeReadLock(node->getLock());
 									
 									// Set block hash to the next header's block hash
-									blockHash = node.getHeaders().getLeaf(syncedHeaderIndex + 1)->getBlockHash();
+									blockHash = node->getHeaders().getLeaf(syncedHeaderIndex + 1)->getBlockHash();
 								}
 								
 								// Otherwise
@@ -2705,10 +2754,10 @@ void Peer::readAndWrite() {
 					
 						{
 							// Lock node for writing
-							lock_guard nodeWriteLock(node.getLock());
+							lock_guard nodeWriteLock(node->getLock());
 							
 							// Add self to node's list of banned peers
-							node.addBannedPeer(identifier);
+							node->addBannedPeer(identifier);
 						}
 						
 						// Disconnect
@@ -2732,13 +2781,13 @@ void Peer::readAndWrite() {
 				
 					{
 						// Lock node for reading
-						shared_lock nodeReadLock(node.getLock());
+						shared_lock nodeReadLock(node->getLock());
 						
 						// Set node's totoal difficulty to node's total difficulty
-						nodesTotalDifficulty = node.getTotalDifficulty();
+						nodesTotalDifficulty = node->getTotalDifficulty();
 						
 						// Set node's height to node's height
-						nodesHeight = node.getHeight();
+						nodesHeight = node->getHeight();
 					}
 				
 					// Create ping message
@@ -2765,13 +2814,13 @@ void Peer::readAndWrite() {
 				
 				{
 					// Lock node and self for reading
-					shared_lock nodeReadLock(node.getLock(), defer_lock);
+					shared_lock nodeReadLock(node->getLock(), defer_lock);
 					shared_lock readLock(lock, defer_lock);
 					
 					::lock(nodeReadLock, readLock);
 					
 					// Check if the total difficulty is less than the node's total difficulty
-					if(totalDifficulty < node.getTotalDifficulty()) {
+					if(totalDifficulty < node->getTotalDifficulty()) {
 					
 						// Unlock node and self read locks
 						nodeReadLock.unlock();
@@ -2782,10 +2831,10 @@ void Peer::readAndWrite() {
 						
 							{
 								// Lock node for writing
-								lock_guard nodeWriteLock(node.getLock());
+								lock_guard nodeWriteLock(node->getLock());
 								
 								// Add self to node's list of banned peers
-								node.addBannedPeer(identifier);
+								node->addBannedPeer(identifier);
 							}
 							
 							// Disconnect
@@ -3109,10 +3158,10 @@ void Peer::disconnect() {
 				try {
 			
 					// Lock node for writing
-					lock_guard nodeWriteLock(node.getLock());
+					lock_guard nodeWriteLock(node->getLock());
 					
 					// Add self to node's list of banned peers
-					node.addBannedPeer(identifier);
+					node->addBannedPeer(identifier);
 				}
 				
 				// Catch errors
@@ -3286,13 +3335,13 @@ void Peer::disconnect() {
 		// Try
 		try {
 			// Lock node for writing
-			lock_guard nodeWriteLock(node.getLock());
+			lock_guard nodeWriteLock(node->getLock());
 			
 			// Check if self is healthy
-			if(node.isPeerHealthy(identifier)) {
+			if(node->isPeerHealthy(identifier)) {
 			
 				// Add self to node's healthy peer
-				node.addHealthyPeer(identifier, capabilities);
+				node->addHealthyPeer(identifier, capabilities);
 			}
 		}
 		
@@ -3334,10 +3383,10 @@ bool Peer::processRequestsAndOrResponses() {
 		
 			{
 				// Lock node for writing
-				lock_guard nodeWriteLock(node.getLock());
+				lock_guard nodeWriteLock(node->getLock());
 				
 				// Add self to node's list of banned peers
-				node.addBannedPeer(identifier);
+				node->addBannedPeer(identifier);
 			}
 			
 			// Return false
@@ -3455,7 +3504,7 @@ bool Peer::processRequestsAndOrResponses() {
 					}
 					
 					// Let node know about a peer's info
-					node.peerInfo(identifier, shakeCapabilities, shakeUserAgent, shakeProtocolVersion, shakeBaseFee, shakeTotalDifficulty);
+					node->peerInfo(identifier, shakeCapabilities, shakeUserAgent, shakeProtocolVersion, shakeBaseFee, shakeTotalDifficulty);
 					
 					// Set last ping time to now
 					lastPingTime = chrono::steady_clock::now();
@@ -3513,13 +3562,13 @@ bool Peer::processRequestsAndOrResponses() {
 				
 					{
 						// Lock node for reading
-						shared_lock nodeReadLock(node.getLock());
+						shared_lock nodeReadLock(node->getLock());
 						
 						// Set node's total difficulty to node's total difficulty
-						nodesTotalDifficulty = node.getTotalDifficulty();
+						nodesTotalDifficulty = node->getTotalDifficulty();
 						
 						// Set node's height to node's height
-						nodesHeight = node.getHeight();
+						nodesHeight = node->getHeight();
 					}
 					
 					// Create pong message
@@ -3553,7 +3602,7 @@ bool Peer::processRequestsAndOrResponses() {
 					if(totalDifficultyChanged) {
 					
 						// Let node know that a peer updated
-						node.peerUpdated(identifier, pingTotalDifficulty, pingHeight);
+						node->peerUpdated(identifier, pingTotalDifficulty, pingHeight);
 					}
 					
 					// Set last ping time to now
@@ -3628,7 +3677,7 @@ bool Peer::processRequestsAndOrResponses() {
 					if(totalDifficultyChanged) {
 					
 						// Let node know that a peer updated
-						node.peerUpdated(identifier, pongTotalDifficulty, pongHeight);
+						node->peerUpdated(identifier, pongTotalDifficulty, pongHeight);
 					}
 					
 					// Set last ping time to now
@@ -3689,13 +3738,13 @@ bool Peer::processRequestsAndOrResponses() {
 			
 					{
 						// Lock node for reading
-						shared_lock nodeReadLock(node.getLock());
+						shared_lock nodeReadLock(node->getLock());
 						
 						// Go through all of the node's healthy peers
-						for(const auto &healthyPeer : node.getHealthyPeers()) {
+						for(const auto &healthyPeer : node->getHealthyPeers()) {
 						
 							// Check if peer is healthy
-							if(node.isPeerHealthy(healthyPeer.first)) {
+							if(node->isPeerHealthy(healthyPeer.first)) {
 						
 								// Check if Tor is enabled
 								#ifdef ENABLE_TOR
@@ -3923,17 +3972,17 @@ bool Peer::processRequestsAndOrResponses() {
 										string peerCandidate = string(ipString) + ':' + to_string(ntohs(peerAddress.port));
 									
 										// Lock node for writing
-										lock_guard nodeWriteLock(node.getLock());
+										lock_guard nodeWriteLock(node->getLock());
 										
 										// Check if peer candidate isn't already an unused peer candidate
-										if(!node.isUnusedPeerCandidateValid(peerCandidate)) {
+										if(!node->isUnusedPeerCandidateValid(peerCandidate)) {
 										
 											// Set new peer address received
 											newPeerAddressReceived = true;
 										}
 									
 										// Add peer candidate to node's unused peer candidates
-										node.addUnusedPeerCandidate(move(peerCandidate));
+										node->addUnusedPeerCandidate(move(peerCandidate));
 									}
 								}
 								
@@ -3953,17 +4002,17 @@ bool Peer::processRequestsAndOrResponses() {
 										string peerCandidate = '[' + string(ipString) + "]:" + to_string(ntohs(peerAddress.port));
 									
 										// Lock node for writing
-										lock_guard nodeWriteLock(node.getLock());
+										lock_guard nodeWriteLock(node->getLock());
 										
 										// Check if peer candidate isn't already an unused peer candidate
-										if(!node.isUnusedPeerCandidateValid(peerCandidate)) {
+										if(!node->isUnusedPeerCandidateValid(peerCandidate)) {
 										
 											// Set new peer address received
 											newPeerAddressReceived = true;
 										}
 									
 										// Add peer candidate to node's unused peer candidates
-										node.addUnusedPeerCandidate(move(peerCandidate));
+										node->addUnusedPeerCandidate(move(peerCandidate));
 									}
 								}
 								
@@ -3981,17 +4030,17 @@ bool Peer::processRequestsAndOrResponses() {
 										string peerCandidate(reinterpret_cast<const char *>(peerAddress.address), reinterpret_cast<const char *>(peerAddress.address) + peerAddress.addressLength);
 									
 										// Lock node for writing
-										lock_guard nodeWriteLock(node.getLock());
+										lock_guard nodeWriteLock(node->getLock());
 										
 										// Check if peer candidate isn't already an unused peer candidate
-										if(!node.isUnusedPeerCandidateValid(peerCandidate)) {
+										if(!node->isUnusedPeerCandidateValid(peerCandidate)) {
 										
 											// Set new peer address received
 											newPeerAddressReceived = true;
 										}
 									
 										// Add peer candidate to node's unused peer candidates
-										node.addUnusedPeerCandidate(move(peerCandidate));
+										node->addUnusedPeerCandidate(move(peerCandidate));
 									}
 									
 									// Break
@@ -4021,10 +4070,10 @@ bool Peer::processRequestsAndOrResponses() {
 						
 						{
 							// Lock node for writing
-							lock_guard nodeWriteLock(node.getLock());
+							lock_guard nodeWriteLock(node->getLock());
 							
 							// Add self to node's healthy peer
-							node.addHealthyPeer(identifier, capabilities);
+							node->addHealthyPeer(identifier, capabilities);
 						}
 						
 						// Check if Tor is enabled
@@ -4150,7 +4199,7 @@ bool Peer::processRequestsAndOrResponses() {
 					if(totalDifficultyChanged) {
 					
 						// Let node know that a peer updated
-						node.peerUpdated(identifier, header.value().getTotalDifficulty(), header.value().getHeight());
+						node->peerUpdated(identifier, header.value().getTotalDifficulty(), header.value().getHeight());
 					}
 					
 					// Set last ping time to now
@@ -4272,10 +4321,10 @@ bool Peer::processRequestsAndOrResponses() {
 						
 							{
 								// Lock node for reading
-								shared_lock nodeReadLock(node.getLock());
+								shared_lock nodeReadLock(node->getLock());
 								
 								// Check if newest header doesn't have a higher total difficulty than the node
-								if(this->headers.back().getTotalDifficulty() <= node.getTotalDifficulty()) {
+								if(this->headers.back().getTotalDifficulty() <= node->getTotalDifficulty()) {
 								
 									// Unlock node read lock
 									nodeReadLock.unlock();
@@ -4572,7 +4621,7 @@ bool Peer::processRequestsAndOrResponses() {
 					if(totalDifficultyChanged) {
 					
 						// Let node know that a peer updated
-						node.peerUpdated(identifier, header.value().getTotalDifficulty(), header.value().getHeight());
+						node->peerUpdated(identifier, header.value().getTotalDifficulty(), header.value().getHeight());
 					}
 					
 					// Set last ping time to now
@@ -4681,7 +4730,7 @@ bool Peer::processRequestsAndOrResponses() {
 					}
 					
 					// Check if protocol version is at least four and the transaction's fees are less than the node's required fees
-					if(protocolVersion >= 4 && transaction.value().getFees() < transaction.value().getRequiredFees(node.getBaseFee())) {
+					if(protocolVersion >= 4 && transaction.value().getFees() < transaction.value().getRequiredFees(node->getBaseFee())) {
 					
 						// Set ban to true
 						ban = true;
@@ -4694,10 +4743,10 @@ bool Peer::processRequestsAndOrResponses() {
 					try {
 					
 						// Lock node for writing
-						lock_guard nodeWriteLock(node.getLock());
+						lock_guard nodeWriteLock(node->getLock());
 						
 						// Add transaction to node's mempool
-						node.addToMempool(move(transaction.value()));
+						node->addToMempool(move(transaction.value()));
 					}
 					
 					// Catch errors
@@ -5029,10 +5078,10 @@ bool Peer::processRequestsAndOrResponses() {
 		
 			{
 				// Lock node for writing
-				lock_guard nodeWriteLock(node.getLock());
+				lock_guard nodeWriteLock(node->getLock());
 				
 				// Add self to node's list of banned peers
-				node.addBannedPeer(identifier);
+				node->addBannedPeer(identifier);
 			}
 			
 			// Return false
@@ -5740,7 +5789,7 @@ bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vect
 	
 	{
 		// Lock node and self for writing
-		unique_lock nodeWriteLock(node.getLock(), defer_lock);
+		unique_lock nodeWriteLock(node->getLock(), defer_lock);
 		unique_lock writeLock(lock, defer_lock);
 		
 		::lock(nodeWriteLock, writeLock);
@@ -5749,7 +5798,7 @@ bool Peer::processTransactionHashSetArchive(vector<uint8_t> &&buffer, const vect
 		if(connectionState != ConnectionState::DISCONNECTED) {
 		
 			// Set node's sync state
-			node.setSyncState(move(headers), *transactionHashSetArchiveHeader, move(kernels), move(outputs), move(rangeproofs));
+			node->setSyncState(move(headers), *transactionHashSetArchiveHeader, move(kernels), move(outputs), move(rangeproofs));
 			
 			// Set syncing state to not syncing
 			syncingState = SyncingState::NOT_SYNCING;
@@ -5798,7 +5847,7 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 	
 	// Get header and block from block components
 	const Header &header = get<0>(blockComponents.value());
-	Block &block = get<1>(blockComponents.value());
+	const Block &block = get<1>(blockComponents.value());
 	
 	// Initialize requested header
 	optional<Header> requestedHeader;
@@ -5807,10 +5856,10 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 	if(useNodeHeaders) {
 	
 		// Lock node for reading
-		shared_lock nodeReadLock(node.getLock());
+		shared_lock nodeReadLock(node->getLock());
 		
 		// Set requested header to the next header
-		requestedHeader = *node.getHeaders().getLeaf(syncedHeaderIndex + 1);
+		requestedHeader = *node->getHeaders().getLeaf(syncedHeaderIndex + 1);
 	}
 	
 	// Otherwise
@@ -6045,10 +6094,10 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 	if(useNodeHeaders) {
 	
 		// Lock node for reading
-		shared_lock nodeReadLock(node.getLock());
+		shared_lock nodeReadLock(node->getLock());
 		
 		// Set previous header to the previous header
-		previousHeader = *node.getHeaders().getLeaf(header.getHeight() - 1);
+		previousHeader = *node->getHeaders().getLeaf(header.getHeight() - 1);
 	}
 	
 	// Otherwise
@@ -6311,7 +6360,7 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 	
 	{
 		// Lock node and self for writing
-		unique_lock nodeWriteLock(node.getLock(), defer_lock);
+		unique_lock nodeWriteLock(node->getLock(), defer_lock);
 		unique_lock writeLock(lock, defer_lock);
 		
 		::lock(nodeWriteLock, writeLock);
@@ -6323,7 +6372,7 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 			if(useNodeHeaders) {
 			
 				// Check if updating node's sync state failed
-				if(!node.updateSyncState(syncedHeaderIndex + 1, block)) {
+				if(!node->updateSyncState(syncedHeaderIndex + 1, block)) {
 				
 					// Return false
 					return false;
@@ -6334,7 +6383,7 @@ bool Peer::processBlock(vector<uint8_t > &&buffer) {
 			else {
 			
 				// Check if updating node's sync state failed
-				if(!node.updateSyncState(move(headers), syncedHeaderIndex + 1, block)) {
+				if(!node->updateSyncState(move(headers), syncedHeaderIndex + 1, block)) {
 				
 					// Return false
 					return false;

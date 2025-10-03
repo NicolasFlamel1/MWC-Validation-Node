@@ -20,11 +20,11 @@ namespace MwcValidationNode {
 // Header class forward declaration
 class Header;
 
-// Kernel class forward declaration
-class Kernel;
-
 // Merkle mountain range forward declaration
 template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange;
+
+// Kernel class forward declaration
+class Kernel;
 
 // Output class forward declaration
 class Output;

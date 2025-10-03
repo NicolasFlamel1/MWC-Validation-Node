@@ -34,6 +34,42 @@ Input::Input(const Features features, const uint8_t commitment[Crypto::COMMITMEN
 	}
 }
 
+// Get features
+Input::Features Input::getFeatures() const {
+
+	// Return features
+	return features;
+}
+
+// Get commitment
+const secp256k1_pedersen_commitment &Input::getCommitment() const {
+
+	// Return commitment
+	return commitment;
+}
+
+// Get lookup value
+vector<uint8_t> Input::getLookupValue() const {
+
+	// Check if serializing commitment failed
+	vector<uint8_t> serializedCommitment(Crypto::COMMITMENT_LENGTH);
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment.data(), &commitment)) {
+	
+		// Throw exception
+		throw runtime_error("Serializing commitment failed");
+	}
+	
+	// Return serialized commitment
+	return serializedCommitment;
+}
+
+// Set features
+void Input::setFeatures(const Features features) {
+
+	// Set features to features
+	this->features = features;
+}
+
 // Serialize
 vector<uint8_t> Input::serialize(const uint32_t protocolVersion) const {
 
@@ -60,40 +96,4 @@ vector<uint8_t> Input::serialize(const uint32_t protocolVersion) const {
 	
 	// Return serialized input
 	return serializedInput;
-}
-
-// Get lookup value
-vector<uint8_t> Input::getLookupValue() const {
-
-	// Check if serializing commitment failed
-	vector<uint8_t> serializedCommitment(Crypto::COMMITMENT_LENGTH);
-	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment.data(), &commitment)) {
-	
-		// Throw exception
-		throw runtime_error("Serializing commitment failed");
-	}
-	
-	// Return serialized commitment
-	return serializedCommitment;
-}
-
-// Get features
-Input::Features Input::getFeatures() const {
-
-	// Return features
-	return features;
-}
-
-// Set features
-void Input::setFeatures(const Features features) {
-
-	// Set features to features
-	this->features = features;
-}
-
-// Get commitment
-const secp256k1_pedersen_commitment &Input::getCommitment() const {
-
-	// Return commitment
-	return commitment;
 }

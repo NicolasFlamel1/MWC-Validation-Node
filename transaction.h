@@ -17,6 +17,12 @@ namespace MwcValidationNode {
 
 // Classes
 
+// Node class forward declaration
+class Node;
+
+// Mempool class forward declaration
+class Mempool;
+
 // Transaction class
 class Transaction final {
 
@@ -28,9 +34,6 @@ class Transaction final {
 		
 		// Get offset
 		const uint8_t *getOffset() const;
-		
-		// Get inputs
-		list<Input> &getInputs();
 		
 		// Get inputs
 		const list<Input> &getInputs() const;
@@ -47,14 +50,29 @@ class Transaction final {
 		// Get fees
 		uint64_t getFees() const;
 		
-		// Serialize
-		vector<uint8_t> serialize() const;
+		// Get required fees
+		uint64_t getRequiredFees(const uint64_t baseFee) const;
 		
 		// Equal operator
 		bool operator==(const Transaction &transaction) const;
 		
-		// Get required fees
-		uint64_t getRequiredFees(const uint64_t baseFee) const;
+	// Public for node class
+	private:
+	
+		// Node friend class
+		friend class Node;
+		
+		// Get inputs
+		list<Input> &getInputs();
+		
+	// Public for mempool class
+	private:
+	
+		// Mempool friend class
+		friend class Mempool;
+		
+		// Serialize
+		vector<uint8_t> serialize() const;
 		
 	// Private
 	private:

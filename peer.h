@@ -30,6 +30,30 @@ class Peer final {
 	// Public
 	public:
 	
+		// Constructor
+		explicit Peer(condition_variable &eventOccurred, const mt19937_64::result_type randomSeed);
+		
+		// Destructor
+		~Peer();
+		
+		// Stop
+		void stop();
+		
+		// Get thread
+		thread &getThread();
+		
+		// Get thread
+		const thread &getThread() const;
+		
+		// Is worker operation running
+		bool isWorkerOperationRunning() const;
+		
+	// Public for node class
+	private:
+	
+		// Node friend class
+		friend class Node;
+		
 		// Connection state
 		enum class ConnectionState {
 		
@@ -76,18 +100,9 @@ class Peer final {
 			// Processing block
 			PROCESSING_BLOCK
 		};
-	
-		// Constructor
-		explicit Peer(const string &address, Node &node, condition_variable &eventOccurred, const mt19937_64::result_type randomSeed);
 		
-		// Destructor
-		~Peer();
-		
-		// Stop
-		void stop();
-		
-		// Get thread
-		thread &getThread();
+		// Start
+		void start(const string &address, Node *node);
 		
 		// Get lock
 		shared_mutex &getLock();
@@ -118,9 +133,6 @@ class Peer final {
 		
 		// Get headers
 		MerkleMountainRange<Header> &getHeaders();
-		
-		// Is worker operation running
-		bool isWorkerOperationRunning() const;
 		
 		// Send message
 		void sendMessage(const vector<uint8_t> &message);
@@ -262,7 +274,7 @@ class Peer final {
 		vector<uint8_t> writeBuffer;
 		
 		// Node
-		Node &node;
+		Node *node;
 		
 		// Event occurred
 		condition_variable &eventOccurred;

@@ -71,12 +71,6 @@ class Node final {
 			#endif
 		};
 		
-		// Capabilities
-		static const Capabilities CAPABILITIES;
-		
-		// User agent
-		static constexpr const char USER_AGENT[] = TOSTRING(PROGRAM_NAME) " " TOSTRING(PROGRAM_VERSION);
-	
 		// Constructor
 		explicit Node(const string &torProxyAddress = "localhost", const string &torProxyPort = "9050");
 		
@@ -131,14 +125,26 @@ class Node final {
 		// Stop
 		void stop();
 		
-		// Get peers
-		list<Peer> &getPeers();
-		
 		// Disconnect
 		void disconnect();
 		
 		// Get thread
 		thread &getThread();
+		
+		// Get thread
+		const thread &getThread() const;
+		
+		// Get peers begin
+		list<Peer>::iterator getPeersBegin();
+		
+		// Get peers begin
+		list<Peer>::const_iterator getPeersBegin() const;
+		
+		// Get peers end
+		list<Peer>::iterator getPeersEnd();
+		
+		// Get peers end
+		list<Peer>::const_iterator getPeersEnd() const;
 	
 		// Get total difficulty
 		uint64_t getTotalDifficulty() const;
@@ -165,13 +171,22 @@ class Node final {
 		void broadcastBlock(Header &&header, Block &&block);
 		
 		// Get next block
-		tuple<Header, Block> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
+		tuple<Header, Block, uint64_t> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
+		
+		// Error occurred
+		bool errorOccurred() const;
 		
 	// Public for peer class
 	private:
 	
 		// Peer friend class
 		friend class Peer;
+		
+		// Capabilities
+		static const Capabilities CAPABILITIES;
+		
+		// User agent
+		static constexpr const char USER_AGENT[] = TOSTRING(PROGRAM_NAME) " " TOSTRING(PROGRAM_VERSION);
 		
 		// Get lock
 		shared_mutex &getLock();
@@ -418,7 +433,7 @@ class Node final {
 		
 		// Banned peers
 		unordered_map<string, chrono::time_point<chrono::steady_clock>> bannedPeers;
-	
+		
 		// Peers
 		list<Peer> peers;
 		

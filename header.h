@@ -18,6 +18,12 @@ namespace MwcValidationNode {
 
 // Structures
 
+// Node class forward declaration
+class Node;
+
+// Merkle mountain range class forward declaration
+template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange;
+
 // Header structure
 class Header final : public MerkleMountainRangeLeaf<Header> {
 
@@ -25,20 +31,8 @@ class Header final : public MerkleMountainRangeLeaf<Header> {
 	public:
 	
 		// Constructor
-		explicit Header(const uint16_t version, const uint64_t height, const chrono::time_point<chrono::system_clock> &timestamp, const uint8_t previousBlockHash[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t previousHeaderRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t outputRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t rangeproofRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t kernelRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], const uint64_t outputMerkleMountainRangeSize, const uint64_t kernelMerkleMountainRangeSize, const uint64_t totalDifficulty, const uint32_t secondaryScaling, const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES], const bool verify = true);
+		explicit Header(const uint16_t version, const uint64_t height, const chrono::time_point<chrono::system_clock> &timestamp, const uint8_t previousBlockHash[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t previousHeaderRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t outputRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t rangeproofRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t kernelRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], const uint64_t outputMerkleMountainRangeSize, const uint64_t kernelMerkleMountainRangeSize, const uint64_t totalDifficulty, const uint32_t secondaryScaling, const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]);
 	
-		// Serialize
-		virtual vector<uint8_t> serialize() const override final;
-		
-		// Save
-		virtual void save(ofstream &file) const override final;
-		
-		// Equality operator
-		bool operator==(const Header &other) const;
-		
-		// Inequality operator
-		bool operator!=(const Header &other) const;
-		
 		// Get version
 		uint16_t getVersion() const;
 		
@@ -81,23 +75,44 @@ class Header final : public MerkleMountainRangeLeaf<Header> {
 		// Get nonce
 		uint64_t getNonce() const;
 		
-		// Set nonce
-		void setNonce(const uint64_t nonce);
-		
 		// Get edge bits
 		uint8_t getEdgeBits() const;
-		
-		// Set edge bits
-		void setEdgeBits(const uint8_t edgeBits);
 		
 		// Get proof nonces
 		const uint64_t *getProofNonces() const;
 		
-		// Set proof nonces
-		void setProofNonces(const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]);
-		
 		// Get block hash
 		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getBlockHash() const;
+		
+		// Set proof of work
+		bool setProofOfWork(const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]);
+		
+		// Equality operator
+		bool operator==(const Header &other) const;
+		
+		// Inequality operator
+		bool operator!=(const Header &other) const;
+		
+	// Public for node class
+	private:
+	
+		// Node friend class
+		friend class Node;
+		
+		// Constructor
+		explicit Header(const uint16_t version, const uint64_t height, const chrono::time_point<chrono::system_clock> &timestamp, const uint8_t previousBlockHash[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t previousHeaderRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t outputRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t rangeproofRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t kernelRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], const uint64_t outputMerkleMountainRangeSize, const uint64_t kernelMerkleMountainRangeSize, const uint64_t totalDifficulty, const uint32_t secondaryScaling, const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES], const bool verify);
+		
+	// Public for Merkle mountain range class
+	private:
+	
+		// Merkle mountain range friend class
+		friend class MerkleMountainRange<Header>;
+		
+		// Serialize
+		virtual vector<uint8_t> serialize() const override final;
+		
+		// Save
+		virtual void save(ofstream &file) const override final;
 		
 		// Restore
 		static Header restore(ifstream &file);
@@ -107,16 +122,16 @@ class Header final : public MerkleMountainRangeLeaf<Header> {
 		
 		// Restore sum
 		static void restoreSum(int &sum, ifstream &file);
-	
+		
 	// Private
 	private:
 	
+		// Future number of blocks threshold
+		static const uint64_t FUTURE_NUMBER_OF_BLOCKS_THRESHOLD;
+		
 		// Constructor
 		explicit Header(ifstream &file);
 		
-		// Future number of blocks threshold
-		static const uint64_t FUTURE_NUMBER_OF_BLOCKS_THRESHOLD;
-	
 		// Get proof nonces bytes
 		vector<uint8_t> getProofNoncesBytes() const;
 

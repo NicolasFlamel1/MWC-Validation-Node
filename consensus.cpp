@@ -446,6 +446,7 @@ uint64_t Consensus::getHeaderDifficulty(const Header &header) {
 	const uint64_t blockHashAsNumber = Common::bigEndianToHostByteOrder(*reinterpret_cast<const uint64_t *>(blockHash.data()));
 	
 	// Get difficulty
+	// TODO __int128 doesn't exist for 32 bit targets
 	const unsigned __int128 difficulty = (static_cast<unsigned __int128>(scaling) << 64) / max(static_cast<uint64_t>(1), blockHashAsNumber);
 	
 	// Return difficulty

@@ -17,12 +17,303 @@ using namespace MwcValidationNode;
 
 // Constants
 
-
 // Future number of blocks threshold
 const uint64_t Header::FUTURE_NUMBER_OF_BLOCKS_THRESHOLD = 12;
 
 
 // Supporting function implementation
+
+// Constructor
+Header::Header(const uint16_t version, const uint64_t height, const chrono::time_point<chrono::system_clock> &timestamp, const uint8_t previousBlockHash[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t previousHeaderRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t outputRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t rangeproofRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t kernelRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], const uint64_t outputMerkleMountainRangeSize, const uint64_t kernelMerkleMountainRangeSize, const uint64_t totalDifficulty, const uint32_t secondaryScaling, const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]) :
+
+	// Delegate constructor
+	Header(version, height, timestamp, previousBlockHash, previousHeaderRoot, outputRoot, rangeproofRoot, kernelRoot, totalKernelOffset, outputMerkleMountainRangeSize, kernelMerkleMountainRangeSize, totalDifficulty, secondaryScaling, nonce, edgeBits, proofNonces, true)
+{
+}
+
+// Get version
+uint16_t Header::getVersion() const {
+
+	// Return version
+	return version;
+}
+
+// Get height
+uint64_t Header::getHeight() const {
+
+	// Return height
+	return height;
+}
+
+// Get timestamp
+const chrono::time_point<chrono::system_clock> &Header::getTimestamp() const {
+
+	// Return timestamp
+	return timestamp;
+}
+
+// Get previous block hash
+const uint8_t *Header::getPreviousBlockHash() const {
+
+	// Return previous block hash
+	return previousBlockHash;
+}
+
+// Get previous header root
+const uint8_t *Header::getPreviousHeaderRoot() const {
+
+	// Return previous header root
+	return previousHeaderRoot;
+}
+
+// Get output root
+const uint8_t *Header::getOutputRoot() const {
+
+	// Return output root
+	return outputRoot;
+}
+
+// Get rangeproof root
+const uint8_t *Header::getRangeproofRoot() const {
+
+	// Return rangeproof root
+	return rangeproofRoot;
+}
+
+// Get kernel root
+const uint8_t *Header::getKernelRoot() const {
+
+	// Return kernel root
+	return kernelRoot;
+}
+
+// Get total kernel offset
+const uint8_t *Header::getTotalKernelOffset() const {
+
+	// Return total kernel offset
+	return totalKernelOffset;
+}
+
+// Get output Merkle mountain range size
+uint64_t Header::getOutputMerkleMountainRangeSize() const {
+
+	// Return output Merkle mountain range size
+	return outputMerkleMountainRangeSize;
+}
+
+// Get kernel Merkle mountain range size
+uint64_t Header::getKernelMerkleMountainRangeSize() const {
+
+	// Return kernel Merkle mountain range size
+	return kernelMerkleMountainRangeSize;
+}
+
+// Get total difficulty
+uint64_t Header::getTotalDifficulty() const {
+
+	// Return total difficulty
+	return totalDifficulty;
+}
+
+// Get secondary scaling
+uint32_t Header::getSecondaryScaling() const {
+
+	// Return secondary scaling
+	return secondaryScaling;
+}
+
+// Get nonce
+uint64_t Header::getNonce() const {
+
+	// Return nonce
+	return nonce;
+}
+
+// Get edge bits
+uint8_t Header::getEdgeBits() const {
+
+	// Return edge bits
+	return edgeBits;
+}
+
+// Get proof nonces
+const uint64_t *Header::getProofNonces() const {
+
+	// Return proof nonces
+	return proofNonces;
+}
+
+// Get block hash
+array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Header::getBlockHash() const {
+
+	// Initialize block hash
+	array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> blockHash;
+	
+	// Get proof nonces bytes
+	const vector<uint8_t> proofNoncesBytes = getProofNoncesBytes();
+	
+	// Check if getting block hash failed
+	if(blake2b(blockHash.data(), blockHash.size(), proofNoncesBytes.data(), proofNoncesBytes.size(), nullptr, 0)) {
+	
+		// Throw error
+		throw runtime_error("Getting block hash failed");
+	}
+	
+	// Return block hash
+	return blockHash;
+}
+
+// Set proof of work
+bool Header::setProofOfWork(const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]) {
+
+	// Get hash from the header and nonce
+	const array hash = ProofOfWork::getProofOfWorkHash(*this, nonce);
+	
+	// Check if hash, edge bits, and proof nonces are a valid proof of work
+	if(ProofOfWork::hasValidProofOfWork(hash, edgeBits, proofNonces)) {
+	
+		// Set nonce to nonce
+		this->nonce = nonce;
+		
+		// Set edge bits to edge bits
+		this->edgeBits = edgeBits;
+		
+		// Set proof nonces to proof nonces
+		memcpy(this->proofNonces, proofNonces, sizeof(this->proofNonces));
+		
+		// Return true
+		return true;
+	}
+	
+	// Return false
+	return false;
+}
+
+// Equality operator
+bool Header::operator==(const Header &other) const {
+
+	// Check if versions differ
+	if(version != other.version) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if heights differ
+	if(height != other.height) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if timestamps differ
+	if(timestamp != other.timestamp) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if previous block hashes differ
+	if(memcmp(previousBlockHash, other.previousBlockHash, sizeof(other.previousBlockHash))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if previous header roots differ
+	if(memcmp(previousHeaderRoot, other.previousHeaderRoot, sizeof(other.previousHeaderRoot))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if output roots differ
+	if(memcmp(outputRoot, other.outputRoot, sizeof(other.outputRoot))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if rangeproof roots differ
+	if(memcmp(rangeproofRoot, other.rangeproofRoot, sizeof(other.rangeproofRoot))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if kernel roots differ
+	if(memcmp(kernelRoot, other.kernelRoot, sizeof(other.kernelRoot))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if total kernel offset differ
+	if(memcmp(totalKernelOffset, other.totalKernelOffset, sizeof(other.totalKernelOffset))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if output Merkle mountain range sizes differ
+	if(outputMerkleMountainRangeSize != other.outputMerkleMountainRangeSize) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if kernel Merkle mountain range sizes differ
+	if(kernelMerkleMountainRangeSize != other.kernelMerkleMountainRangeSize) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if total difficulties differ
+	if(totalDifficulty != other.totalDifficulty) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if secondary scalings differ
+	if(secondaryScaling != other.secondaryScaling) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if nonces differ
+	if(nonce != other.nonce) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if edge bits differ
+	if(edgeBits != other.edgeBits) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if proof nonces differ
+	if(memcmp(proofNonces, other.proofNonces, sizeof(other.proofNonces))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Return true
+	return true;
+}
+
+// Inequality operator
+bool Header::operator!=(const Header &other) const {
+
+	// Return if headers aren't equal
+	return !(*this == other);
+}
 
 // Constructor
 Header::Header(const uint16_t version, const uint64_t height, const chrono::time_point<chrono::system_clock> &timestamp, const uint8_t previousBlockHash[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t previousHeaderRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t outputRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t rangeproofRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t kernelRoot[Crypto::BLAKE2B_HASH_LENGTH], const uint8_t totalKernelOffset[Crypto::SECP256K1_PRIVATE_KEY_LENGTH], const uint64_t outputMerkleMountainRangeSize, const uint64_t kernelMerkleMountainRangeSize, const uint64_t totalDifficulty, const uint32_t secondaryScaling, const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES], const bool verify) :
@@ -241,285 +532,6 @@ void Header::save(ofstream &file) const {
 		const uint64_t serializedProofNonce = Common::hostByteOrderToBigEndian(proofNonces[i]);
 		file.write(reinterpret_cast<const char *>(&serializedProofNonce), sizeof(serializedProofNonce));
 	}
-}
-
-// Equality operator
-bool Header::operator==(const Header &other) const {
-
-	// Check if versions differ
-	if(version != other.version) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if heights differ
-	if(height != other.height) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if timestamps differ
-	if(timestamp != other.timestamp) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if previous block hashes differ
-	if(memcmp(previousBlockHash, other.previousBlockHash, sizeof(other.previousBlockHash))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if previous header roots differ
-	if(memcmp(previousHeaderRoot, other.previousHeaderRoot, sizeof(other.previousHeaderRoot))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if output roots differ
-	if(memcmp(outputRoot, other.outputRoot, sizeof(other.outputRoot))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if rangeproof roots differ
-	if(memcmp(rangeproofRoot, other.rangeproofRoot, sizeof(other.rangeproofRoot))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if kernel roots differ
-	if(memcmp(kernelRoot, other.kernelRoot, sizeof(other.kernelRoot))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if total kernel offset differ
-	if(memcmp(totalKernelOffset, other.totalKernelOffset, sizeof(other.totalKernelOffset))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if output Merkle mountain range sizes differ
-	if(outputMerkleMountainRangeSize != other.outputMerkleMountainRangeSize) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if kernel Merkle mountain range sizes differ
-	if(kernelMerkleMountainRangeSize != other.kernelMerkleMountainRangeSize) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if total difficulties differ
-	if(totalDifficulty != other.totalDifficulty) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if secondary scalings differ
-	if(secondaryScaling != other.secondaryScaling) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if nonces differ
-	if(nonce != other.nonce) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if edge bits differ
-	if(edgeBits != other.edgeBits) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if proof nonces differ
-	if(memcmp(proofNonces, other.proofNonces, sizeof(other.proofNonces))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Return true
-	return true;
-}
-
-// Inequality operator
-bool Header::operator!=(const Header &other) const {
-
-	// Return if headers aren't equal
-	return !(*this == other);
-}
-
-// Get version
-uint16_t Header::getVersion() const {
-
-	// Return version
-	return version;
-}
-
-// Get height
-uint64_t Header::getHeight() const {
-
-	// Return height
-	return height;
-}
-
-// Get timestamp
-const chrono::time_point<chrono::system_clock> &Header::getTimestamp() const {
-
-	// Return timestamp
-	return timestamp;
-}
-
-// Get previous block hash
-const uint8_t *Header::getPreviousBlockHash() const {
-
-	// Return previous block hash
-	return previousBlockHash;
-}
-
-// Get previous header root
-const uint8_t *Header::getPreviousHeaderRoot() const {
-
-	// Return previous header root
-	return previousHeaderRoot;
-}
-
-// Get output root
-const uint8_t *Header::getOutputRoot() const {
-
-	// Return output root
-	return outputRoot;
-}
-
-// Get rangeproof root
-const uint8_t *Header::getRangeproofRoot() const {
-
-	// Return rangeproof root
-	return rangeproofRoot;
-}
-
-// Get kernel root
-const uint8_t *Header::getKernelRoot() const {
-
-	// Return kernel root
-	return kernelRoot;
-}
-
-// Get total kernel offset
-const uint8_t *Header::getTotalKernelOffset() const {
-
-	// Return total kernel offset
-	return totalKernelOffset;
-}
-
-// Get output Merkle mountain range size
-uint64_t Header::getOutputMerkleMountainRangeSize() const {
-
-	// Return output Merkle mountain range size
-	return outputMerkleMountainRangeSize;
-}
-
-// Get kernel Merkle mountain range size
-uint64_t Header::getKernelMerkleMountainRangeSize() const {
-
-	// Return kernel Merkle mountain range size
-	return kernelMerkleMountainRangeSize;
-}
-
-// Get total difficulty
-uint64_t Header::getTotalDifficulty() const {
-
-	// Return total difficulty
-	return totalDifficulty;
-}
-
-// Get secondary scaling
-uint32_t Header::getSecondaryScaling() const {
-
-	// Return secondary scaling
-	return secondaryScaling;
-}
-
-// Get nonce
-uint64_t Header::getNonce() const {
-
-	// Return nonce
-	return nonce;
-}
-
-// Set nonce
-void Header::setNonce(const uint64_t nonce) {
-
-	// Set nonce to nonce
-	this->nonce = nonce;
-}
-
-// Get edge bits
-uint8_t Header::getEdgeBits() const {
-
-	// Return edge bits
-	return edgeBits;
-}
-
-// Set edge bits
-void Header::setEdgeBits(const uint8_t edgeBits) {
-
-	// Set edge bits to edge bits
-	this->edgeBits = edgeBits;
-}
-
-// Get proof nonces
-const uint64_t *Header::getProofNonces() const {
-
-	// Return proof nonces
-	return proofNonces;
-}
-
-// Set proof nonces
-void Header::setProofNonces(const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]) {
-
-	// Set proof nonces to proof nonces
-	memcpy(this->proofNonces, proofNonces, sizeof(this->proofNonces));
-}
-
-// Get block hash
-array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Header::getBlockHash() const {
-
-	// Initialize block hash
-	array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> blockHash;
-	
-	// Get proof nonces bytes
-	const vector<uint8_t> proofNoncesBytes = getProofNoncesBytes();
-	
-	// Check if getting block hash failed
-	if(blake2b(blockHash.data(), blockHash.size(), proofNoncesBytes.data(), proofNoncesBytes.size(), nullptr, 0)) {
-	
-		// Throw error
-		throw runtime_error("Getting block hash failed");
-	}
-	
-	// Return block hash
-	return blockHash;
 }
 
 // Restore

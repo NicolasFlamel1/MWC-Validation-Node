@@ -18,12 +18,18 @@ namespace MwcValidationNode {
 
 // Classes
 
+// Merkle mountain range class forward declaration
+template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange;
+
 // Merkle mountain range leaf class
 template<typename DerivedClass, size_t maximumSerializedMerkleMountainRangeLeafLength = 0, typename SumClass = int, bool allowDuplicateLookupValues = false> class MerkleMountainRangeLeaf {
 
-	// Public
-	public:
+	// Public for Merkle mountain range class
+	protected:
 	
+		// Merkle mountain range friend class
+		friend class MerkleMountainRange<DerivedClass>;
+		
 		// Maximum serialized length
 		static const size_t MAXIMUM_SERIALIZED_LENGTH = maximumSerializedMerkleMountainRangeLeafLength;
 		
@@ -56,9 +62,6 @@ template<typename DerivedClass, size_t maximumSerializedMerkleMountainRangeLeafL
 		// Sum
 		typedef SumClass Sum;
 		
-		// Serialize
-		virtual vector<uint8_t> serialize() const = 0;
-		
 		// Get lookup value
 		virtual optional<vector<uint8_t>> getLookupValue() const;
 		
@@ -67,6 +70,12 @@ template<typename DerivedClass, size_t maximumSerializedMerkleMountainRangeLeafL
 		
 		// Subtract from sum
 		virtual void subtractFromSum(SumClass &sum, const SubtractionReason subtractionReason) const;
+		
+	// Private
+	private:
+		
+		// Serialize
+		virtual vector<uint8_t> serialize() const = 0;
 		
 		// Save
 		virtual void save(ofstream &file) const = 0;

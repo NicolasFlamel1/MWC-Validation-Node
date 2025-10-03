@@ -17,6 +17,49 @@ using namespace MwcValidationNode;
 // Supporting function implementation
 
 // Constructor
+Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels) :
+
+	// Delegate constructor
+	Block(move(inputs), move(outputs), move(rangeproofs), move(kernels), false, true)
+{
+}
+
+// Get inputs
+const list<Input> &Block::getInputs() const {
+
+	// Return inputs
+	return inputs;
+}
+
+// Get outputs
+const list<Output> &Block::getOutputs() const {
+
+	// Return outputs
+	return outputs;
+}
+
+// Get rangeproofs
+const list<Rangeproof> &Block::getRangeproofs() const {
+
+	// Return rangeproofs
+	return rangeproofs;
+}
+
+// Get kernels
+const list<Kernel> &Block::getKernels() const {
+
+	// Return kernels
+	return kernels;
+}
+
+// Get inputs
+list<Input> &Block::getInputs() {
+
+	// Return inputs
+	return inputs;
+}
+
+// Constructor
 Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&rangeproofs, list<Kernel> &&kernels, const bool isTransaction, const bool verify) :
 
 	// Set inputs to inputs
@@ -63,62 +106,6 @@ Block::Block(list<Input> &&inputs, list<Output> &&outputs, list<Rangeproof> &&ra
 			throw runtime_error("Doesn't have valid cut through");
 		}
 	}
-}
-
-// Get inputs
-list<Input> &Block::getInputs() {
-
-	// Return inputs
-	return inputs;
-}
-
-// Get inputs
-const list<Input> &Block::getInputs() const {
-
-	// Return inputs
-	return inputs;
-}
-
-// Get outputs
-list<Output> &Block::getOutputs() {
-
-	// Return outputs
-	return outputs;
-}
-
-// Get outputs
-const list<Output> &Block::getOutputs() const {
-
-	// Return outputs
-	return outputs;
-}
-
-// Get rangeproofs
-list<Rangeproof> &Block::getRangeproofs() {
-
-	// Return rangeproofs
-	return rangeproofs;
-}
-
-// Get rangeproofs
-const list<Rangeproof> &Block::getRangeproofs() const {
-
-	// Return rangeproofs
-	return rangeproofs;
-}
-
-// Get kernels
-list<Kernel> &Block::getKernels() {
-
-	// Return kernels
-	return kernels;
-}
-
-// Get kernels
-const list<Kernel> &Block::getKernels() const {
-
-	// Return kernels
-	return kernels;
 }
 
 // Is sorted and unique

@@ -54,6 +54,27 @@ namespace MwcValidationNode {
 
 // Classes
 
+// Node class forward declaration
+class Node;
+
+// Peer class forward declaration
+class Peer;
+
+// Merkle mountain range class forward declaration
+template<typename MerkleMountainRangeLeafDerivedClass> class MerkleMountainRange;
+
+// Header class forward declaration
+class Header;
+
+// Kernel class forward declaration
+class Kernel;
+
+// Output class forward declaration
+class Output;
+
+// Rangeproof class forward declaration
+class Rangeproof;
+
 // Common class
 class Common final {
 
@@ -96,12 +117,6 @@ class Common final {
 		// Constructor
 		Common() = delete;
 	
-		// Initialize
-		static bool initialize();
-		
-		// Set closing
-		static void setClosing();
-		
 		// Is closing
 		static bool isClosing();
 		
@@ -159,9 +174,6 @@ class Common final {
 		// Write int64
 		static void writeInt64(vector<uint8_t> &buffer, const int64_t value);
 		
-		// Free memory
-		static void freeMemory();
-		
 		// Uint8 vector hash
 		class Uint8VectorHash {
 
@@ -186,6 +198,36 @@ class Common final {
 		
 		// Read int64
 		template<typename StorageClass> static int64_t readInt64(const StorageClass &buffer, const typename StorageClass::size_type offset);
+		
+	// Public for node class
+	private:
+	
+		// Node friend class
+		friend class Node;
+		
+		// Initialize
+		static bool initialize();
+		
+	// Public for peer class
+	private:
+	
+		// Peer friend class
+		friend class Peer;
+		
+		// Set closing
+		static void setClosing();
+		
+	// Public for Merkle mountain range class
+	private:
+	
+		// Merkle mountain range friend class
+		friend class MerkleMountainRange<Header>;
+		friend class MerkleMountainRange<Kernel>;
+		friend class MerkleMountainRange<Output>;
+		friend class MerkleMountainRange<Rangeproof>;
+		
+		// Free memory
+		static void freeMemory();
 		
 	// Private
 	private:

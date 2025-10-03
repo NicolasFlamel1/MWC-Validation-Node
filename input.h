@@ -17,6 +17,18 @@ namespace MwcValidationNode {
 
 // Classes
 
+// Node class forward declaration
+class Node;
+
+// Block class forward declaration
+class Block;
+
+// Message class forward declaration
+class Message;
+
+// Transaction class forward declaration
+class Transaction;
+
 // Input class
 class Input final {
 
@@ -42,21 +54,35 @@ class Input final {
 		// Constructor
 		explicit Input(const Features features, const uint8_t commitment[Crypto::COMMITMENT_LENGTH]);
 		
-		// Serialize
-		vector<uint8_t> serialize(const uint32_t protocolVersion = 0) const;
+		// Get features
+		Features getFeatures() const;
+		
+		// Get commitment
+		const secp256k1_pedersen_commitment &getCommitment() const;
 		
 		// Get lookup value
 		vector<uint8_t> getLookupValue() const;
 		
-		// Get features
-		Features getFeatures() const;
+	// Public for node class
+	private:
+	
+		// Node friend class
+		friend class Node;
 		
 		// Set features
 		void setFeatures(const Features features);
 		
-		// Get commitment
-		const secp256k1_pedersen_commitment &getCommitment() const;
+	// Public for block, message, and transaction classes
+	private:
 	
+		// Block, message, and transaction friend classes
+		friend class Block;
+		friend class Message;
+		friend class Transaction;
+		
+		// Serialize
+		vector<uint8_t> serialize(const uint32_t protocolVersion = 0) const;
+		
 	// Private
 	private:
 	

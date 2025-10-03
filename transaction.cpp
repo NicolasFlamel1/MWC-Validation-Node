@@ -163,13 +163,6 @@ const uint8_t *Transaction::getOffset() const {
 }
 
 // Get inputs
-list<Input> &Transaction::getInputs() {
-
-	// Return block's inputs
-	return block.getInputs();
-}
-
-// Get inputs
 const list<Input> &Transaction::getInputs() const {
 
 	// Return block's inputs
@@ -202,6 +195,27 @@ uint64_t Transaction::getFees() const {
 
 	// Return fees
 	return fees;
+}
+
+// Get required fees
+uint64_t Transaction::getRequiredFees(const uint64_t baseFee) const {
+
+	// Return required fees based on the number of inputs, outputs, and kernels
+	return SaturateMath::multiply(max(SaturateMath::subtract(SaturateMath::add(SaturateMath::multiply(getOutputs().size(), BODY_WEIGHT_OUTPUT_FACTOR), getKernels().size()), getInputs().size()), static_cast<uint64_t>(1)), baseFee);
+}
+
+// Equal operator
+bool Transaction::operator==(const Transaction &transaction) const {
+
+	// Return if serialized transactions are equal
+	return serialize() == transaction.serialize();
+}
+
+// Get inputs
+list<Input> &Transaction::getInputs() {
+
+	// Return block's inputs
+	return block.getInputs();
 }
 
 // Serialize
@@ -256,18 +270,4 @@ vector<uint8_t> Transaction::serialize() const {
 	
 	// Return serialized transaction
 	return serializedTransaction;
-}
-
-// Equal operator
-bool Transaction::operator==(const Transaction &transaction) const {
-
-	// Return if serialized transactions are equal
-	return serialize() == transaction.serialize();
-}
-
-// Get required fees
-uint64_t Transaction::getRequiredFees(const uint64_t baseFee) const {
-
-	// Return required fees based on the number of inputs, outputs, and kernels
-	return SaturateMath::multiply(max(SaturateMath::subtract(SaturateMath::add(SaturateMath::multiply(getOutputs().size(), BODY_WEIGHT_OUTPUT_FACTOR), getKernels().size()), getInputs().size()), static_cast<uint64_t>(1)), baseFee);
 }

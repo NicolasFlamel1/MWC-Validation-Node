@@ -36,8 +36,15 @@ const uint8_t ProofOfWork::C29_SIPHASH_ROTATION = 25;
 bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 
 	// Get hash from the header
-	const array hash = getProofOfWorkHash(header);
+	const array hash = getProofOfWorkHash(header, header.getNonce());
 	
+	// Return if the hash, header's edge bits, and header's proof nonces are a valid proof of work
+	return hasValidProofOfWork(hash, header.getEdgeBits(), header.getProofNonces());
+}
+
+// Has valid proof of work
+bool ProofOfWork::hasValidProofOfWork(const array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> &proofOfWorkHash, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]) {
+
 	// Initialize SipHash keys
 	uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH];
 	
@@ -45,20 +52,20 @@ bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 	for(size_t i = 0; i < sizeof(sipHashKeys) / sizeof(sipHashKeys[0]); ++i) {
 	
 		// Set SipHash key
-		sipHashKeys[i] = Common::littleEndianToHostByteOrder(*reinterpret_cast<const uint64_t *>(&hash[i * sizeof(uint64_t)]));
+		sipHashKeys[i] = Common::littleEndianToHostByteOrder(*reinterpret_cast<const uint64_t *>(&proofOfWorkHash[i * sizeof(uint64_t)]));
 	}
 
 	// Set number of edge bits
-	const uint64_t numberOfEdges = static_cast<uint64_t>(1) << header.getEdgeBits();
+	const uint64_t numberOfEdges = static_cast<uint64_t>(1) << edgeBits;
 	
 	// Set edge mask
 	const uint64_t edgeMask = numberOfEdges - 1;
 	
-	// Check if header uses C29 edge bits
-	if(header.getEdgeBits() == Consensus::C29_EDGE_BITS) {
+	// Check if uses C29 edge bits
+	if(edgeBits == Consensus::C29_EDGE_BITS) {
 	
 		// Set number of nodes
-		const uint64_t numberOfNodes = static_cast<uint64_t>(1) << (header.getEdgeBits() - 1);
+		const uint64_t numberOfNodes = static_cast<uint64_t>(1) << (edgeBits - 1);
 		
 		// Set node mask
 		const uint64_t nodeMask = numberOfNodes - 1;
@@ -73,11 +80,11 @@ bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 		uint64_t xor0 = 0;
 		uint64_t xor1 = 0;
 		
-		// Go through all of the header's proof nonces
+		// Go through all of the proof nonces
 		for(uint64_t i = 0; i < Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES; ++i) {
 		
 			// Get dir
-			const uint64_t dir = header.getProofNonces()[i] & 1;
+			const uint64_t dir = proofNonces[i] & 1;
 			
 			// Check if edges aren't balanced
 			if(ndir[dir] >= Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES / 2) {
@@ -87,21 +94,21 @@ bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 			}
 			
 			// Check if edges are too big
-			if(header.getProofNonces()[i] > edgeMask) {
+			if(proofNonces[i] > edgeMask) {
 			
 				// Return false
 				return false;
 			}
 			
 			// Check if edges are not ascending
-			if(i && header.getProofNonces()[i] <= header.getProofNonces()[i - 1]) {
+			if(i && proofNonces[i] <= proofNonces[i - 1]) {
 			
 				// Return false
 				return false;
 			}
 			
 			// Get edge
-			const uint64_t edge = sipHashBlock(sipHashKeys, header.getProofNonces()[i], C29_SIPHASH_ROTATION);
+			const uint64_t edge = sipHashBlock(sipHashKeys, proofNonces[i], C29_SIPHASH_ROTATION);
 			
 			// Get index
 			const uint64_t index = 4 * ndir[dir] + 2 * dir;
@@ -175,11 +182,11 @@ bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 		}
 	}
 
-	// Otherwise check if header at least C31 edge bits
-	else if(header.getEdgeBits() >= Consensus::C31_EDGE_BITS) {
+	// Otherwise check if uses at least C31 edge bits
+	else if(edgeBits >= Consensus::C31_EDGE_BITS) {
 	
 		// Set number of nodes
-		const uint64_t numberOfNodes = static_cast<uint64_t>(1) << header.getEdgeBits();
+		const uint64_t numberOfNodes = static_cast<uint64_t>(1) << edgeBits;
 		
 		// Set node mask
 		const uint64_t nodeMask = numberOfNodes - 1;
@@ -191,26 +198,26 @@ bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 		uint64_t xor0 = (Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES / 2) & 1;
 		uint64_t xor1 = xor0;
 		
-		// Go through all of the header's proof nonces
+		// Go through all of the proof nonces
 		for(uint64_t i = 0; i < Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES; ++i) {
 		
 			// Check if edges are too big
-			if(header.getProofNonces()[i] > edgeMask) {
+			if(proofNonces[i] > edgeMask) {
 			
 				// Return false
 				return false;
 			}
 			
 			// Check if edges are not ascending
-			if(i && header.getProofNonces()[i] <= header.getProofNonces()[i - 1]) {
+			if(i && proofNonces[i] <= proofNonces[i - 1]) {
 			
 				// Return false
 				return false;
 			}
 			
 			// Set UVs
-			uvs[2 * i] = sipNode(sipHashKeys, header.getProofNonces()[i], 0) & nodeMask;
-			uvs[2 * i + 1] = sipNode(sipHashKeys, header.getProofNonces()[i], 1) & nodeMask;
+			uvs[2 * i] = sipNode(sipHashKeys, proofNonces[i], 0) & nodeMask;
+			uvs[2 * i + 1] = sipNode(sipHashKeys, proofNonces[i], 1) & nodeMask;
 			
 			// Update XORs
 			xor0 ^= uvs[2 * i];
@@ -285,6 +292,67 @@ bool ProofOfWork::hasValidProofOfWork(const Header &header) {
 	return true;
 }
 
+// Get proof of work hash
+array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> ProofOfWork::getProofOfWorkHash(const Header &header, const uint64_t nonce) {
+
+	// Initialize data
+	vector<uint8_t> data;
+	
+	// Append header's version to data
+	Common::writeUint16(data, header.getVersion());
+	
+	// Append header's height to data
+	Common::writeUint64(data, header.getHeight());
+	
+	// Append header's timestamp to data
+	Common::writeInt64(data, chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count());
+	
+	// Append header's previous block hash to data
+	data.insert(data.cend(), header.getPreviousBlockHash(), header.getPreviousBlockHash() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's previous header root to data
+	data.insert(data.cend(), header.getPreviousHeaderRoot(), header.getPreviousHeaderRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's previous output to data
+	data.insert(data.cend(), header.getOutputRoot(), header.getOutputRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's rangeproof root to data
+	data.insert(data.cend(), header.getRangeproofRoot(), header.getRangeproofRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's kernel root to data
+	data.insert(data.cend(), header.getKernelRoot(), header.getKernelRoot() + Crypto::BLAKE2B_HASH_LENGTH);
+	
+	// Append header's total kernel offset to data
+	data.insert(data.cend(), header.getTotalKernelOffset(), header.getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH);
+	
+	// Append header's output Merkle mountain range size to data
+	Common::writeUint64(data, header.getOutputMerkleMountainRangeSize());
+	
+	// Append header's kernel Merkle mountain range size to data
+	Common::writeUint64(data, header.getKernelMerkleMountainRangeSize());
+	
+	// Append header's total difficulty to data
+	Common::writeUint64(data, header.getTotalDifficulty());
+	
+	// Append header's secondary scaling to data
+	Common::writeUint32(data, header.getSecondaryScaling());
+	
+	// Append nonce to data
+	Common::writeUint64(data, nonce);
+	
+	// Check if getting hash of data failed
+	array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> hash;
+	
+	if(blake2b(hash.data(), hash.size(), data.data(), data.size(), nullptr, 0)) {
+	
+		// Throw error
+		throw runtime_error("Getting hash of data failed");
+	}
+	
+	// Return hash
+	return hash;
+}
+
 // SipHash-2-4 constructor
 ProofOfWork::SipHash24::SipHash24(const uint64_t sipHashKeys[SIPHASH_KEYS_LENGTH]) {
 
@@ -356,67 +424,6 @@ void ProofOfWork::SipHash24::round(const uint8_t rotation) {
 	values[3] ^= values[0];
 	
 	values[2] = rotl(values[2], 32);
-}
-
-// Get proof of work hash
-array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> ProofOfWork::getProofOfWorkHash(const Header &header) {
-
-	// Initialize data
-	vector<uint8_t> data;
-	
-	// Append header's version to data
-	Common::writeUint16(data, header.getVersion());
-	
-	// Append header's height to data
-	Common::writeUint64(data, header.getHeight());
-	
-	// Append header's timestamp to data
-	Common::writeInt64(data, chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count());
-	
-	// Append header's previous block hash to data
-	data.insert(data.cend(), header.getPreviousBlockHash(), header.getPreviousBlockHash() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's previous header root to data
-	data.insert(data.cend(), header.getPreviousHeaderRoot(), header.getPreviousHeaderRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's previous output to data
-	data.insert(data.cend(), header.getOutputRoot(), header.getOutputRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's rangeproof root to data
-	data.insert(data.cend(), header.getRangeproofRoot(), header.getRangeproofRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's kernel root to data
-	data.insert(data.cend(), header.getKernelRoot(), header.getKernelRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's total kernel offset to data
-	data.insert(data.cend(), header.getTotalKernelOffset(), header.getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH);
-	
-	// Append header's output Merkle mountain range size to data
-	Common::writeUint64(data, header.getOutputMerkleMountainRangeSize());
-	
-	// Append header's kernel Merkle mountain range size to data
-	Common::writeUint64(data, header.getKernelMerkleMountainRangeSize());
-	
-	// Append header's total difficulty to data
-	Common::writeUint64(data, header.getTotalDifficulty());
-	
-	// Append header's secondary scaling to data
-	Common::writeUint32(data, header.getSecondaryScaling());
-	
-	// Append header's nonce to data
-	Common::writeUint64(data, header.getNonce());
-	
-	// Check if getting hash of data failed
-	array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> hash;
-	
-	if(blake2b(hash.data(), hash.size(), data.data(), data.size(), nullptr, 0)) {
-	
-		// Throw error
-		throw runtime_error("Getting hash of data failed");
-	}
-	
-	// Return hash
-	return hash;
 }
 
 // SipHash block

@@ -73,52 +73,6 @@ mutex Common::memoryLock;
 
 // Supporting function implementation
 
-// Initialize
-bool Common::initialize() {
-
-	// Check if not disabling signal handler
-	#ifndef DISABLE_SIGNAL_HANDLER
-	
-		// Check if setting signal handler failed
-		if(signal(SIGINT, [](const int signal) {
-		
-			// Check signal
-			switch(signal) {
-			
-				// Interrupt
-				case SIGINT:
-				
-					// Throw error if atomic bool isn't always lock free
-					static_assert(atomic_bool::is_always_lock_free, "Atomic bool isn't always lock free");
-				
-					// Set closing to true
-					closing.store(true);
-					
-					// Set signal occurred to true
-					signalOccurred.store(true);
-					
-					// Break
-					break;
-			}
-			
-		}) == SIG_ERR) {
-		
-			// Return false
-			return false;
-		}
-	#endif
-	
-	// Return true
-	return true;
-}
-
-// Set closing
-void Common::setClosing() {
-
-	// Set closing to true
-	closing.store(true);
-}
-
 // Is closing
 bool Common::isClosing() {
 
@@ -459,6 +413,69 @@ void Common::writeInt64(vector<uint8_t> &buffer, const int64_t value) {
 	return writeUint64(buffer, *reinterpret_cast<const uint64_t *>(&value));
 }
 
+// Uint8 vector hash operator
+size_t Common::Uint8VectorHash::operator()(const vector<uint8_t> &uint8Vector) const {
+
+	// Return hash of the uint8 vector
+	return hash<string>()(Common::toHexString(uint8Vector));
+}
+
+// Initialize
+bool Common::initialize() {
+
+	// Check if not disabling signal handler
+	#ifndef DISABLE_SIGNAL_HANDLER
+	
+		// Set is initialized to false
+		static bool isInitialized = false;
+		
+		// Check if not initialized
+		if(!isInitialized) {
+		
+			// Check if setting signal handler failed
+			if(signal(SIGINT, [](const int signal) {
+			
+				// Check signal
+				switch(signal) {
+				
+					// Interrupt
+					case SIGINT:
+					
+						// Throw error if atomic bool isn't always lock free
+						static_assert(atomic_bool::is_always_lock_free, "Atomic bool isn't always lock free");
+					
+						// Set closing to true
+						closing.store(true);
+						
+						// Set signal occurred to true
+						signalOccurred.store(true);
+						
+						// Break
+						break;
+				}
+				
+			}) == SIG_ERR) {
+			
+				// Return false
+				return false;
+			}
+			
+			// Set is initialized to true
+			isInitialized = true;
+		}
+	#endif
+	
+	// Return true
+	return true;
+}
+
+// Set closing
+void Common::setClosing() {
+
+	// Set closing to true
+	closing.store(true);
+}
+
 // Free memory
 void Common::freeMemory() {
 
@@ -480,11 +497,4 @@ void Common::freeMemory() {
 	catch(...) {
 	
 	}
-}
-
-// Uint8 vector hash operator
-size_t Common::Uint8VectorHash::operator()(const vector<uint8_t> &uint8Vector) const {
-
-	// Return hash of the uint8 vector
-	return hash<string>()(Common::toHexString(uint8Vector));
 }

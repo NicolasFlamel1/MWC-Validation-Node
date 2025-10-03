@@ -15,56 +15,62 @@ using namespace MwcValidationNode;
 // Supporting function implementation
 
 // Constructor
-Output::Output(const Features features, const uint8_t commitment[Crypto::COMMITMENT_LENGTH], const bool isGenesisBlockOutput) :
+Output::Output(const Features features, const uint8_t commitment[Crypto::COMMITMENT_LENGTH]) :
 
-	// Set features to features
-	features(features)
+	// Delegate constructor
+	Output(features, commitment, false)
 {
-
-	// Check if features is invalid
-	if(features == Features::UNKNOWN) {
-	
-		// Throw exception
-		throw runtime_error("Features is invalid");
-	}
-	
-	// Check if commitment is invalid
-	if(!secp256k1_pedersen_commitment_parse(secp256k1_context_no_precomp, &this->commitment, commitment)) {
-	
-		// Throw exception
-		throw runtime_error("Commitment is invalid");
-	}
-	
-	// Check if output doesn't match the genesis block output
-	if(isGenesisBlockOutput && *this != Consensus::GENESIS_BLOCK_OUTPUT) {
-	
-		// Throw exception
-		throw runtime_error("Output doesn't match the genesis block output");
-	}
 }
 
-// Serialize
-vector<uint8_t> Output::serialize() const {
+// Get features
+Output::Features Output::getFeatures() const {
 
-	// Initialize serialized output
-	vector<uint8_t> serializedOutput;
+	// Return features
+	return features;
+}
+
+// Get commitment
+const secp256k1_pedersen_commitment &Output::getCommitment() const {
+
+	// Return commitment
+	return commitment;
+}
+
+// Equality operator
+bool Output::operator==(const Output &other) const {
+
+	// Check if features differ
+	if(features != other.features) {
 	
-	// Append features to serialized output
-	Common::writeUint8(serializedOutput, static_cast<underlying_type_t<Features>>(features));
-	
-	// Check if serializing commitment failed
-	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
-	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &commitment)) {
-	
-		// Throw exception
-		throw runtime_error("Serializing commitment failed");
+		// Return false
+		return false;
 	}
 	
-	// Append serialized commitment to serialized output
-	serializedOutput.insert(serializedOutput.cend(), cbegin(serializedCommitment), cend(serializedCommitment));
+	// Check if serializing commitments failed
+	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
+	uint8_t otherSerializedCommitment[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &commitment) || !secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, otherSerializedCommitment, &other.commitment)) {
 	
-	// Return serialized output
-	return serializedOutput;
+		// Throw exception
+		throw runtime_error("Serializing commitments failed");
+	}
+	
+	// Check if serialized commitments differ
+	if(memcmp(serializedCommitment, otherSerializedCommitment, sizeof(otherSerializedCommitment))) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Return true
+	return true;
+}
+
+// Inequality operator
+bool Output::operator!=(const Output &other) const {
+
+	// Return if outputs aren't equal
+	return !(*this == other);
 }
 
 // Get lookup value
@@ -229,84 +235,6 @@ void Output::save(ofstream &file) const {
 	file.write(reinterpret_cast<const char *>(serializedCommitment), sizeof(serializedCommitment));
 }
 
-// Equality operator
-bool Output::operator==(const Output &other) const {
-
-	// Check if features differ
-	if(features != other.features) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Check if serializing commitments failed
-	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
-	uint8_t otherSerializedCommitment[Crypto::COMMITMENT_LENGTH];
-	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &commitment) || !secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, otherSerializedCommitment, &other.commitment)) {
-	
-		// Throw exception
-		throw runtime_error("Serializing commitments failed");
-	}
-	
-	// Check if serialized commitments differ
-	if(memcmp(serializedCommitment, otherSerializedCommitment, sizeof(otherSerializedCommitment))) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Return true
-	return true;
-}
-
-// Inequality operator
-bool Output::operator!=(const Output &other) const {
-
-	// Return if outputs aren't equal
-	return !(*this == other);
-}
-
-// Get features
-Output::Features Output::getFeatures() const {
-
-	// Return features
-	return features;
-}
-
-// Get commitment
-const secp256k1_pedersen_commitment &Output::getCommitment() const {
-
-	// Return commitment
-	return commitment;
-}
-
-// Get serialized protocol version
-uint32_t Output::getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedOutput, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedOutputLength, const uint32_t protocolVersion) {
-
-	// Return protocol version
-	return protocolVersion;
-}
-
-// Unserialize
-pair<Output, array<uint8_t, Output::MAXIMUM_SERIALIZED_LENGTH>::size_type> Output::unserialize(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedOutput, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedOutputLength, const uint32_t protocolVersion, const bool isGenesisBlockOutput) {
-
-	// Check if serialized output doesn't contain features and a commitment
-	if(serializedOutputLength < MAXIMUM_SERIALIZED_LENGTH) {
-	
-		// Throw exception
-		throw runtime_error("Serialized output doesn't contain features and a commitment");
-	}
-	
-	// Get features from serialized output
-	const Features features = (Common::readUint8(serializedOutput, 0) < static_cast<underlying_type_t<Features>>(Features::UNKNOWN)) ? static_cast<Features>(Common::readUint8(serializedOutput, 0)) : Features::UNKNOWN;
-	
-	// Get commitment from serialized output
-	const uint8_t *commitment = &serializedOutput[sizeof(features)];
-	
-	// Return output
-	return {Output(features, commitment, isGenesisBlockOutput), MAXIMUM_SERIALIZED_LENGTH};
-}
-
 // Restore
 Output Output::restore(ifstream &file) {
 
@@ -364,6 +292,86 @@ void Output::restoreSum(secp256k1_pedersen_commitment &sum, ifstream &file) {
 			// Throw exception
 			throw runtime_error("Parsing sum failed");
 		}
+	}
+}
+
+// Get serialized protocol version
+uint32_t Output::getSerializedProtocolVersion(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedOutput, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedOutputLength, const uint32_t protocolVersion) {
+
+	// Return protocol version
+	return protocolVersion;
+}
+
+// Unserialize
+pair<Output, array<uint8_t, Output::MAXIMUM_SERIALIZED_LENGTH>::size_type> Output::unserialize(const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH> &serializedOutput, const array<uint8_t, MAXIMUM_SERIALIZED_LENGTH>::size_type serializedOutputLength, const uint32_t protocolVersion, const bool isGenesisBlockOutput) {
+
+	// Check if serialized output doesn't contain features and a commitment
+	if(serializedOutputLength < MAXIMUM_SERIALIZED_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Serialized output doesn't contain features and a commitment");
+	}
+	
+	// Get features from serialized output
+	const Features features = (Common::readUint8(serializedOutput, 0) < static_cast<underlying_type_t<Features>>(Features::UNKNOWN)) ? static_cast<Features>(Common::readUint8(serializedOutput, 0)) : Features::UNKNOWN;
+	
+	// Get commitment from serialized output
+	const uint8_t *commitment = &serializedOutput[sizeof(features)];
+	
+	// Return output
+	return {Output(features, commitment, isGenesisBlockOutput), MAXIMUM_SERIALIZED_LENGTH};
+}
+
+// Serialize
+vector<uint8_t> Output::serialize() const {
+
+	// Initialize serialized output
+	vector<uint8_t> serializedOutput;
+	
+	// Append features to serialized output
+	Common::writeUint8(serializedOutput, static_cast<underlying_type_t<Features>>(features));
+	
+	// Check if serializing commitment failed
+	uint8_t serializedCommitment[Crypto::COMMITMENT_LENGTH];
+	if(!secp256k1_pedersen_commitment_serialize(secp256k1_context_no_precomp, serializedCommitment, &commitment)) {
+	
+		// Throw exception
+		throw runtime_error("Serializing commitment failed");
+	}
+	
+	// Append serialized commitment to serialized output
+	serializedOutput.insert(serializedOutput.cend(), cbegin(serializedCommitment), cend(serializedCommitment));
+	
+	// Return serialized output
+	return serializedOutput;
+}
+
+// Constructor
+Output::Output(const Features features, const uint8_t commitment[Crypto::COMMITMENT_LENGTH], const bool isGenesisBlockOutput) :
+
+	// Set features to features
+	features(features)
+{
+
+	// Check if features is invalid
+	if(features == Features::UNKNOWN) {
+	
+		// Throw exception
+		throw runtime_error("Features is invalid");
+	}
+	
+	// Check if commitment is invalid
+	if(!secp256k1_pedersen_commitment_parse(secp256k1_context_no_precomp, &this->commitment, commitment)) {
+	
+		// Throw exception
+		throw runtime_error("Commitment is invalid");
+	}
+	
+	// Check if output doesn't match the genesis block output
+	if(isGenesisBlockOutput && *this != Consensus::GENESIS_BLOCK_OUTPUT) {
+	
+		// Throw exception
+		throw runtime_error("Output doesn't match the genesis block output");
 	}
 }
 

@@ -33,13 +33,6 @@ int main() {
 	// Create node
 	MwcValidationNode::Node node;
 	
-	// Check if initializing common failed
-	if(!MwcValidationNode::Common::initialize()) {
-	
-		// Return failure
-		return EXIT_FAILURE;
-	}
-	
 	// At this point all node functions are allowed in this thread. The node's state can be restored with node.restore("state_file")
 	
 	// Set node's on start syncing callback
@@ -123,7 +116,7 @@ int main() {
 	// Start node
 	node.start();
 	
-	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), node.broadcastTransaction(), node.broadcastBlock(), and calling the node's destructor. All other node functions must happen in the callback functions
+	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), node.broadcastTransaction(), node.broadcastBlock(), node.errorOccurred(), and calling the node's destructor. All other node functions must happen in the callback functions
 	
 	// Stop node
 	node.stop();
@@ -131,7 +124,7 @@ int main() {
 	// Wait for node to stop running
 	node.getThread().join();
 	
-	// The node has stopped running, however it remains connected to any existing peers. Additional node functions that are allowed in this thread now are node.getPeers() and node.disconnect(). All other node functions must happen in the callback functions. The only peer functions that can be called in this thread are peer.stop(), peer.getThread(), and calling a peer's destructor.
+	// The node has stopped running, however it remains connected to any existing peers. Additional node functions that are allowed in this thread now are node.getPeersBegin(), node.getPeersEnd(), and node.disconnect(). All other node functions must happen in the callback functions
 	
 	// Disconnect from node's peers and wait for the operation to complete
 	node.disconnect();

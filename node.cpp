@@ -157,6 +157,13 @@ Node::Node(const string &torProxyAddress, const string &torProxyPort) :
 	// Set disconnected to false
 	disconnected(false)
 {
+
+	// Check if initializing common failed
+	if(!Common::initialize()) {
+	
+		// Throw exception
+		throw runtime_error("Initializing common failed");
+	}
 }
 
 // Destructor
@@ -395,7 +402,7 @@ void Node::setOnPeerInfoCallback(const function<void(const string &peerIdentifie
 }
 
 // Set on peer update callback
-void Node::setOnPeerUpdateCallback(const function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerInfoCallback) {
+void Node::setOnPeerUpdateCallback(const function<void(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerUpdateCallback) {
 
 	// Check if started
 	if(started) {
@@ -538,38 +545,6 @@ void Node::stop() {
 	peerEventOccurred.notify_one();
 }
 
-// Get peers
-list<Peer> &Node::getPeers() {
-
-	// Check if not started
-	if(!started) {
-	
-		// Throw exception
-		throw runtime_error("Node not started");
-	}
-	
-	// Check if main thread is running
-	if(mainThread.joinable()) {
-	
-		// Throw exception
-		throw runtime_error("Node is running");
-	}
-	
-	// Go through all peers
-	for(Peer &peer : peers) {
-	
-		// Check if current thread is the peer's thread
-		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
-		
-			// Throw exception
-			throw runtime_error("Can't get peers from current thread");
-		}
-	}
-	
-	// Return peers
-	return peers;
-}
-
 // Disconnect
 void Node::disconnect() {
 
@@ -588,7 +563,7 @@ void Node::disconnect() {
 	}
 	
 	// Go through all peers
-	for(Peer &peer : peers) {
+	for(const Peer &peer : peers) {
 	
 		// Check if current thread is the peer's thread
 		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
@@ -681,6 +656,148 @@ thread &Node::getThread() {
 	return mainThread;
 }
 
+// Get thread
+const thread &Node::getThread() const {
+
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
+	// Return main thread
+	return mainThread;
+}
+
+// Get peers begin
+list<Peer>::iterator Node::getPeersBegin() {
+
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
+	// Check if main thread is running
+	if(mainThread.joinable()) {
+	
+		// Throw exception
+		throw runtime_error("Node is running");
+	}
+	
+	// Go through all peers
+	for(const Peer &peer : peers) {
+	
+		// Check if current thread is the peer's thread
+		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
+		
+			// Throw exception
+			throw runtime_error("Can't get peers from current thread");
+		}
+	}
+	
+	// Return peers begin
+	return peers.begin();
+}
+
+// Get peers begin
+list<Peer>::const_iterator Node::getPeersBegin() const {
+
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
+	// Check if main thread is running
+	if(mainThread.joinable()) {
+	
+		// Throw exception
+		throw runtime_error("Node is running");
+	}
+	
+	// Go through all peers
+	for(const Peer &peer : peers) {
+	
+		// Check if current thread is the peer's thread
+		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
+		
+			// Throw exception
+			throw runtime_error("Can't get peers from current thread");
+		}
+	}
+	
+	// Return peers begin
+	return peers.cbegin();
+}
+
+// Get peers end
+list<Peer>::iterator Node::getPeersEnd() {
+
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
+	// Check if main thread is running
+	if(mainThread.joinable()) {
+	
+		// Throw exception
+		throw runtime_error("Node is running");
+	}
+	
+	// Go through all peers
+	for(const Peer &peer : peers) {
+	
+		// Check if current thread is the peer's thread
+		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
+		
+			// Throw exception
+			throw runtime_error("Can't get peers from current thread");
+		}
+	}
+	
+	// Return peers end
+	return peers.end();
+}
+
+// Get peers end
+list<Peer>::const_iterator Node::getPeersEnd() const {
+
+	// Check if not started
+	if(!started) {
+	
+		// Throw exception
+		throw runtime_error("Node not started");
+	}
+	
+	// Check if main thread is running
+	if(mainThread.joinable()) {
+	
+		// Throw exception
+		throw runtime_error("Node is running");
+	}
+	
+	// Go through all peers
+	for(const Peer &peer : peers) {
+	
+		// Check if current thread is the peer's thread
+		if(peer.getThread().joinable() && this_thread::get_id() == peer.getThread().get_id()) {
+		
+			// Throw exception
+			throw runtime_error("Can't get peers from current thread");
+		}
+	}
+	
+	// Return peers end
+	return peers.cend();
+}
+
 // Get total difficulty
 uint64_t Node::getTotalDifficulty() const {
 
@@ -750,7 +867,7 @@ void Node::broadcastBlock(Header &&header, Block &&block) {
 }
 
 // Get next block
-tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase) {
+tuple<Header, Block, uint64_t> Node::getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase) {
 
 	// Check if mempool is enabled
 	#ifdef ENABLE_MEMPOOL
@@ -1204,9 +1321,6 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 		// Create block from inputs, sorted outputs, sorted rangeproofs, and sorted kernels
 		const Block block(move(inputs), move(sortedOutputs), move(sortedRangeproofs), move(sortedKernels), false, false);
 		
-		// Initialize header
-		optional<const Header> header;
-		
 		// Try
 		try {
 		
@@ -1284,17 +1398,16 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 			throw runtime_error("Adding block to Merkle mountain ranges failed");
 		}
 		
+		// Set ignore exception to false
+		bool ignoreException = false;
+		
 		// Try
 		try {
 			
 			// Create header
 			const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES] = {};
-			header.emplace(Consensus::getHeaderVersion(nextHeaderHeight), nextHeaderHeight, max(chrono::system_clock::now() + Consensus::BLOCK_TIME, previousHeader->getTimestamp() + 1s), previousHeader->getBlockHash().data(), headers.getRootAtNumberOfLeaves(previousHeader->getHeight() + 1).data(), outputs.getRootAtSize(outputs.getSize()).data(), rangeproofs.getRootAtSize(rangeproofs.getSize()).data(), kernels.getRootAtSize(kernels.getSize()).data(), totalKernelOffset, outputs.getSize(), kernels.getSize(), SaturateMath::add(previousHeader->getTotalDifficulty(), targetDifficulty), targetSecondaryScaling, targetDifficulty, 0, proofNonces, false);
-		}
-		
-		// Catch errors
-		catch(...) {
-		
+			const Header header(Consensus::getHeaderVersion(nextHeaderHeight), nextHeaderHeight, max(chrono::system_clock::now() + Consensus::BLOCK_TIME, previousHeader->getTimestamp() + 1s), previousHeader->getBlockHash().data(), headers.getRootAtNumberOfLeaves(previousHeader->getHeight() + 1).data(), outputs.getRootAtSize(outputs.getSize()).data(), rangeproofs.getRootAtSize(rangeproofs.getSize()).data(), kernels.getRootAtSize(kernels.getSize()).data(), totalKernelOffset, outputs.getSize(), kernels.getSize(), SaturateMath::add(previousHeader->getTotalDifficulty(), targetDifficulty), targetSecondaryScaling, 0, 0, proofNonces, false);
+			
 			// Try
 			try {
 			
@@ -1307,6 +1420,9 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 			// Catch errors
 			catch(...) {
 			
+				// Set ignore exception to true
+				ignoreException = true;
+				
 				// Set headers to include the genesis block header
 				headers.clear();
 				headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
@@ -1351,75 +1467,83 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 				
 				// Set is synced to false
 				isSynced = false;
+				
+				// Throw exception
+				throw runtime_error("Removing block to Merkle mountain ranges failed");
 			}
 			
-			// Rethrow error
-			throw;
-		}
-		
-		// Try
-		try {
-		
-			// Undo changed to kernels, outputs, and rangeproofs
-			kernels.rewindToSize(previousHeader->getKernelMerkleMountainRangeSize());
-			outputs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
-			rangeproofs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+			// Return header, block, and target difficulty
+			return {header, block, targetDifficulty};
 		}
 		
 		// Catch errors
 		catch(...) {
 		
-			// Set headers to include the genesis block header
-			headers.clear();
-			headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
+			// Check if not ignoring exception
+			if(!ignoreException) {
 			
-			// Set synced header index to the newest known height
-			syncedHeaderIndex = headers.back().getHeight();
-			
-			// Set kernels to include the genesis block kernel
-			kernels.clear();
-			kernels.appendLeaf(Consensus::GENESIS_BLOCK_KERNEL);
-			
-			// Set outputs to include the genesis block output
-			outputs.clear();
-			outputs.appendLeaf(Consensus::GENESIS_BLOCK_OUTPUT);
-			
-			// Set rangeproofs to include the genesis block rangeproof
-			rangeproofs.clear();
-			rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
-			
-			// Check if mempool is enabled
-			#ifdef ENABLE_MEMPOOL
-			
-				// Clear mempool
-				mempool.clear();
+				// Try
+				try {
 				
-				// Check if on mempool clear callback exists
-				if(onMempoolClearCallback) {
-				
-					// Try
-					try {
-					
-						// Run on mempool clear callback
-						onMempoolClearCallback();
-					}
-					
-					// Catch errors
-					catch(...) {
-					
-					}
+					// Undo changed to kernels, outputs, and rangeproofs
+					kernels.rewindToSize(previousHeader->getKernelMerkleMountainRangeSize());
+					outputs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
+					rangeproofs.rewindToSize(previousHeader->getOutputMerkleMountainRangeSize());
 				}
-			#endif
+				
+				// Catch errors
+				catch(...) {
+				
+					// Set headers to include the genesis block header
+					headers.clear();
+					headers.appendLeaf(Consensus::GENESIS_BLOCK_HEADER);
+					
+					// Set synced header index to the newest known height
+					syncedHeaderIndex = headers.back().getHeight();
+					
+					// Set kernels to include the genesis block kernel
+					kernels.clear();
+					kernels.appendLeaf(Consensus::GENESIS_BLOCK_KERNEL);
+					
+					// Set outputs to include the genesis block output
+					outputs.clear();
+					outputs.appendLeaf(Consensus::GENESIS_BLOCK_OUTPUT);
+					
+					// Set rangeproofs to include the genesis block rangeproof
+					rangeproofs.clear();
+					rangeproofs.appendLeaf(Consensus::GENESIS_BLOCK_RANGEPROOF);
+					
+					// Check if mempool is enabled
+					#ifdef ENABLE_MEMPOOL
+					
+						// Clear mempool
+						mempool.clear();
+						
+						// Check if on mempool clear callback exists
+						if(onMempoolClearCallback) {
+						
+							// Try
+							try {
+							
+								// Run on mempool clear callback
+								onMempoolClearCallback();
+							}
+							
+							// Catch errors
+							catch(...) {
+							
+							}
+						}
+					#endif
+					
+					// Set is synced to false
+					isSynced = false;
+				}
+			}
 			
-			// Set is synced to false
-			isSynced = false;
-			
-			// Throw exception
-			throw runtime_error("Removing block to Merkle mountain ranges failed");
+			// Rethrow error
+			throw;
 		}
-		
-		// Return header and block
-		return {header.value(), block};
 	
 	// Otherwise
 	#else
@@ -1427,6 +1551,13 @@ tuple<Header, Block> Node::getNextBlock(const function<tuple<Output, Rangeproof,
 		// Throw exception
 		throw runtime_error("Mempool isn't enabled");
 	#endif
+}
+
+// Error occurred
+bool Node::errorOccurred() const {
+
+	// Return if an error occurred
+	return Common::errorOccurred();
 }
 
 // Get lock
@@ -3592,7 +3723,7 @@ void Node::connectToMorePeers() {
 			try {
 			
 				// Create peer from peer candidate
-				peers.emplace_back(peerCandidate.first, *this, peerEventOccurred, randomNumberGenerator());
+				peers.emplace_back(peerEventOccurred, randomNumberGenerator()).start(peerCandidate.first, this);
 			}
 			
 			// Catch errors
