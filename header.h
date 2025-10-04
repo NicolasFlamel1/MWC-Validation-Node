@@ -84,6 +84,9 @@ class Header final : public MerkleMountainRangeLeaf<Header> {
 		// Get block hash
 		array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> getBlockHash() const;
 		
+		// Get pre-proof of work
+		vector<uint8_t> getPreProofOfWork() const;
+		
 		// Set proof of work
 		bool setProofOfWork(const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]);
 		

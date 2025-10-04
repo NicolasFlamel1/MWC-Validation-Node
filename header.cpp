@@ -163,26 +163,79 @@ array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> Header::getBlockHash() const {
 	return blockHash;
 }
 
+// Get pre-proof of work
+vector<uint8_t> Header::getPreProofOfWork() const {
+
+	// Initialize pre-proof of work
+	vector<uint8_t> preProofOfWork;
+	
+	// Append version to pre-proof of work
+	Common::writeUint16(preProofOfWork, version);
+	
+	// Append height to pre-proof of work
+	Common::writeUint64(preProofOfWork, height);
+	
+	// Append timestamp to pre-proof of work
+	Common::writeInt64(preProofOfWork, chrono::duration_cast<chrono::seconds>(timestamp.time_since_epoch()).count());
+	
+	// Append previous block hash to pre-proof of work
+	preProofOfWork.insert(preProofOfWork.cend(), cbegin(previousBlockHash), cend(previousBlockHash));
+	
+	// Append previous header root to pre-proof of work
+	preProofOfWork.insert(preProofOfWork.cend(), cbegin(previousHeaderRoot), cend(previousHeaderRoot));
+	
+	// Append output root to pre-proof of work
+	preProofOfWork.insert(preProofOfWork.cend(), cbegin(outputRoot), cend(outputRoot));
+	
+	// Append rangeproof root to pre-proof of work
+	preProofOfWork.insert(preProofOfWork.cend(), cbegin(rangeproofRoot), cend(rangeproofRoot));
+	
+	// Append kernel root to pre-proof of work
+	preProofOfWork.insert(preProofOfWork.cend(), cbegin(kernelRoot), cend(kernelRoot));
+	
+	// Append total kernel offset to pre-proof of work
+	preProofOfWork.insert(preProofOfWork.cend(), cbegin(totalKernelOffset), cend(totalKernelOffset));
+	
+	// Append output Merkle mountain range size to pre-proof of work
+	Common::writeUint64(preProofOfWork, outputMerkleMountainRangeSize);
+	
+	// Append kernel Merkle mountain range size to pre-proof of work
+	Common::writeUint64(preProofOfWork, kernelMerkleMountainRangeSize);
+	
+	// Append total difficulty to pre-proof of work
+	Common::writeUint64(preProofOfWork, totalDifficulty);
+	
+	// Append secondary scaling to pre-proof of work
+	Common::writeUint32(preProofOfWork, secondaryScaling);
+	
+	// Return pre-proof of work
+	return preProofOfWork;
+}
+
 // Set proof of work
 bool Header::setProofOfWork(const uint64_t nonce, const uint8_t edgeBits, const uint64_t proofNonces[Crypto::CUCKOO_CYCLE_NUMBER_OF_PROOF_NONCES]) {
 
-	// Get hash from the header and nonce
-	const array hash = ProofOfWork::getProofOfWorkHash(*this, nonce);
+	// Check if edge bits is valid
+	if((edgeBits >= Consensus::C29_EDGE_BITS && height < Consensus::C31_HARD_FORK_HEIGHT) || edgeBits == Consensus::C31_EDGE_BITS) {
 	
-	// Check if hash, edge bits, and proof nonces are a valid proof of work
-	if(ProofOfWork::hasValidProofOfWork(hash, edgeBits, proofNonces)) {
-	
-		// Set nonce to nonce
-		this->nonce = nonce;
+		// Get hash from the header and nonce
+		const array hash = ProofOfWork::getProofOfWorkHash(*this, nonce);
 		
-		// Set edge bits to edge bits
-		this->edgeBits = edgeBits;
+		// Check if hash, edge bits, and proof nonces are a valid proof of work
+		if(ProofOfWork::hasValidProofOfWork(hash, edgeBits, proofNonces)) {
 		
-		// Set proof nonces to proof nonces
-		memcpy(this->proofNonces, proofNonces, sizeof(this->proofNonces));
-		
-		// Return true
-		return true;
+			// Set nonce to nonce
+			this->nonce = nonce;
+			
+			// Set edge bits to edge bits
+			this->edgeBits = edgeBits;
+			
+			// Set proof nonces to proof nonces
+			memcpy(this->proofNonces, proofNonces, sizeof(this->proofNonces));
+			
+			// Return true
+			return true;
+		}
 	}
 	
 	// Return false

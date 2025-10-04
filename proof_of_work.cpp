@@ -295,58 +295,19 @@ bool ProofOfWork::hasValidProofOfWork(const array<uint8_t, Crypto::BLAKE2B_HASH_
 // Get proof of work hash
 array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> ProofOfWork::getProofOfWorkHash(const Header &header, const uint64_t nonce) {
 
-	// Initialize data
-	vector<uint8_t> data;
+	// Get header's pre-proof of work
+	vector<uint8_t> proofOfWork = header.getPreProofOfWork();
 	
-	// Append header's version to data
-	Common::writeUint16(data, header.getVersion());
+	// Append nonce to the pre-proof of work to get the proof of work
+	Common::writeUint64(proofOfWork, nonce);
 	
-	// Append header's height to data
-	Common::writeUint64(data, header.getHeight());
-	
-	// Append header's timestamp to data
-	Common::writeInt64(data, chrono::duration_cast<chrono::seconds>(header.getTimestamp().time_since_epoch()).count());
-	
-	// Append header's previous block hash to data
-	data.insert(data.cend(), header.getPreviousBlockHash(), header.getPreviousBlockHash() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's previous header root to data
-	data.insert(data.cend(), header.getPreviousHeaderRoot(), header.getPreviousHeaderRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's previous output to data
-	data.insert(data.cend(), header.getOutputRoot(), header.getOutputRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's rangeproof root to data
-	data.insert(data.cend(), header.getRangeproofRoot(), header.getRangeproofRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's kernel root to data
-	data.insert(data.cend(), header.getKernelRoot(), header.getKernelRoot() + Crypto::BLAKE2B_HASH_LENGTH);
-	
-	// Append header's total kernel offset to data
-	data.insert(data.cend(), header.getTotalKernelOffset(), header.getTotalKernelOffset() + Crypto::SECP256K1_PRIVATE_KEY_LENGTH);
-	
-	// Append header's output Merkle mountain range size to data
-	Common::writeUint64(data, header.getOutputMerkleMountainRangeSize());
-	
-	// Append header's kernel Merkle mountain range size to data
-	Common::writeUint64(data, header.getKernelMerkleMountainRangeSize());
-	
-	// Append header's total difficulty to data
-	Common::writeUint64(data, header.getTotalDifficulty());
-	
-	// Append header's secondary scaling to data
-	Common::writeUint32(data, header.getSecondaryScaling());
-	
-	// Append nonce to data
-	Common::writeUint64(data, nonce);
-	
-	// Check if getting hash of data failed
+	// Check if getting hash of proof of work failed
 	array<uint8_t, Crypto::BLAKE2B_HASH_LENGTH> hash;
 	
-	if(blake2b(hash.data(), hash.size(), data.data(), data.size(), nullptr, 0)) {
+	if(blake2b(hash.data(), hash.size(), proofOfWork.data(), proofOfWork.size(), nullptr, 0)) {
 	
 		// Throw error
-		throw runtime_error("Getting hash of data failed");
+		throw runtime_error("Getting hash of proof of work failed");
 	}
 	
 	// Return hash
