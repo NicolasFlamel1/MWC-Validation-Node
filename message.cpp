@@ -742,6 +742,9 @@ list<NetworkAddress> Message::readPeerAddressesMessage(const vector<uint8_t> &pe
 		// Read network address from peer addresses message
 		NetworkAddress networkAddress = readNetworkAddress(peerAddressesMessage, peerAddressOffset);
 		
+		// Set use address to true
+		bool useAddress = true;
+		
 		// Check network addresses's family
 		switch(networkAddress.family) {
 		
@@ -751,6 +754,13 @@ list<NetworkAddress> Message::readPeerAddressesMessage(const vector<uint8_t> &pe
 			
 				// Update peer address offset
 				peerAddressOffset += sizeof(networkAddress.family) + networkAddress.addressLength + sizeof(networkAddress.port);
+				
+				// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L187-L202)
+				if(!networkAddress.port) {
+				
+					// Set use address to false
+					useAddress = false;
+				}
 			
 				// Break
 				break;
@@ -760,7 +770,14 @@ list<NetworkAddress> Message::readPeerAddressesMessage(const vector<uint8_t> &pe
 			
 				// Update peer address offset
 				peerAddressOffset += sizeof(networkAddress.family) + sizeof(uint64_t) + networkAddress.addressLength;
-			
+				
+				// Check if network address's address is invalid (mwc-node allows addresses to not end with .onion)
+				if(networkAddress.addressLength <= sizeof(".onion") - sizeof('\0') || memcmp(&reinterpret_cast<const uint8_t *>(networkAddress.address)[networkAddress.addressLength - (sizeof(".onion") - sizeof('\0'))], ".onion", sizeof(".onion") - sizeof('\0')) || memchr(networkAddress.address, '[', networkAddress.addressLength) || memchr(networkAddress.address, ']', networkAddress.addressLength) || memchr(networkAddress.address, ':', networkAddress.addressLength) || !Common::isUtf8(reinterpret_cast<const char *>(networkAddress.address), networkAddress.addressLength)) {
+				
+					// Set use address to false
+					useAddress = false;
+				}
+				
 				// Break
 				break;
 			
@@ -774,8 +791,12 @@ list<NetworkAddress> Message::readPeerAddressesMessage(const vector<uint8_t> &pe
 				break;
 		}
 		
-		// Append network address to list
-		networkAddresses.push_back(move(networkAddress));
+		// Check if using address
+		if(useAddress) {
+		
+			// Append network address to list
+			networkAddresses.push_back(move(networkAddress));
+		}
 	}
 	
 	// Return network addresses
@@ -1444,12 +1465,12 @@ void Message::writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress 
 			// Append network address's address to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(networkAddress.address), reinterpret_cast<const uint8_t *>(networkAddress.address) + networkAddress.addressLength);
 			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L156)
+			// Check if network address's port is invalid
 			if(!networkAddress.port) {
 			
 				// Throw exception
 				throw runtime_error("Port is invalid");
-			}*/
+			}
 			
 			// Append network address's port to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(&networkAddress.port), reinterpret_cast<const uint8_t *>(&networkAddress.port) + sizeof(networkAddress.port));
@@ -1473,12 +1494,12 @@ void Message::writeNetworkAddress(vector<uint8_t> &buffer, const NetworkAddress 
 			// Append network address's address to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(networkAddress.address), reinterpret_cast<const uint8_t *>(networkAddress.address) + networkAddress.addressLength);
 			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L164)
+			// Check if network address's port is invalid
 			if(!networkAddress.port) {
 			
 				// Throw exception
 				throw runtime_error("Port is invalid");
-			}*/
+			}
 			
 			// Append network address's port to buffer
 			buffer.insert(buffer.cend(), reinterpret_cast<const uint8_t *>(&networkAddress.port), reinterpret_cast<const uint8_t *>(&networkAddress.port) + sizeof(networkAddress.port));
@@ -1578,13 +1599,6 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 			// Set network address's port
 			memcpy(&networkAddress.port, &buffer[offset + sizeof(networkAddress.family) + networkAddress.addressLength], sizeof(networkAddress.port));
 			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L187-L191)
-			if(!networkAddress.port) {
-			
-				// Throw exception
-				throw runtime_error("Port is invalid");
-			}*/
-			
 			// Break
 			break;
 		
@@ -1613,13 +1627,6 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 			
 			// Set network address's port
 			memcpy(&networkAddress.port, &buffer[offset + sizeof(networkAddress.family) + networkAddress.addressLength], sizeof(networkAddress.port));
-			
-			/*// Check if network address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L195-L202)
-			if(!networkAddress.port) {
-			
-				// Throw exception
-				throw runtime_error("Port is invalid");
-			}*/
 			
 			// Break
 			break;
@@ -1664,13 +1671,6 @@ NetworkAddress Message::readNetworkAddress(const vector<uint8_t> &buffer, const 
 				
 				// Set network address's address
 				networkAddress.address = &buffer[offset + sizeof(networkAddress.family) + sizeof(addressLength)];
-				
-				// Check if address is invalid
-				if(networkAddress.addressLength <= sizeof(".onion") - sizeof('\0') || memcmp(&reinterpret_cast<const uint8_t *>(networkAddress.address)[networkAddress.addressLength - (sizeof(".onion") - sizeof('\0'))], ".onion", sizeof(".onion") - sizeof('\0')) || memchr(networkAddress.address, '[', networkAddress.addressLength) || memchr(networkAddress.address, ']', networkAddress.addressLength) || memchr(networkAddress.address, ':', networkAddress.addressLength) || !Common::isUtf8(reinterpret_cast<const char *>(networkAddress.address), networkAddress.addressLength)) {
-				
-					// Throw exception
-					throw runtime_error("Address is invalid");
-				}
 			}
 		
 			// Break
