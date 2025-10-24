@@ -610,8 +610,8 @@ void Peer::startSyncing(const MerkleMountainRange<Header> &headers, const uint64
 	// Set number of reorgs during block sync to zero
 	numberOfReorgsDuringBlockSync = 0;
 	
-	// Check if next header is known
-	if(headers.getLeaf(syncedHeaderIndex + 1)) {
+	// Check if next header is known, all this peer's headers are known, and transaction hash set isn't needed
+	if(headers.getLeaf(syncedHeaderIndex + 1) && headers.back().getTotalDifficulty() >= totalDifficulty && headers.back().getHeight() - syncedHeaderIndex <= Consensus::CUT_THROUGH_HORIZON) {
 	
 		// Set syncing state to requesting block
 		syncingState = SyncingState::REQUESTING_BLOCK;
