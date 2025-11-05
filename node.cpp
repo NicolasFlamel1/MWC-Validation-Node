@@ -1,5 +1,7 @@
 // Header files
 #include "./common.h"
+#include <fcntl.h>
+#include <unistd.h>
 #include "./consensus.h"
 #include "./crypto.h"
 #include "./message.h"
@@ -15,6 +17,9 @@ using namespace MwcValidationNode;
 
 
 // Constants
+
+// Default base fee
+const uint64_t Node::DEFAULT_BASE_FEE = 1000;
 
 // Check if Tor is enabled
 #ifdef ENABLE_TOR
@@ -109,20 +114,14 @@ const chrono::hours Node::BANNED_PEERS_CLEANUP_INTERVAL = 6h;
 // Remove random peer interval
 const chrono::hours Node::REMOVE_RANDOM_PEER_INTERVAL = 6h;
 
-// Default base fee
-const uint64_t Node::DEFAULT_BASE_FEE = 1000;
-
 
 // Supporting function implementation
 
 // Constructor
-Node::Node(const string &torProxyAddress, const string &torProxyPort) :
+Node::Node() :
 
-	// Set Tor proxy address
-	torProxyAddress(torProxyAddress),
-	
-	// Set Tor proxy port
-	torProxyPort(torProxyPort),
+	// Set address info to nothing
+	addressInfo(nullptr, freeaddrinfo),
 	
 	// Create random number generator with a random device
 	randomNumberGenerator(random_device()()),
@@ -147,6 +146,25 @@ Node::Node(const string &torProxyAddress, const string &torProxyPort) :
 	
 	// Set is synced to false
 	isSynced(false),
+	
+	// Check if Windows
+	#ifdef _WIN32
+	
+		// Set socket to invalid
+		socket(INVALID_SOCKET),
+	
+	// Otherwise
+	#else
+	
+		// Set socket to invalid
+		socket(-1),
+	#endif
+	
+	// Set number of outbound peers to zero
+	numberOfOutboundPeers(0),
+	
+	// Set number of inbound peers to zero
+	numberOfInboundPeers(0),
 
 	// Set stop monitoring to false
 	stopMonitoring(false),
@@ -388,7 +406,7 @@ void Node::setOnPeerConnectCallback(const function<void(Node &node, const string
 }
 
 // Set on peer info callback
-void Node::setOnPeerInfoCallback(const function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback) {
+void Node::setOnPeerInfoCallback(const function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty, const bool isInbound)> &onPeerInfoCallback) {
 
 	// Check if started
 	if(started) {
@@ -413,6 +431,20 @@ void Node::setOnPeerUpdateCallback(const function<void(Node &node, const string 
 	
 	// Set on peer update callback
 	this->onPeerUpdateCallback = onPeerUpdateCallback;
+}
+
+// Set on peer healthy callback
+void Node::setOnPeerHealthyCallback(const function<bool(Node &node, const string &peerIdentifier)> &onPeerHealthyCallback) {
+
+	// Check if started
+	if(started) {
+	
+		// Throw exception
+		throw runtime_error("Node is started");
+	}
+	
+	// Set on peer healthy callback
+	this->onPeerHealthyCallback = onPeerHealthyCallback;
 }
 
 // Set on peer disconnect callback
@@ -502,7 +534,7 @@ void Node::setOnMempoolClearCallback(const function<void(Node &node)> &onMempool
 }
 
 // Start
-void Node::start(const char *customDnsSeed, const uint64_t baseFee) {
+void Node::start(const char *torProxyAddress, const uint16_t torProxyPort, const char *customDnsSeed, const uint64_t baseFee, const char *listeningAddress, const uint16_t listeningPort, const Capabilities desiredPeerCapabilities) {
 
 	// Check if started
 	if(started) {
@@ -514,6 +546,19 @@ void Node::start(const char *customDnsSeed, const uint64_t baseFee) {
 	// Set started to true
 	started = true;
 	
+	// Set Tor proxy address to Tor proxy address
+	this->torProxyAddress = torProxyAddress;
+	
+	// Check if Tor proxy port is invalid
+	if(!torProxyPort) {
+	
+		// Throw exception
+		throw runtime_error("Tor proxy port is invalid");
+	}
+	
+	// Set Tor proxy port to Tor proxy port
+	this->torProxyPort = to_string(torProxyPort);
+	
 	// Check if custom DNS seed exists
 	if(customDnsSeed) {
 	
@@ -524,8 +569,254 @@ void Node::start(const char *customDnsSeed, const uint64_t baseFee) {
 	// Set base fee to base fee
 	this->baseFee = baseFee;
 	
-	// Create main thread
-	mainThread = thread(&Node::monitor, this);
+	// Check if listening address exists
+	if(listeningAddress) {
+	
+		// Check if listening port is invalid
+		if(!listeningPort) {
+		
+			// Throw exception
+			throw runtime_error("Listening port is invalid");
+		}
+		
+		// Set hints
+		const addrinfo hints = {
+		
+			// Port provided
+			.ai_flags = AI_NUMERICSERV,
+		
+			// IPv4 or IPv6
+			.ai_family = AF_UNSPEC,
+			
+			// TCP
+			.ai_socktype = SOCK_STREAM,
+		};
+		
+		// Check if getting address info for the listening address failed
+		addrinfo *temp;
+		if(getaddrinfo(listeningAddress, to_string(listeningPort).c_str(), &hints, &temp) || !temp) {
+		
+			// Throw exception
+			throw runtime_error("Getting address info for the listening address failed");
+		}
+		
+		// Set address info to the result
+		addressInfo = unique_ptr<addrinfo, decltype(&freeaddrinfo)>(temp, freeaddrinfo);
+		
+		// Check address info family
+		switch(addressInfo->ai_family) {
+		
+			// IPv4
+			case AF_INET:
+			
+				{
+					// Get IPv4 info for the address info
+					const sockaddr_in *ipv4Info = reinterpret_cast<const sockaddr_in *>(addressInfo->ai_addr);
+					
+					// Set listening network address's family to IPv4
+					listeningNetworkAddress.family = NetworkAddress::Family::IPV4;
+					
+					// Set listening network address's address to the address
+					listeningNetworkAddress.address = &ipv4Info->sin_addr;
+					
+					// Set listening network address's address length to the address length
+					listeningNetworkAddress.addressLength = sizeof(ipv4Info->sin_addr);
+					
+					// Set listening network address's port to the port
+					listeningNetworkAddress.port = ipv4Info->sin_port;
+				}
+			
+				// Break
+				break;
+			
+			// IPv6
+			case AF_INET6:
+			
+				{
+					// Get IPv6 info for the address info
+					const sockaddr_in6 *ipv6Info = reinterpret_cast<const sockaddr_in6 *>(addressInfo->ai_addr);
+					
+					// Set listening network address's family to IPv6
+					listeningNetworkAddress.family = NetworkAddress::Family::IPV6;
+					
+					// Set listening network address's address to the address
+					listeningNetworkAddress.address = &ipv6Info->sin6_addr;
+					
+					// Set listening network address's address length to the address length
+					listeningNetworkAddress.addressLength = sizeof(ipv6Info->sin6_addr);
+					
+					// Set listening network address's port to the port
+					listeningNetworkAddress.port = ipv6Info->sin6_port;
+				}
+			
+				// Break
+				break;
+			
+			// Default
+			default:
+			
+				// Throw exception
+				throw runtime_error("Address info family is invalid");
+				
+				// Break
+				break;
+		}
+		
+		// Create socket
+		socket = ::socket(addressInfo->ai_family, addressInfo->ai_socktype, addressInfo->ai_protocol);
+		
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Check if creating socket failed
+			if(socket == INVALID_SOCKET) {
+			
+		// Otherwise
+		#else
+		
+			// Check if creating socket failed
+			if(socket == -1) {
+		#endif
+		
+			// Throw exception
+			throw runtime_error("Creating socket failed");
+		}
+		
+		// Check if Windows
+		#ifdef _WIN32
+	
+			// Check if setting the socket as non-blocking failed
+			u_long nonBlocking = true;
+			if(ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+		
+		// Otherwise
+		#else
+
+			// Check if setting the socket as non-blocking failed
+			const int socketFlags = fcntl(socket, F_GETFL);
+			if(socketFlags == -1 || fcntl(socket, F_SETFL, socketFlags | O_NONBLOCK) == -1) {
+		#endif
+		
+			// Check if Windows
+			#ifdef _WIN32
+			
+				// Close socket
+				closesocket(socket);
+				
+			// Otherwise
+			#else
+			
+				// Close socket
+				close(socket);
+			#endif
+			
+			// Throw exception
+			throw runtime_error("Setting the socket as non-blocking failed");
+		}
+		
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Set enable reuse address to true
+			const DWORD enableReuseAddress = TRUE;
+			
+		// Otherwise
+		#else
+		
+			// Set enable reuse address to true
+			const int enableReuseAddress = 1;
+		#endif
+		
+		// Check if allowing socket to reuse address failed
+		if(setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&enableReuseAddress), sizeof(enableReuseAddress))) {
+		
+			// Check if Windows
+			#ifdef _WIN32
+			
+				// Close socket
+				closesocket(socket);
+				
+			// Otherwise
+			#else
+			
+				// Close socket
+				close(socket);
+			#endif
+			
+			// Throw exception
+			throw runtime_error("Aallowing socket to reuse address failed");
+		}
+		
+		// Check if binding the socket failed
+		if(::bind(socket, addressInfo->ai_addr, addressInfo->ai_addrlen)) {
+		
+			// Check if Windows
+			#ifdef _WIN32
+			
+				// Close socket
+				closesocket(socket);
+				
+			// Otherwise
+			#else
+			
+				// Close socket
+				close(socket);
+			#endif
+			
+			// Throw exception
+			throw runtime_error("Binding the socket failed");
+		}
+		
+		// Check if listening on the socket failed
+		if(listen(socket, SOMAXCONN)) {
+		
+			// Check if Windows
+			#ifdef _WIN32
+			
+				// Close socket
+				closesocket(socket);
+				
+			// Otherwise
+			#else
+			
+				// Close socket
+				close(socket);
+			#endif
+			
+			// Throw exception
+			throw runtime_error("Listening on the socket failed");
+		}
+	}
+	
+	// Set desired peer capabilities to desired peer capabilities
+	this->desiredPeerCapabilities = desiredPeerCapabilities;
+	
+	// Try
+	try {
+	
+		// Create main thread
+		mainThread = thread(&Node::monitor, this);
+	}
+	
+	// Catch errors
+	catch(...) {
+	
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Close socket
+			closesocket(socket);
+			
+		// Otherwise
+		#else
+		
+			// Close socket
+			close(socket);
+		#endif
+		
+		// Rethrow error
+		throw;
+	}
 }
 
 // Stop
@@ -843,11 +1134,14 @@ const MerkleMountainRange<Rangeproof> &Node::getRangeproofs() const {
 // Broadcast transaction
 void Node::broadcastTransaction(Transaction &&transaction) {
 
-	// Lock for writing
-	lock_guard writeLock(lock);
+	{
 	
-	// Add transaction to list of pending transactions
-	pendingTransactions.push_back(move(transaction));
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Add transaction to list of pending transactions
+		pendingTransactions.push_back(move(transaction));
+	}
 	
 	// Notify that an event occurred
 	peerEventOccurred.notify_one();
@@ -856,11 +1150,14 @@ void Node::broadcastTransaction(Transaction &&transaction) {
 // Broadcast block
 void Node::broadcastBlock(Header &&header, Block &&block) {
 
-	// Lock for writing
-	lock_guard writeLock(lock);
+	{
 	
-	// Set pending block to the block
-	pendingBlock.emplace(move(header), move(block));
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Set pending block to the block
+		pendingBlock.emplace(move(header), move(block));
+	}
 	
 	// Notify that an event occurred
 	peerEventOccurred.notify_one();
@@ -1836,7 +2133,7 @@ void Node::peerConnected(const string &peerIdentifier) {
 }
 
 // Peer info
-void Node::peerInfo(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) {
+void Node::peerInfo(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty, const bool isInbound) {
 
 	// Check if on peer info callback exists
 	if(onPeerInfoCallback) {
@@ -1848,7 +2145,7 @@ void Node::peerInfo(const string &peerIdentifier, const Capabilities capabilitie
 		try {
 		
 			// Run on peer info callback
-			onPeerInfoCallback(*this, peerIdentifier, capabilities, userAgent, protocolVersion, baseFee, totalDifficulty);
+			onPeerInfoCallback(*this, peerIdentifier, capabilities, userAgent, protocolVersion, baseFee, totalDifficulty, isInbound);
 		}
 		
 		// Catch errors
@@ -1879,6 +2176,34 @@ void Node::peerUpdated(const string &peerIdentifier, const uint64_t totalDifficu
 		
 		}
 	}
+}
+
+// Peer healthy
+bool Node::peerHealthy(const string &peerIdentifier) {
+
+	// Check if on peer healthy callback exists
+	if(onPeerHealthyCallback) {
+	
+		// Lock for writing
+		lock_guard writeLock(lock);
+		
+		// Try
+		try {
+		
+			// Return running on peer healthy callback
+			return onPeerHealthyCallback(*this, peerIdentifier);
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Return false
+			return false;
+		}
+	}
+	
+	// Return true
+	return true;
 }
 
 // Get Tor proxy address
@@ -2281,6 +2606,48 @@ uint64_t Node::getBaseFee() const {
 
 	// Return base fee
 	return baseFee;
+}
+
+// Is listening
+bool Node::isListening() const {
+
+	// Check if Windows
+	#ifdef _WIN32
+	
+		// Return if socket isn't invalid
+		return socket != INVALID_SOCKET;
+		
+	// Otherwise
+	#else
+	
+		// Return if socket isn't invalid
+		return socket != -1;
+	#endif
+}
+
+// Get listening network address
+const NetworkAddress *Node::getListeningNetworkAddress() const {
+
+	// Check if is listening
+	if(isListening()) {
+	
+		// Return listening network address
+		return &listeningNetworkAddress;
+	}
+	
+	// Otherwise
+	else {
+	
+		// Return nothing
+		return nullptr;
+	}
+}
+
+// Get desired peer capabilities
+Node::Capabilities Node::getDesiredPeerCapabilities() const {
+
+	// Return desired peer capabilities
+	return desiredPeerCapabilities;
 }
 
 // Cleanup mempool
@@ -3104,11 +3471,18 @@ void Node::monitor() {
 				sync();
 			}
 			
-			// Check if more peers are desired
-			if(peers.size() < DESIRED_NUMBER_OF_PEERS) {
+			// Check if is listening
+			if(isListening()) {
+			
+				// Accept inbound peers
+				acceptInboundPeers();
+			}
+			
+			// Check if more outbound peers are desired
+			if(numberOfOutboundPeers < (isListening() ? (DESIRED_NUMBER_OF_PEERS + 1) / 2 : DESIRED_NUMBER_OF_PEERS)) {
 		
-				// Connect to more peers
-				connectToMorePeers();
+				// Connect to outbound peers
+				connectToOutboundPeers();
 			}
 			
 			// Check if time to cleanup unused peer candidates
@@ -3164,6 +3538,23 @@ void Node::monitor() {
 	
 		// Set closing
 		Common::setClosing();
+	}
+	
+	// Check if is listening
+	if(isListening()) {
+	
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Close socket
+			closesocket(socket);
+			
+		// Otherwise
+		#else
+		
+			// Close socket
+			close(socket);
+		#endif
 	}
 	
 	// Check if an error occurred
@@ -3522,6 +3913,20 @@ void Node::removeDisconnectedPeers() {
 			isSyncing = false;
 		}
 		
+		// Check if peer is outbound
+		if(i->isOutbound()) {
+		
+			// Decrement number of outbound peers
+			--numberOfOutboundPeers;
+		}
+		
+		// Otherwise
+		else {
+		
+			// Decrement number of inbound peers
+			--numberOfInboundPeers;
+		}
+		
 		// Remove peer and go to next peer
 		i = peers.erase(i);
 	}
@@ -3674,6 +4079,20 @@ void Node::removeRandomPeer() {
 			// Set is syncing to false
 			isSyncing = false;
 		}
+		
+		// Check if peer is outbound
+		if(peer->isOutbound()) {
+		
+			// Decrement number of outbound peers
+			--numberOfOutboundPeers;
+		}
+		
+		// Otherwise
+		else {
+		
+			// Decrement number of inbound peers
+			--numberOfInboundPeers;
+		}
 
 		// Remove peer
 		peers.erase(peer);
@@ -3686,14 +4105,259 @@ void Node::removeRandomPeer() {
 	}
 }
 
-// Connect to more peers
-void Node::connectToMorePeers() {
+// Accept inbound peers
+void Node::acceptInboundPeers() {
+
+	// Initialize address
+	sockaddr_storage address;
+	
+	// Check if Windows
+	#ifdef _WIN32
+	
+		// Initialize recent IPv4 addresses
+		set<decltype(reinterpret_cast<const sockaddr_in *>(&address)->sin_addr.S_un.S_addr)> recentIpv4Addresses;
+		
+	// Otherwise
+	#else
+	
+		// Initialize recent IPv4 addresses
+		set<decltype(reinterpret_cast<const sockaddr_in *>(&address)->sin_addr.s_addr)> recentIpv4Addresses;
+	#endif
+	
+	// Initialize recent IPv6 addresses
+	// TODO __int128 doesn't exist for 32 bit targets
+	set<unsigned __int128> recentIpv6Addresses;
+	
+	// Loop while not stopping monitoring and not closing
+	while(!stopMonitoring.load() && !Common::isClosing()) {
+	
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Set address length to the size of the address
+			int addressLength = sizeof(address);
+			
+			// Check if accepting peer's connection failed
+			const SOCKET peerSocket = accept(socket, reinterpret_cast<sockaddr *>(&address), &addressLength);
+			if(peerSocket == INVALID_SOCKET) {
+			
+				// Check if there's no more peer connections to accept
+				if(WSAGetLastError() == WSAEWOULDBLOCK) {
+				
+		// Otherwise
+		#else
+		
+			// Set address length to the size of the address
+			socklen_t addressLength = sizeof(address);
+			
+			// Check if accepting peer's connection failed
+			const int peerSocket = accept(socket, reinterpret_cast<sockaddr *>(&address), &addressLength);
+			if(peerSocket == -1) {
+		
+				// Check if there's no more peer connections to accept
+				if(errno == EAGAIN || errno == EWOULDBLOCK) {
+		#endif
+		
+				// Break
+				break;
+			}
+		}
+		
+		// Otherwise check if no more inbound peers are desired
+		else if(numberOfInboundPeers >= DESIRED_NUMBER_OF_PEERS / 2) {
+		
+			// Check if Windows
+			#ifdef _WIN32
+			
+				// Shutdown peer socket receive and send
+				shutdown(peerSocket, SD_BOTH);
+				
+				// Close peer socket
+				closesocket(peerSocket);
+				
+			// Otherwise
+			#else
+			
+				// Shutdown peer socket receive and send
+				shutdown(peerSocket, SHUT_RDWR);
+				
+				// Close peer socket
+				close(peerSocket);
+			#endif
+		}
+		
+		// Otherwise
+		else {
+		
+			// Set invalid address to false
+			bool invalidAddress = false;
+			
+			// Check address's family
+			switch(address.ss_family) {
+			
+				// IPv4
+				case AF_INET:
+				
+					// Check if Windows
+					#ifdef _WIN32
+					
+						// Check if address wasn't recently connected
+						if(!recentIpv4Addresses.contains(reinterpret_cast<const sockaddr_in *>(&address)->sin_addr.S_un.S_addr)) {
+						
+							// Set that address was recently connected
+							recentIpv4Addresses.insert(reinterpret_cast<const sockaddr_in *>(&address)->sin_addr.S_un.S_addr);
+							
+					// Otherwise
+					#else
+					
+						// Check if address wasn't recently connected
+						if(!recentIpv4Addresses.contains(reinterpret_cast<const sockaddr_in *>(&address)->sin_addr.s_addr)) {
+						
+							// Set that address was recently connected
+							recentIpv4Addresses.insert(reinterpret_cast<const sockaddr_in *>(&address)->sin_addr.s_addr);
+					#endif
+					
+					}
+					
+					// Otherwise
+					else {
+					
+						// Set invalid address to true
+						invalidAddress = true;
+					}
+					
+					// Break
+					break;
+					
+				// IPv6
+				case AF_INET6:
+				
+					// Check if Windows
+					#ifdef _WIN32
+					
+						// Check if address wasn't recently connected
+						if(!recentIpv6Addresses.contains(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.u.Byte))) {
+						
+							// Set that address was recently connected
+							recentIpv6Addresses.insert(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.u.Byte));
+							
+					// Otherwise
+					#else
+					
+						// Check if address wasn't recently connected
+						if(!recentIpv6Addresses.contains(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.s6_addr))) {
+						
+							// Set that address was recently connected
+							recentIpv6Addresses.insert(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.s6_addr));
+					#endif
+					
+					}
+						
+					// Otherwise
+					else {
+					
+						// Set invalid address to true
+						invalidAddress = true;
+					}
+					
+					// Break
+					break;
+					
+				// Default
+				default:
+				
+					// Set invalid address to true
+					invalidAddress = true;
+					
+					// Break
+					break;
+			}
+			
+			// Check if address isn't valid
+			if(invalidAddress) {
+			
+				// Check if Windows
+				#ifdef _WIN32
+				
+					// Shutdown peer socket receive and send
+					shutdown(peerSocket, SD_BOTH);
+					
+					// Close peer socket
+					closesocket(peerSocket);
+					
+				// Otherwise
+				#else
+				
+					// Shutdown peer socket receive and send
+					shutdown(peerSocket, SHUT_RDWR);
+					
+					// Close peer socket
+					close(peerSocket);
+				#endif
+			}
+			
+			// Otherwise
+			else {
+			
+				// Try
+				try {
+				
+					// Create new peer from peer candidate
+					Peer &newPeer = peers.emplace_back(peerEventOccurred, randomNumberGenerator());
+					
+					// Try
+					try {
+					
+						// Start new inbound peer
+						newPeer.startInbound(peerSocket, this);
+						
+						// Increment number of inbound peers
+						++numberOfInboundPeers;
+					}
+					
+					// Catch errors
+					catch(...) {
+					
+						// Remove new peer
+						peers.pop_back();
+					}
+				}
+				
+				// Catch errors
+				catch(...) {
+				
+					// Check if Windows
+					#ifdef _WIN32
+					
+						// Shutdown peer socket receive and send
+						shutdown(peerSocket, SD_BOTH);
+						
+						// Close peer socket
+						closesocket(peerSocket);
+						
+					// Otherwise
+					#else
+					
+						// Shutdown peer socket receive and send
+						shutdown(peerSocket, SHUT_RDWR);
+						
+						// Close peer socket
+						close(peerSocket);
+					#endif
+				}
+			}
+		}
+	}
+}
+
+// Connect to outbound peers
+void Node::connectToOutboundPeers() {
 
 	// Lock for writing
 	lock_guard writeLock(lock);
 	
-	// Check if more unused peer candidates are needed to obtain the desired number of peers
-	if(SaturateMath::add(peers.size(), unusedPeerCandidates.size()) < DESIRED_NUMBER_OF_PEERS) {
+	// Check if more unused peer candidates are needed to obtain the desired number of outbound peers
+	if(SaturateMath::add(numberOfOutboundPeers, unusedPeerCandidates.size()) < (isListening() ? (DESIRED_NUMBER_OF_PEERS + 1) / 2 : DESIRED_NUMBER_OF_PEERS)) {
 	
 		// Go through all DNS seeds
 		for(const string &dnsSeed : getDnsSeeds()) {
@@ -3703,8 +4367,8 @@ void Node::connectToMorePeers() {
 		}
 	}
 	
-	// Go through all of the unused peer candidates until at the desired number of peers
-	for(unordered_map<string, chrono::time_point<chrono::steady_clock>>::const_iterator i = unusedPeerCandidates.cbegin(); i != unusedPeerCandidates.cend() && peers.size() != DESIRED_NUMBER_OF_PEERS;) {
+	// Go through all of the unused peer candidates until at the desired number of outbound peers
+	for(unordered_map<string, chrono::time_point<chrono::steady_clock>>::const_iterator i = unusedPeerCandidates.cbegin(); i != unusedPeerCandidates.cend() && numberOfOutboundPeers < (isListening() ? (DESIRED_NUMBER_OF_PEERS + 1) / 2 : DESIRED_NUMBER_OF_PEERS);) {
 	
 		// Get peer candidate
 		const pair<string, chrono::time_point<chrono::steady_clock>> &peerCandidate = *i;
@@ -3721,8 +4385,11 @@ void Node::connectToMorePeers() {
 				// Try
 				try {
 				
-					// Start new peer
-					newPeer.start(peerCandidate.first, this);
+					// Start new outbound peer
+					newPeer.startOutbound(peerCandidate.first, this);
+					
+					// Increment number of outbound peers
+					++numberOfOutboundPeers;
 				}
 				
 				// Catch errors

@@ -101,8 +101,21 @@ class Peer final {
 			PROCESSING_BLOCK
 		};
 		
-		// Start
-		void start(const string &address, Node *node);
+		// Start outbound
+		void startOutbound(const string &address, Node *node);
+		
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Start inbound
+			void startInbound(const SOCKET socket, Node *node);
+			
+		// Otherwise
+		#else
+		
+			// Start inbound
+			void startInbound(const int socket, Node *node);
+		#endif
 		
 		// Get lock
 		shared_mutex &getLock();
@@ -136,6 +149,9 @@ class Peer final {
 		
 		// Send message
 		void sendMessage(const vector<uint8_t> &message);
+		
+		// Is outbound
+		bool isOutbound() const;
 	
 	// Private
 	private:
@@ -218,8 +234,11 @@ class Peer final {
 		// Before disconnect delay duration
 		static const chrono::milliseconds BEFORE_DISCONNECT_DELAY_DURATION;
 		
-		// Connect
-		void connect(const string &address);
+		// Connect outbound
+		void connectOutbound(const string address);
+		
+		// Connect inbound
+		void connectInbound();
 		
 		// Read and write
 		void readAndWrite();
@@ -335,6 +354,9 @@ class Peer final {
 		
 		// Lock
 		shared_mutex lock;
+		
+		// Is inbound
+		bool isInbound;
 		
 		// Identifier
 		string identifier;

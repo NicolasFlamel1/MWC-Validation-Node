@@ -78,7 +78,7 @@ int main() {
 	});
 	
 	// Set node's on peer info callback
-	node.setOnPeerInfoCallback([](MwcValidationNode::Node &node, const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) -> void {
+	node.setOnPeerInfoCallback([](MwcValidationNode::Node &node, const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty, const bool isInbound) -> void {
 	
 		// Do something when a connected peer's info becomes known (this happens once per connected peer when that peer's info first becomes known)
 	});
@@ -87,6 +87,15 @@ int main() {
 	node.setOnPeerUpdateCallback([](MwcValidationNode::Node &node, const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height) -> void {
 	
 		// Do something when a connected peer's total difficulty changes (this happens everytime a connected peer's total difficulty changes)
+	});
+	
+	// Set node's on peer healthy callback
+	node.setOnPeerHealthyCallback([](MwcValidationNode::Node &node, const string &peerIdentifier) -> bool {
+	
+		// Do something when a connected peer is considered healthy (this happens once per connected peer when the peer sends a valid Message::PEER_ADDRESSES message)
+		
+		// Return true to stay connected to the peer otherwise return false or throw an exception
+		return true;
 	});
 	
 	// Set node's on peer disconnect callback
@@ -113,7 +122,7 @@ int main() {
 		// Do something when the node's mempool is cleared (this happens everytime the node's mempool is cleared which can be caused when the node uses a new transaction hash set or when it recovers from an error)
 	});
 	
-	// Start node
+	// Start node (you can can set the node's Tor proxy address, Tor proxy port, DNS seed, base fee, listening address, listening port, and desired peer capabilities here)
 	node.start();
 	
 	// Other things can be done here since the node is running in its own thread. The only node functions allowed in this thread now while the node is running are node.stop(), node.getThread(), node.broadcastTransaction(), node.broadcastBlock(), and calling the node's destructor. All other node functions must happen in the callback functions
@@ -135,13 +144,13 @@ int main() {
 	return EXIT_SUCCESS;
 }
 ```
-All node functions throw a runtime exception if they fail. All callback functions may be running in a separate thread so make sure any variables access in them are thread safe. Only one callback function will run at a time and access to the node within the callback functions is thread safe. Don't call a node's destructor, node.broadcastTransaction(), or node.broadcastBlock() inside the callback functions.
+All node functions throw a runtime exception if they fail. All callback functions may be running in a separate thread so make sure any variables access in them are thread safe. Only one callback function will run at a time and access to the node within the callback functions is thread safe. Don't call a node's destructor, `node.broadcastTransaction()`, or `node.broadcastBlock()` inside the callback functions.
 
 The following flags can be defined before `#include "./mwc_validation_node.h"` to enable or change certain features:
-* `#define DISABLE_SIGNAL_HANDLER`: Don't use builtin signal handler for SIGINT that stops the node.
+* `#define DISABLE_SIGNAL_HANDLER`: Don't use builtin signal handler for `SIGINT` that stops the node.
 * `#define ENABLE_FLOONET`: Uses floonet instead of mainnet.
-* `#define ENABLE_TOR`: Uses the Tor SOCKS5 proxy listening at localhost:9050 for all peer communication. This address can be changed by providing an address and port to the node's constructor.
-* `#define ENABLE_MEMPOOL`: Enables keeping track of transactions in the node's mempool. Mempool related node callback functions and node.getNextBlock() can be used with this enabled.
+* `#define ENABLE_TOR`: Uses the Tor SOCKS5 proxy listening at `localhost:9050` for all peer communication. This address can be changed by providing an address and port to the node's `node.start()` function.
+* `#define ENABLE_MEMPOOL`: Enables keeping track of transactions in the node's mempool. Mempool related node callback functions and `node.getNextBlock()` can be used with this enabled.
 * `#define PRUNE_HEADERS`: Removes headers after they are no longer needed to verify the blockchain.
 * `#define PRUNE_KERNELS`: Removes kernels after they are no longer needed to verify the blockchain.
 * `#define PRUNE_RANGEPROOFS`: Removes rangeproofs after they are no longer needed to verify the blockchain.

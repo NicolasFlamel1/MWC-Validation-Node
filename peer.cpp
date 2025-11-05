@@ -30,8 +30,8 @@ using namespace MwcValidationNode;
 // Communication state
 enum class Peer::CommunicationState {
 
-	// Hand sent
-	HAND_SENT,
+	// Handshake pending
+	HANDSHAKE_PENDING,
 	
 	// Peer addresses requested
 	PEER_ADDRESSES_REQUESTED,
@@ -130,8 +130,8 @@ Peer::Peer(condition_variable &eventOccurred, const mt19937_64::result_type rand
 	// Set syncing state to not syncing
 	syncingState(SyncingState::NOT_SYNCING),
 	
-	// Set communication state to hand sent
-	communicationState(CommunicationState::HAND_SENT),
+	// Set communication state to handshake pending
+	communicationState(CommunicationState::HANDSHAKE_PENDING),
 	
 	// Check if Windows
 	#ifdef _WIN32
@@ -449,8 +449,8 @@ Peer::~Peer() {
 		}
 	}
 	
-	// Check if shake was received
-	if(communicationState > CommunicationState::HAND_SENT) {
+	// Check if handshake was completed
+	if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 	
 		// Try
 		try {
@@ -529,14 +529,79 @@ bool Peer::isWorkerOperationRunning() const {
 	return workerOperation.valid();
 }
 
-// Start
-void Peer::start(const string &address, Node *node) {
+// Start outbound
+void Peer::startOutbound(const string &address, Node *node) {
 
 	// Set node to node
 	this->node = node;
 	
+	// Set is inbound to false
+	isInbound = false;
+	
 	// Create main thread
-	mainThread = thread(&Peer::connect, this, address);
+	mainThread = thread(&Peer::connectOutbound, this, address);
+}
+
+// Check if Windows
+#ifdef _WIN32
+
+	// Start inbound
+	void Peer::startInbound(const SOCKET socket, Node *node) {
+	
+// Otherwise
+#else
+
+	// Start inbound
+	void Peer::startInbound(const int socket, Node *node) {
+#endif
+
+	// Set socket to socket
+	this->socket = socket;
+	
+	// Set node to node
+	this->node = node;
+	
+	// Set is inbound to true
+	isInbound = true;
+	
+	// Try
+	try {
+	
+		// Create main thread
+		mainThread = thread(&Peer::connectInbound, this);
+	}
+	
+	// Catch errors
+	catch(...) {
+	
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Shutdown socket receive and send
+			shutdown(this->socket, SD_BOTH);
+			
+			// Close socket
+			closesocket(this->socket);
+			
+			// Set socket to invalid
+			this->socket = INVALID_SOCKET;
+			
+		// Otherwise
+		#else
+		
+			// Shutdown socket receive and send
+			shutdown(this->socket, SHUT_RDWR);
+			
+			// Close socket
+			close(this->socket);
+			
+			// Set socket to invalid
+			this->socket = -1;
+		#endif
+		
+		// Rethrow error
+		throw;
+	}
 }
 
 // Get lock
@@ -610,7 +675,7 @@ void Peer::startSyncing(const MerkleMountainRange<Header> &headers, const uint64
 	// Set number of reorgs during block sync to zero
 	numberOfReorgsDuringBlockSync = 0;
 	
-	// Check if next header is known, all this peer's headers are known, and transaction hash set isn't needed
+	// Check if next block's header is known, all this peer's headers are known, and transaction hash set isn't needed
 	if(headers.getLeaf(syncedHeaderIndex + 1) && headers.back().getTotalDifficulty() >= totalDifficulty && headers.back().getHeight() - syncedHeaderIndex <= Consensus::CUT_THROUGH_HORIZON) {
 	
 		// Set syncing state to requesting block
@@ -646,8 +711,15 @@ void Peer::sendMessage(const vector<uint8_t> &message) {
 	}
 }
 
-// Connect
-void Peer::connect(const string &address) {
+// Is outbound
+bool Peer::isOutbound() const {
+
+	// Return if isn't inbound
+	return !isInbound;
+}
+
+// Connect outbound
+void Peer::connectOutbound(const string address) {
 
 	// Try
 	try {
@@ -734,13 +806,13 @@ void Peer::connect(const string &address) {
 		#ifdef ENABLE_TOR
 		
 			// Check if getting address info for the node's Tor proxy failed
-			if(getaddrinfo(node->getTorProxyAddress().c_str(), node->getTorProxyPort().c_str(), &hints, &addressInfo)) {
+			if(getaddrinfo(node->getTorProxyAddress().c_str(), node->getTorProxyPort().c_str(), &hints, &addressInfo) || !addressInfo) {
 		
 		// Otherwise
 		#else
 		
 			// Check if getting address info for the current address failed
-			if(getaddrinfo(currentAddress.c_str(), port, &hints, &addressInfo)) {
+			if(getaddrinfo(currentAddress.c_str(), port, &hints, &addressInfo) || !addressInfo) {
 		#endif
 		
 			// Delay
@@ -856,7 +928,7 @@ void Peer::connect(const string &address) {
 							
 								{
 									// Get IPv4 info for the server
-									const sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(server->ai_addr);
+									const sockaddr_in *ipv4Info = reinterpret_cast<const sockaddr_in *>(server->ai_addr);
 									
 									// Set server address's family to IPv4
 									serverAddress.family = NetworkAddress::Family::IPV4;
@@ -888,7 +960,7 @@ void Peer::connect(const string &address) {
 							
 								{
 									// Get IPv6 info for the server
-									const sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(server->ai_addr);
+									const sockaddr_in6 *ipv6Info = reinterpret_cast<const sockaddr_in6 *>(server->ai_addr);
 									
 									// Set server address's family to IPv6
 									serverAddress.family = NetworkAddress::Family::IPV6;
@@ -1114,10 +1186,23 @@ void Peer::connect(const string &address) {
 							// Check if connected
 							if(connected) {
 							
-								// Check if getting socket's error status was successful
+								// Initialize error status
 								int errorStatus;
-								socklen_t errorStatusLength = sizeof(errorStatus);
 								
+								// Check if Windows
+								#ifdef _WIN32
+								
+									// Set error status length to the size of the error status
+									int errorStatusLength = sizeof(errorStatus);
+									
+								// Otherwise
+								#else
+								
+									// Set error status length to the size of the error status
+									socklen_t errorStatusLength = sizeof(errorStatus);
+								#endif
+								
+								// Check if getting socket's error status was successful
 								if(!getsockopt(socket, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&errorStatus), &errorStatusLength)) {
 								
 									// Check if socket doesn't have any errors
@@ -1995,8 +2080,15 @@ void Peer::connect(const string &address) {
 											// Set invalid client to false
 											bool invalidClient = false;
 											
-											// Check if is an Onion service
-											if(isOnionService) {
+											// Check if node is listening
+											if(node->isListening()) {
+											
+												// Set client address to the node's listening network address
+												clientAddress = *node->getListeningNetworkAddress();
+											}
+											
+											// Otherwise check if is an Onion service
+											else if(isOnionService) {
 											
 												// Clear client service address
 												clientOnionServiceAddress.clear();
@@ -2004,7 +2096,7 @@ void Peer::connect(const string &address) {
 												// TODO Create Tor address with checksum and version
 												
 												// Go through all characters in a Tor address
-												for(int i = 0; i < Common::TOR_ADDRESS_LENGTH; ++i) {
+												for(size_t i = 0; i < Common::TOR_ADDRESS_LENGTH; ++i) {
 												
 													// Append random base32 character to the client Onion service address
 													clientOnionServiceAddress += Common::BASE32_CHARACTERS[randomNumberGenerator() % sizeof(Common::BASE32_CHARACTERS)];
@@ -2026,10 +2118,23 @@ void Peer::connect(const string &address) {
 											// Otherwise
 											else {
 										
-												// Check if getting client info was successful
+												// Initialize client info
 												sockaddr_storage clientInfo;
-												socklen_t clientInfoLength = sizeof(clientInfo);
 												
+												// Check if Windows
+												#ifdef _WIN32
+												
+													// Set client info length to the size of the client info
+													int clientInfoLength = sizeof(clientInfo);
+													
+												// Otherwise
+												#else
+												
+													// Set client info length to the size of the client info
+													socklen_t clientInfoLength = sizeof(clientInfo);
+												#endif
+												
+												// Check if getting client info was successful
 												if(!getsockname(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
 												
 													// Check client info's family
@@ -2040,7 +2145,7 @@ void Peer::connect(const string &address) {
 														
 															{
 																// Get IPv4 info for the client
-																const sockaddr_in *ipv4Info = reinterpret_cast<sockaddr_in *>(&clientInfo);
+																const sockaddr_in *ipv4Info = reinterpret_cast<const sockaddr_in *>(&clientInfo);
 																
 																// Set client address's family to IPv4
 																clientAddress.family = NetworkAddress::Family::IPV4;
@@ -2063,7 +2168,7 @@ void Peer::connect(const string &address) {
 														
 															{
 																// Get IPv6 info for the client
-																const sockaddr_in6 *ipv6Info = reinterpret_cast<sockaddr_in6 *>(&clientInfo);
+																const sockaddr_in6 *ipv6Info = reinterpret_cast<const sockaddr_in6 *>(&clientInfo);
 																
 																// Set client address's family to IPv6
 																clientAddress.family = NetworkAddress::Family::IPV6;
@@ -2222,13 +2327,11 @@ void Peer::connect(const string &address) {
 						++numberOfMessagesSent;
 					}
 					
-					{
-						// Lock for writing
-						lock_guard writeLock(lock);
-					
-						// Set connection state to connected
-						connectionState = ConnectionState::CONNECTED;
-					}
+					// Lock for writing
+					lock_guard writeLock(lock);
+				
+					// Set connection state to connected
+					connectionState = ConnectionState::CONNECTED;
 				}
 				
 				// Catch errors
@@ -2282,9 +2385,6 @@ void Peer::connect(const string &address) {
 				
 				// Read and write
 				readAndWrite();
-				
-				// Return
-				return;
 			}
 			
 			// Otherwise
@@ -2308,6 +2408,152 @@ void Peer::connect(const string &address) {
 					eventOccurred.notify_one();
 				}
 			}
+		}
+	}
+	
+	// Catch errors
+	catch(...) {
+	
+		// Delay
+		this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+		
+		// Try
+		try {
+	
+			// Lock for writing
+			lock_guard writeLock(lock);
+		
+			// Set connection state to disconnected
+			connectionState = ConnectionState::DISCONNECTED;
+		}
+		
+		// Catch errors
+		catch(...) {
+		
+			// Set closing
+			Common::setClosing();
+		}
+		
+		// Notify peers that event occurred
+		eventOccurred.notify_one();
+	}
+}
+
+// Connect inbound
+void Peer::connectInbound() {
+
+	// Try
+	try {
+	
+		// Check if Windows
+		#ifdef _WIN32
+
+			// Check if setting the socket as non-blocking failed
+			u_long nonBlocking = true;
+			if(ioctlsocket(socket, FIONBIO, &nonBlocking)) {
+			
+				// Shutdown socket receive and send
+				shutdown(socket, SD_BOTH);
+				
+				// Close socket
+				closesocket(socket);
+				
+				// Set socket to invalid
+				socket = INVALID_SOCKET;
+				
+		// Otherwise
+		#else
+
+			// Check if setting the socket as non-blocking failed
+			const int socketFlags = fcntl(socket, F_GETFL);
+			if(socketFlags == -1 || fcntl(socket, F_SETFL, socketFlags | O_NONBLOCK) == -1) {
+			
+				// Shutdown socket receive and send
+				shutdown(socket, SHUT_RDWR);
+				
+				// Close socket
+				close(socket);
+				
+				// Set socket to invalid
+				socket = -1;
+		#endif
+		
+			// Delay
+			this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+			
+			{
+				// Lock for writing
+				lock_guard writeLock(lock);
+				
+				// Set connection state to disconnected
+				connectionState = ConnectionState::DISCONNECTED;
+			}
+			
+			// Notify peers that event occurred
+			eventOccurred.notify_one();
+		}
+		
+		// Otherwise
+		else {
+			
+			// Try
+			try {
+			
+				// Lock for writing
+				lock_guard writeLock(lock);
+				
+				// Set connection state to connected
+				connectionState = ConnectionState::CONNECTED;
+			}
+			
+			// Catch errors
+			catch(...) {
+			
+				// Check if Windows
+				#ifdef _WIN32
+				
+					// Shutdown socket receive and send
+					shutdown(socket, SD_BOTH);
+					
+					// Close socket
+					closesocket(socket);
+					
+					// Set socket to invalid
+					socket = INVALID_SOCKET;
+					
+				// Otherwise
+				#else
+				
+					// Shutdown socket receive and send
+					shutdown(socket, SHUT_RDWR);
+					
+					// Close socket
+					close(socket);
+					
+					// Set socket to invalid
+					socket = -1;
+				#endif
+				
+				// Delay
+				this_thread::sleep_for(BEFORE_DISCONNECT_DELAY_DURATION);
+				
+				{
+					// Lock for writing
+					lock_guard writeLock(lock);
+					
+					// Set connection state to disconnected
+					connectionState = ConnectionState::DISCONNECTED;
+				}
+				
+				// Notify peers that event occurred
+				eventOccurred.notify_one();
+				
+				// Return
+				return;
+			}
+			
+			// Read and write
+			readAndWrite();
 		}
 	}
 	
@@ -2377,7 +2623,9 @@ void Peer::readAndWrite() {
 				// Check if peer addresses were required by now
 				if(chrono::steady_clock::now() - startReadAndWriteTime > PEER_ADDRESSES_RECEIVED_REQUIRED_DURATION) {
 				
-					{
+					// Check if has an identifier
+					if(!identifier.empty()) {
+					
 						// Lock node for writing
 						lock_guard nodeWriteLock(node->getLock());
 						
@@ -2405,7 +2653,9 @@ void Peer::readAndWrite() {
 					// Unlock write lock
 					writeLock.unlock();
 					
-					{
+					// Check if has an identifier
+					if(!identifier.empty()) {
+					
 						// Lock node for writing
 						lock_guard nodeWriteLock(node->getLock());
 						
@@ -2444,7 +2694,7 @@ void Peer::readAndWrite() {
 				if(chrono::steady_clock::now() - lastGetPeerAddressesTime >= GET_PEER_ADDRESSES_INTERVAL) {
 			
 					// Create get peer addresses message
-					const vector getPeerAddressesMessage = Message::createGetPeerAddressesMessage(Node::Capabilities::FULL_NODE);
+					const vector getPeerAddressesMessage = Message::createGetPeerAddressesMessage(node->getDesiredPeerCapabilities());
 					
 					{
 						// Lock for writing
@@ -2498,7 +2748,7 @@ void Peer::readAndWrite() {
 						
 						// Check if too many reorgs haven't occurred during the block sync
 						if(numberOfReorgsDuringBlockSync < MAXIMUM_ALLOWED_NUMBER_OF_REORGS_DURING_BLOCK_SYNC) {
-					
+						
 							// Set syncing state to requesting headers
 							syncingState = SyncingState::REQUESTING_HEADERS;
 							
@@ -2769,8 +3019,8 @@ void Peer::readAndWrite() {
 				}
 			}
 			
-			// Check if shake was received
-			if(communicationState > CommunicationState::HAND_SENT) {
+			// Check if handshake was completed
+			if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 		
 				// Check if time to send a ping
 				if(chrono::steady_clock::now() - lastPingTime >= PING_INTERVAL) {
@@ -3046,22 +3296,20 @@ void Peer::readAndWrite() {
 							// Set current write done to true
 							currentWriteDone = true;
 							
-							{
-								// Lock for writing
-								lock_guard writeLock(lock);
-						
-								// Remove bytes from write buffer
-								writeBuffer.erase(writeBuffer.cbegin(), writeBuffer.cbegin() + bytesSent);
-								
-								// Check if write buffer is empty
-								if(writeBuffer.empty()) {
-								
-									// Free all memory allocated by the write buffer
-									vector<uint8_t>().swap(writeBuffer);
-								
-									// break
-									break;
-								}
+							// Lock for writing
+							lock_guard writeLock(lock);
+					
+							// Remove bytes from write buffer
+							writeBuffer.erase(writeBuffer.cbegin(), writeBuffer.cbegin() + bytesSent);
+							
+							// Check if write buffer is empty
+							if(writeBuffer.empty()) {
+							
+								// Free all memory allocated by the write buffer
+								vector<uint8_t>().swap(writeBuffer);
+							
+								// break
+								break;
 							}
 						}
 					} while(bytesSent > 0);
@@ -3329,8 +3577,8 @@ void Peer::disconnect() {
 		Common::setClosing();
 	}
 	
-	// Check if shake was received
-	if(communicationState > CommunicationState::HAND_SENT) {
+	// Check if handshake was completed
+	if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 	
 		// Try
 		try {
@@ -3381,7 +3629,9 @@ bool Peer::processRequestsAndOrResponses() {
 		// Catch errors
 		catch(...) {
 		
-			{
+			// Check if has an identifier
+			if(!identifier.empty()) {
+			
 				// Lock node for writing
 				lock_guard nodeWriteLock(node->getLock());
 				
@@ -3431,8 +3681,292 @@ bool Peer::processRequestsAndOrResponses() {
 			// Hand
 			case Message::Type::HAND:
 			
-				// Set ban to true
-				ban = true;
+				// Check if expecting hand request
+				if(isInbound && communicationState == CommunicationState::HANDSHAKE_PENDING) {
+				
+					// Initialize hand components
+					tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress> handComponents;
+					
+					// Try
+					try {
+					
+						// Read hand message
+						handComponents = Message::readHandMessage(readBuffer);
+					}
+		
+					// Catch errors
+					catch(...) {
+					
+						// Set ban to true
+						ban = true;
+						
+						// Break
+						break;
+					}
+					
+					// Get hand capabilities, total difficulty, user agent, negotiated protocol version, base fee, and client address from hand components
+					const Node::Capabilities &handCapabilities = get<0>(handComponents);
+					const uint64_t &handTotalDifficulty = get<1>(handComponents);
+					const string &handUserAgent = get<2>(handComponents);
+					const uint32_t &handNegotiatedProtocolVersion = get<3>(handComponents);
+					const uint64_t &handBaseFee = get<4>(handComponents);
+					const NetworkAddress &handClientAddress = get<5>(handComponents);
+					
+					// Check hand client address's family
+					string clientIdentifier;
+					switch(handClientAddress.family) {
+					
+						// IPv4 or IPv6
+						case NetworkAddress::Family::IPV4:
+						case NetworkAddress::Family::IPV6:
+						
+							{
+								// Initialize client info
+								sockaddr_storage clientInfo;
+								
+								// Check if Windows
+								#ifdef _WIN32
+								
+									// Set client info length to the size of the client info
+									int clientInfoLength = sizeof(clientInfo);
+									
+								// Otherwise
+								#else
+								
+									// Set client info length to the size of the client info
+									socklen_t clientInfoLength = sizeof(clientInfo);
+								#endif
+								
+								// Check if getting client info was successful
+								if(!getsockname(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
+								
+									// Check client info's family
+									switch(clientInfo.ss_family) {
+									
+										// IPv4
+										case AF_INET:
+										
+											{
+												// Get IPv4 info for the client
+												const sockaddr_in *ipv4Info = reinterpret_cast<const sockaddr_in *>(&clientInfo);
+												
+												// Check if node is listening and peer is the node
+												if(node->isListening() && node->getListeningNetworkAddress()->family == NetworkAddress::Family::IPV4 && !memcmp(&ipv4Info->sin_addr, node->getListeningNetworkAddress()->address, sizeof(ipv4Info->sin_addr)) && handClientAddress.port == node->getListeningNetworkAddress()->port) {
+												
+													// Return false
+													return false;
+												}
+												
+												// Check if getting the client's IP string was successful
+												char ipString[INET_ADDRSTRLEN];
+												if(inet_ntop(AF_INET, &ipv4Info->sin_addr, ipString, sizeof(ipString))) {
+												
+													// Set client identifier to the IP string with the hand client address port
+													clientIdentifier = string(ipString) + ':' + to_string(ntohs(handClientAddress.port));
+												}
+												
+												// Otherwise
+												else {
+												
+													// Return false
+													return false;
+												}
+											}
+											
+											// Break
+											break;
+											
+										// IPv6
+										case AF_INET6:
+										
+											{
+												// Get IPv6 info for the client
+												const sockaddr_in6 *ipv6Info = reinterpret_cast<const sockaddr_in6 *>(&clientInfo);
+												
+												// Check if node is listening and peer is the node
+												if(node->isListening() && node->getListeningNetworkAddress()->family == NetworkAddress::Family::IPV6 && !memcmp(&ipv6Info->sin6_addr, node->getListeningNetworkAddress()->address, sizeof(ipv6Info->sin6_addr)) && handClientAddress.port == node->getListeningNetworkAddress()->port) {
+												
+													// Return false
+													return false;
+												}
+												
+												// Check if getting the client's IP string was successful
+												char ipString[INET6_ADDRSTRLEN];
+												if(inet_ntop(AF_INET6, &ipv6Info->sin6_addr, ipString, sizeof(ipString))) {
+												
+													// Set client identifier to the IP string with the hand client address port
+													clientIdentifier = '[' + string(ipString) + "]:" + to_string(ntohs(handClientAddress.port));
+												}
+												
+												// Otherwise
+												else {
+												
+													// Return false
+													return false;
+												}
+											}
+											
+											// Break
+											break;
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Return false
+									return false;
+								}
+							}
+							
+							// Break
+							break;
+						
+						// Check if Tor is enabled
+						#ifdef ENABLE_TOR
+						
+							// Onion service
+							case NetworkAddress::Family::ONION_SERVICE:
+							
+								// Check if node is listening and peer is the node
+								if(node->isListening() && node->getListeningNetworkAddress()->family == NetworkAddress::Family::ONION_SERVICE && handClientAddress.addressLength == node->getListeningNetworkAddress()->addressLength && !memcmp(handClientAddress.address, node->getListeningNetworkAddress()->address, handClientAddress.addressLength)) {
+								
+									// Return false
+									return false;
+								}
+								
+								// Set client identifier
+								clientIdentifier = string(reinterpret_cast<const char *>(handClientAddress.address), reinterpret_cast<const char *>(handClientAddress.address) + handClientAddress.addressLength);
+								
+								// Break
+								break;
+						#endif
+						
+						// Default
+						default:
+						
+							// Break
+							break;
+					}
+					
+					// Check if client identifier exists
+					if(clientIdentifier.empty()) {
+					
+						// Set ban to true
+						ban = true;
+						
+						// Break
+						break;
+					}
+					
+					// Initialize node's total difficulty
+					uint64_t nodesTotalDifficulty;
+					
+					{
+						// Lock node for writing
+						unique_lock nodeWriteLock(node->getLock());
+						
+						// Check if client is currently used
+						if(node->getCurrentlyUsedPeerCandidates().contains(clientIdentifier)) {
+						
+							// Unlock node write lock
+							nodeWriteLock.unlock();
+						
+							// Return false
+							return false;
+						}
+						
+						// Check if client is banned
+						if(node->isPeerBanned(clientIdentifier)) {
+						
+							// Unlock node write lock
+							nodeWriteLock.unlock();
+							
+							// Set ban to true
+							ban = true;
+							
+							// Break
+							break;
+						}
+						
+						// Add client to the node's list of currently used peer candidates
+						node->getCurrentlyUsedPeerCandidates().insert(clientIdentifier);
+						
+						// Set node's total difficulty to node's total difficulty
+						nodesTotalDifficulty = node->getTotalDifficulty();
+					}
+
+					// Set identifier to client identifier
+					identifier = move(clientIdentifier);
+
+					// Let node know that a peer connected
+					node->peerConnected(identifier);
+					
+					// Create shake message
+					const vector shakeMessage = Message::createShakeMessage(handNegotiatedProtocolVersion, nodesTotalDifficulty, node->getBaseFee(), Node::CAPABILITIES, Node::USER_AGENT);
+					
+					// Create get peer addresses message
+					const vector getPeerAddressesMessage = Message::createGetPeerAddressesMessage(node->getDesiredPeerCapabilities());
+					
+					{
+						// Lock for writing
+						lock_guard writeLock(lock);
+					
+						// Set capabilities to hand's capabilities
+						capabilities = handCapabilities;
+						
+						// Set total difficulty to hand's total difficulty
+						totalDifficulty = handTotalDifficulty;
+						
+						// Set user agent to hand's user agent
+						userAgent = handUserAgent;
+						
+						// Set protocol version to hand's negotiated protocol version
+						protocolVersion = handNegotiatedProtocolVersion;
+						
+						// Set base fee to hand's base fee
+						baseFee = handBaseFee;
+						
+						// Append shake messages to write buffer
+						writeBuffer.insert(writeBuffer.cend(), shakeMessage.cbegin(), shakeMessage.cend());
+						
+						// Check if not at the max number of messages sent
+						if(numberOfMessagesSent != INT_MAX) {
+						
+							// Increment number of messages sent
+							++numberOfMessagesSent;
+						}
+						
+						// Append get peer addresses messages to write buffer
+						writeBuffer.insert(writeBuffer.cend(), getPeerAddressesMessage.cbegin(), getPeerAddressesMessage.cend());
+						
+						// Check if not at the max number of messages sent
+						if(numberOfMessagesSent != INT_MAX) {
+						
+							// Increment number of messages sent
+							++numberOfMessagesSent;
+						}
+					}
+					
+					// Let node know about a peer's info
+					node->peerInfo(identifier, handCapabilities, handUserAgent, handNegotiatedProtocolVersion, handBaseFee, handTotalDifficulty, isInbound);
+					
+					// Set last ping time to now
+					lastPingTime = chrono::steady_clock::now();
+					
+					// Set total difficulty last changed time to now
+					totalDifficultyLastChangedTime = chrono::steady_clock::now();
+					
+					// Set communication state to peer addresses requested
+					communicationState = CommunicationState::PEER_ADDRESSES_REQUESTED;
+				}
+				
+				// Otherwise
+				else {
+				
+					// Set ban to true
+					ban = true;
+				}
 				
 				// Break
 				break;
@@ -3441,7 +3975,7 @@ bool Peer::processRequestsAndOrResponses() {
 			case Message::Type::SHAKE:
 			
 				// Check if expecting shake response
-				if(communicationState == CommunicationState::HAND_SENT) {
+				if(!isInbound && communicationState == CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize shake components
 					tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> shakeComponents;
@@ -3463,15 +3997,15 @@ bool Peer::processRequestsAndOrResponses() {
 						break;
 					}
 					
-					// Get shake capabilities, total difficulty, user agent, protocol version, and base fee from shake components
+					// Get shake capabilities, total difficulty, user agent, negotiated protocol version, and base fee from shake components
 					const Node::Capabilities &shakeCapabilities = get<0>(shakeComponents);
 					const uint64_t &shakeTotalDifficulty = get<1>(shakeComponents);
 					const string &shakeUserAgent = get<2>(shakeComponents);
-					const uint32_t &shakeProtocolVersion = get<3>(shakeComponents);
+					const uint32_t &shakeNegotiatedProtocolVersion = get<3>(shakeComponents);
 					const uint64_t &shakeBaseFee = get<4>(shakeComponents);
 					
 					// Create get peer addresses message
-					const vector getPeerAddressesMessage = Message::createGetPeerAddressesMessage(Node::Capabilities::FULL_NODE);
+					const vector getPeerAddressesMessage = Message::createGetPeerAddressesMessage(node->getDesiredPeerCapabilities());
 					
 					{
 						// Lock for writing
@@ -3486,8 +4020,8 @@ bool Peer::processRequestsAndOrResponses() {
 						// Set user agent to shake's user agent
 						userAgent = shakeUserAgent;
 						
-						// Set protocol version to shake's protocol version
-						protocolVersion = shakeProtocolVersion;
+						// Set protocol version to shake's negotiated protocol version
+						protocolVersion = shakeNegotiatedProtocolVersion;
 						
 						// Set base fee to shake's base fee
 						baseFee = shakeBaseFee;
@@ -3504,7 +4038,7 @@ bool Peer::processRequestsAndOrResponses() {
 					}
 					
 					// Let node know about a peer's info
-					node->peerInfo(identifier, shakeCapabilities, shakeUserAgent, shakeProtocolVersion, shakeBaseFee, shakeTotalDifficulty);
+					node->peerInfo(identifier, shakeCapabilities, shakeUserAgent, shakeNegotiatedProtocolVersion, shakeBaseFee, shakeTotalDifficulty, isInbound);
 					
 					// Set last ping time to now
 					lastPingTime = chrono::steady_clock::now();
@@ -3529,8 +4063,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Ping
 			case Message::Type::PING:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize ping components
 					tuple<uint64_t, uint64_t> pingComponents;
@@ -3632,8 +4166,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Pong
 			case Message::Type::PONG:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize pong components
 					tuple<uint64_t, uint64_t> pongComponents;
@@ -3707,8 +4241,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Get peer addresses
 			case Message::Type::GET_PEER_ADDRESSES:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize desired capabilities
 					Node::Capabilities desiredCapabilities;
@@ -3898,19 +4432,17 @@ bool Peer::processRequestsAndOrResponses() {
 					// Create peer addresses message
 					const vector peerAddressesMessage = Message::createPeerAddressesMessage(networkAddresses);
 					
-					{
-						// Lock for writing
-						lock_guard writeLock(lock);
+					// Lock for writing
+					lock_guard writeLock(lock);
+					
+					// Check if messages can be sent
+					if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
+					
+						// Append peer addresses message to write buffer
+						writeBuffer.insert(writeBuffer.cend(), peerAddressesMessage.cbegin(), peerAddressesMessage.cend());
 						
-						// Check if messages can be sent
-						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
-						
-							// Append peer addresses message to write buffer
-							writeBuffer.insert(writeBuffer.cend(), peerAddressesMessage.cbegin(), peerAddressesMessage.cend());
-							
-							// Increment number of messages sent
-							++numberOfMessagesSent;
-						}
+						// Increment number of messages sent
+						++numberOfMessagesSent;
 					}
 				}
 				
@@ -4079,15 +4611,22 @@ bool Peer::processRequestsAndOrResponses() {
 						// Check if Tor is enabled
 						#ifdef ENABLE_TOR
 						
-							// Check if capabilities isn't a full node
-							if((capabilities & (Node::Capabilities::FULL_NODE & ~Node::Capabilities::TOR_ADDRESS)) != (Node::Capabilities::FULL_NODE & ~Node::Capabilities::TOR_ADDRESS)) {
+							// Check if capabilities aren't desired
+							if((capabilities & (node->getDesiredPeerCapabilities() & ~Node::Capabilities::TOR_ADDRESS)) != (node->getDesiredPeerCapabilities() & ~Node::Capabilities::TOR_ADDRESS)) {
 						
 						// Otherwise
 						#else
 						
-							// Check if capabilities isn't a full node
-							if((capabilities & Node::Capabilities::FULL_NODE) != Node::Capabilities::FULL_NODE) {
+							// Check if capabilities aren't desired
+							if((capabilities & node->getDesiredPeerCapabilities()) != node->getDesiredPeerCapabilities()) {
 						#endif
+						
+							// Return false
+							return false;
+						}
+						
+						// Check if letting node know that a peer is healthy failed
+						if(!node->peerHealthy(identifier)) {
 						
 							// Return false
 							return false;
@@ -4119,25 +4658,23 @@ bool Peer::processRequestsAndOrResponses() {
 			// Get headers
 			case Message::Type::GET_HEADERS:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 					
 					// Create error message
 					const vector errorMessage = Message::createErrorMessage();
 					
-					{
-						// Lock for writing
-						lock_guard writeLock(lock);
+					// Lock for writing
+					lock_guard writeLock(lock);
+					
+					// Check if messages can be sent
+					if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
+					
+						// Append error message to write buffer
+						writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
 						
-						// Check if messages can be sent
-						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
-						
-							// Append error message to write buffer
-							writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
-							
-							// Increment number of messages sent
-							++numberOfMessagesSent;
-						}
+						// Increment number of messages sent
+						++numberOfMessagesSent;
 					}
 				}
 				
@@ -4154,8 +4691,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Header
 			case Message::Type::HEADER:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize header
 					optional<Header> header;
@@ -4236,8 +4773,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Headers
 			case Message::Type::HEADERS:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Lock for reading
 					shared_lock readLock(lock);
@@ -4362,7 +4899,7 @@ bool Peer::processRequestsAndOrResponses() {
 									{
 										// Lock for writing
 										lock_guard writeLock(lock);
-									
+										
 										// Set syncing state to requesting transaction hash sewt
 										syncingState = SyncingState::REQUESTING_TRANSACTION_HASH_SET;
 									}
@@ -4387,13 +4924,11 @@ bool Peer::processRequestsAndOrResponses() {
 										++numberOfReorgsDuringHeadersSync;
 									}
 									
-									{
-										// Lock for writing
-										lock_guard writeLock(lock);
-										
-										// Set syncing state to requesting headers
-										syncingState = SyncingState::REQUESTING_HEADERS;
-									}
+									// Lock for writing
+									lock_guard writeLock(lock);
+									
+									// Set syncing state to requesting headers
+									syncingState = SyncingState::REQUESTING_HEADERS;
 								}
 							}
 							
@@ -4403,13 +4938,11 @@ bool Peer::processRequestsAndOrResponses() {
 								// Set number of reorgs during headers sync to zero
 								numberOfReorgsDuringHeadersSync = 0;
 								
-								{
-									// Lock for writing
-									lock_guard writeLock(lock);
-									
-									// Set syncing state to requesting block
-									syncingState = SyncingState::REQUESTING_BLOCK;
-								}
+								// Lock for writing
+								lock_guard writeLock(lock);
+								
+								// Set syncing state to requesting block
+								syncingState = SyncingState::REQUESTING_BLOCK;
 							}
 						}
 					}
@@ -4438,25 +4971,23 @@ bool Peer::processRequestsAndOrResponses() {
 			// Get block
 			case Message::Type::GET_BLOCK:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 					
 					// Create error message
 					const vector errorMessage = Message::createErrorMessage();
 					
-					{
-						// Lock for writing
-						lock_guard writeLock(lock);
+					// Lock for writing
+					lock_guard writeLock(lock);
+					
+					// Check if messages can be sent
+					if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
+					
+						// Append error message to write buffer
+						writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
 						
-						// Check if messages can be sent
-						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
-						
-							// Append error message to write buffer
-							writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
-							
-							// Increment number of messages sent
-							++numberOfMessagesSent;
-						}
+						// Increment number of messages sent
+						++numberOfMessagesSent;
 					}
 				}
 				
@@ -4473,8 +5004,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Block
 			case Message::Type::BLOCK:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Lock for reading
 					shared_lock readLock(lock);
@@ -4541,25 +5072,23 @@ bool Peer::processRequestsAndOrResponses() {
 			// Get compact block
 			case Message::Type::GET_COMPACT_BLOCK:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 					
 					// Create error message
 					const vector errorMessage = Message::createErrorMessage();
 					
-					{
-						// Lock for writing
-						lock_guard writeLock(lock);
+					// Lock for writing
+					lock_guard writeLock(lock);
+					
+					// Check if messages can be sent
+					if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
+					
+						// Append error message to write buffer
+						writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
 						
-						// Check if messages can be sent
-						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
-						
-							// Append error message to write buffer
-							writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
-							
-							// Increment number of messages sent
-							++numberOfMessagesSent;
-						}
+						// Increment number of messages sent
+						++numberOfMessagesSent;
 					}
 				}
 				
@@ -4576,8 +5105,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Compact block
 			case Message::Type::COMPACT_BLOCK:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize header
 					optional<Header> header;
@@ -4658,8 +5187,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Stem transaction
 			case Message::Type::STEM_TRANSACTION:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize stem transaction message
 					vector<uint8_t> stemTransactionMessage;
@@ -4706,8 +5235,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Transaction
 			case Message::Type::TRANSACTION:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize transaction
 					optional<Transaction> transaction;
@@ -4771,25 +5300,23 @@ bool Peer::processRequestsAndOrResponses() {
 			// Transaction hash set request
 			case Message::Type::TRANSACTION_HASH_SET_REQUEST:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 					
 					// Create error message
 					const vector errorMessage = Message::createErrorMessage();
 					
-					{
-						// Lock for writing
-						lock_guard writeLock(lock);
+					// Lock for writing
+					lock_guard writeLock(lock);
+					
+					// Check if messages can be sent
+					if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
+					
+						// Append error message to write buffer
+						writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
 						
-						// Check if messages can be sent
-						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
-						
-							// Append error message to write buffer
-							writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
-							
-							// Increment number of messages sent
-							++numberOfMessagesSent;
-						}
+						// Increment number of messages sent
+						++numberOfMessagesSent;
 					}
 				}
 				
@@ -4806,8 +5333,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Transaction hash set archive
 			case Message::Type::TRANSACTION_HASH_SET_ARCHIVE:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Lock for reading
 					shared_lock readLock(lock);
@@ -4965,25 +5492,23 @@ bool Peer::processRequestsAndOrResponses() {
 			// Get transaction
 			case Message::Type::GET_TRANSACTION:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 					
 					// Create error message
 					const vector errorMessage = Message::createErrorMessage();
 					
-					{
-						// Lock for writing
-						lock_guard writeLock(lock);
+					// Lock for writing
+					lock_guard writeLock(lock);
+					
+					// Check if messages can be sent
+					if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
+					
+						// Append error message to write buffer
+						writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
 						
-						// Check if messages can be sent
-						if(numberOfMessagesSent < MAXIMUM_NUMBER_OF_MESSAGES_SENT_PER_INTERVAL / 2) {
-						
-							// Append error message to write buffer
-							writeBuffer.insert(writeBuffer.cend(), errorMessage.cbegin(), errorMessage.cend());
-							
-							// Increment number of messages sent
-							++numberOfMessagesSent;
-						}
+						// Increment number of messages sent
+						++numberOfMessagesSent;
 					}
 				}
 				
@@ -5000,8 +5525,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Transaction kernel
 			case Message::Type::TRANSACTION_KERNEL:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Try
 					try {
@@ -5031,8 +5556,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Tor address
 			case Message::Type::TOR_ADDRESS:
 			
-				// Check if shake was received
-				if(communicationState > CommunicationState::HAND_SENT) {
+				// Check if handshake was completed
+				if(communicationState > CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Try
 					try {
@@ -5062,8 +5587,8 @@ bool Peer::processRequestsAndOrResponses() {
 			// Default
 			default:
 			
-				// Check if shake wasn't received
-				if(communicationState == CommunicationState::HAND_SENT) {
+				// Check if handshake wasn't completed
+				if(communicationState == CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Set ban to true
 					ban = true;
@@ -5076,7 +5601,9 @@ bool Peer::processRequestsAndOrResponses() {
 		// Check if banning
 		if(ban) {
 		
-			{
+			// Check if has an identifier
+			if(!identifier.empty()) {
+			
 				// Lock node for writing
 				lock_guard nodeWriteLock(node->getLock());
 				

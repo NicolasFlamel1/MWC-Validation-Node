@@ -42,6 +42,9 @@ class Node final {
 			// Unknown
 			UNKNOWN = 0,
 			
+			// None
+			NONE = 0,
+			
 			// Header history
 			HEADER_HISTORY = 1 << 0,
 			
@@ -72,7 +75,7 @@ class Node final {
 		};
 		
 		// Constructor
-		explicit Node(const string &torProxyAddress = "localhost", const string &torProxyPort = "9050");
+		explicit Node();
 		
 		// Destructor
 		~Node();
@@ -102,10 +105,13 @@ class Node final {
 		void setOnPeerConnectCallback(const function<void(Node &node, const string &peerIdentifier)> &onPeerConnectCallback);
 		
 		// Set on peer info callback
-		void setOnPeerInfoCallback(const function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> &onPeerInfoCallback);
+		void setOnPeerInfoCallback(const function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty, const bool isInbound)> &onPeerInfoCallback);
 		
 		// Set on peer update callback
 		void setOnPeerUpdateCallback(const function<void(Node &node, const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> &onPeerUpdateCallback);
+		
+		// Set on peer healthy callback
+		void setOnPeerHealthyCallback(const function<bool(Node &node, const string &peerIdentifier)> &onPeerHealthyCallback);
 		
 		// Set on peer disconnect callback
 		void setOnPeerDisconnectCallback(const function<void(Node &node, const string &peerIdentifier)> &onPeerDisconnectCallback);
@@ -119,8 +125,18 @@ class Node final {
 		// Set on mempool clear callback
 		void setOnMempoolClearCallback(const function<void(Node &node)> &onMempoolClearCallback);
 		
-		// Start
-		void start(const char *customDnsSeed = nullptr, const uint64_t baseFee = DEFAULT_BASE_FEE);
+		// Check if floonet
+		#ifdef ENABLE_FLOONET
+		
+			// Start
+			void start(const char *torProxyAddress = "localhost", const uint16_t torProxyPort = 9050, const char *customDnsSeed = nullptr, const uint64_t baseFee = DEFAULT_BASE_FEE, const char *listeningAddress = nullptr, const uint16_t listeningPort = 13414, const Capabilities desiredPeerCapabilities = Capabilities::FULL_NODE);
+			
+		// Otherwise
+		#else
+		
+			// Start
+			void start(const char *torProxyAddress = "localhost", const uint16_t torProxyPort = 9050, const char *customDnsSeed = nullptr, const uint64_t baseFee = DEFAULT_BASE_FEE, const char *listeningAddress = nullptr, const uint16_t listeningPort = 3414, const Capabilities desiredPeerCapabilities = Capabilities::FULL_NODE);
+		#endif
 		
 		// Stop
 		void stop();
@@ -172,6 +188,9 @@ class Node final {
 		
 		// Get next block
 		tuple<Header, Block, uint64_t> getNextBlock(const function<tuple<Output, Rangeproof, Kernel>(const uint64_t amount)> &createCoinbase);
+		
+		// Default base fee
+		static const uint64_t DEFAULT_BASE_FEE;
 		
 	// Public for peer class
 	private:
@@ -231,10 +250,13 @@ class Node final {
 		void peerConnected(const string &peerIdentifier);
 		
 		// Peer info
-		void peerInfo(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty);
+		void peerInfo(const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty, const bool isInbound);
 		
 		// Peer updated
 		void peerUpdated(const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height);
+		
+		// Peer healthy
+		bool peerHealthy(const string &peerIdentifier);
 		
 		// Get Tor proxy address
 		const string &getTorProxyAddress() const;
@@ -250,6 +272,15 @@ class Node final {
 		
 		// Get base fee
 		uint64_t getBaseFee() const;
+		
+		// Is listening
+		bool isListening() const;
+		
+		// Get listening network address
+		const NetworkAddress *getListeningNetworkAddress() const;
+		
+		// Get desired peer capabilities
+		Capabilities getDesiredPeerCapabilities() const;
 		
 	// Private
 	private:
@@ -296,9 +327,6 @@ class Node final {
 		// Remove random peer interval
 		static const chrono::hours REMOVE_RANDOM_PEER_INTERVAL;
 		
-		// Default base fee
-		static const uint64_t DEFAULT_BASE_FEE;
-		
 		// Cleanup mempool
 		void cleanupMempool();
 		
@@ -320,8 +348,11 @@ class Node final {
 		// Remove random peer
 		void removeRandomPeer();
 		
-		// Connect to more peers
-		void connectToMorePeers();
+		// Accept inbound peers
+		void acceptInboundPeers();
+		
+		// Connect to outbound peers
+		void connectToOutboundPeers();
 		
 		// Sync
 		void sync();
@@ -357,10 +388,13 @@ class Node final {
 		function<void(Node &node, const string &peerIdentifier)> onPeerConnectCallback;
 		
 		// On peer info callback
-		function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty)> onPeerInfoCallback;
+		function<void(Node &node, const string &peerIdentifier, const Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty, const bool isInbound)> onPeerInfoCallback;
 		
 		// On peer update callback
 		function<void(Node &node, const string &peerIdentifier, const uint64_t totalDifficulty, const uint64_t height)> onPeerUpdateCallback;
+		
+		// On peer healthy callback
+		function<bool(Node &node, const string &peerIdentifier)> onPeerHealthyCallback;
 		
 		// On peer disconnect callback
 		function<void(Node &node, const string &peerIdentifier)> onPeerDisconnectCallback;
@@ -375,16 +409,25 @@ class Node final {
 		function<void(Node &node)> onMempoolClearCallback;
 		
 		// Tor proxy address
-		const string torProxyAddress;
+		string torProxyAddress;
 		
 		// Tor proxy port
-		const string torProxyPort;
+		string torProxyPort;
 		
 		// Custom DNS seeds
 		unordered_set<string> customDnsSeeds;
 		
 		// Base fee
 		uint64_t baseFee;
+		
+		// Address info
+		unique_ptr<addrinfo, decltype(&freeaddrinfo)> addressInfo;
+		
+		// Listening network address
+		NetworkAddress listeningNetworkAddress;
+		
+		// Desired peer capabilitied
+		Capabilities desiredPeerCapabilities;
 		
 		// Random number generator
 		mt19937_64 randomNumberGenerator;
@@ -416,6 +459,19 @@ class Node final {
 		// Is synced
 		bool isSynced;
 		
+		// Check if Windows
+		#ifdef _WIN32
+		
+			// Socket
+			SOCKET socket;
+			
+		// Otherwise
+		#else
+		
+			// Socket
+			int socket;
+		#endif
+		
 		// Unused peer candidates
 		unordered_map<string, chrono::time_point<chrono::steady_clock>> unusedPeerCandidates;
 		
@@ -433,6 +489,12 @@ class Node final {
 		
 		// Peers
 		list<Peer> peers;
+		
+		// Number of outbound peers
+		list<Peer>::size_type numberOfOutboundPeers;
+		
+		// Number of inbound peers
+		list<Peer>::size_type numberOfInboundPeers;
 		
 		// Mempool
 		Mempool mempool;

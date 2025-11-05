@@ -128,6 +128,9 @@ class Message final {
 		// Create hand message
 		static vector<uint8_t> createHandMessage(const uint64_t nonce, const uint64_t totalDifficulty, const NetworkAddress &clientAddress, const NetworkAddress &serverAddress, const uint64_t baseFee, const Node::Capabilities capabilities, const char *userAgent);
 		
+		// Create shake message
+		static vector<uint8_t> createShakeMessage(const uint32_t negotiatedProtocolVersion, const uint64_t totalDifficulty, const uint64_t baseFee, const Node::Capabilities capabilities, const char *userAgent);
+		
 		// Create ping message
 		static vector<uint8_t> createPingMessage(const uint64_t totalDifficulty, const uint64_t height);
 		
@@ -166,6 +169,9 @@ class Message final {
 		
 		// Read message header
 		static tuple<Type, vector<uint8_t>::size_type> readMessageHeader(const vector<uint8_t> &messageHeader);
+		
+		// Read hand message
+		static tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress> readHandMessage(const vector<uint8_t> &handMessage);
 		
 		// Read shake message
 		static tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> readShakeMessage(const vector<uint8_t> &shakeMessage);

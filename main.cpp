@@ -144,7 +144,7 @@ int main() {
 		});
 		
 		// Set node's on peer info callback
-		node.setOnPeerInfoCallback([](MwcValidationNode::Node &node, const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty) -> void {
+		node.setOnPeerInfoCallback([](MwcValidationNode::Node &node, const string &peerIdentifier, const MwcValidationNode::Node::Capabilities capabilities, const string &userAgent, const uint32_t protocolVersion, const uint64_t baseFee, const uint64_t totalDifficulty, const bool isInbound) -> void {
 		
 			// Display message
 			cout << "Peer " << peerIdentifier << " is " << userAgent << endl;

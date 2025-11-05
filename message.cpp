@@ -148,6 +148,85 @@ vector<uint8_t> Message::createHandMessage(const uint64_t nonce, const uint64_t 
 	return payload;
 }
 
+// Create shake message
+vector<uint8_t> Message::createShakeMessage(const uint32_t negotiatedProtocolVersion, const uint64_t totalDifficulty, const uint64_t baseFee, const Node::Capabilities capabilities, const char *userAgent) {
+
+	// Initialize payload
+	vector<uint8_t> payload;
+	
+	// Check if negotiated protocol version isn't compatible
+	if(!COMPATIBLE_PROTOCOL_VERSIONS.contains(negotiatedProtocolVersion)) {
+	
+		// Throw exception
+		throw runtime_error("Negotiated protocol version isn't compatible");
+	}
+	
+	// Append negotiated protocol version to payload
+	Common::writeUint32(payload, negotiatedProtocolVersion);
+	
+	// Append capabilities to payload
+	Common::writeUint32(payload, capabilities);
+	
+	// Check if total difficulty is invalid
+	if(totalDifficulty < Consensus::GENESIS_BLOCK_HEADER.getTotalDifficulty()) {
+	
+		// Throw exception
+		throw runtime_error("Total difficulty is invalid");
+	}
+	
+	// Append total difficulty to payload
+	Common::writeUint64(payload, totalDifficulty);
+	
+	// Check if user agent length is invalid
+	if(!userAgent || !*userAgent) {
+	
+		// Throw exception
+		throw runtime_error("User agent length is invalid");
+	}
+	
+	// Check if user agent length is too big
+	if(strlen(userAgent) > MAXIMUM_USER_AGENT_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("User agent length is too big");
+	}
+	
+	// Append user agent length to payload
+	Common::writeUint64(payload, strlen(userAgent));
+	
+	// Check if user agent is invalid
+	if(!Common::isUtf8(userAgent, strlen(userAgent))) {
+	
+		// Throw exception
+		throw runtime_error("User agent is invalid");
+	}
+	
+	// Append user agent to payload
+	payload.insert(payload.cend(), userAgent, userAgent + strlen(userAgent));
+	
+	// Get genesis block's block hash
+	const array blockHash = Consensus::GENESIS_BLOCK_HEADER.getBlockHash();
+	
+	// Append block hash to payload
+	payload.insert(payload.cend(), blockHash.cbegin(), blockHash.cend());
+	
+	// Check if negotiated protocol version is at least four
+	if(negotiatedProtocolVersion >= 4) {
+	
+		// Append base fee to payload
+		Common::writeUint64(payload, baseFee);
+	}
+	
+	// Create message header
+	const vector messageHeader = createMessageHeader(Type::SHAKE, payload.size());
+	
+	// Prepend message header to payload
+	payload.insert(payload.cbegin(), messageHeader.cbegin(), messageHeader.cend());
+	
+	// Return payload
+	return payload;
+}
+
 // Create ping message
 vector<uint8_t> Message::createPingMessage(const uint64_t totalDifficulty, const uint64_t height) {
 
@@ -478,45 +557,289 @@ tuple<Message::Type, vector<uint8_t>::size_type> Message::readMessageHeader(cons
 	return {type, payloadLength};
 }
 
+// Read hand message
+tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress> Message::readHandMessage(const vector<uint8_t> &handMessage) {
+
+	// Check if hand message doesn't contain a protocol version
+	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint32_t)) {
+	
+		// Throw exception
+		throw runtime_error("Hand message doesn't contain a protocol version");
+	}
+
+	// Get negotiated protocol version from hand message
+	const uint32_t negotiatedProtocolVersion = min(Common::readUint32(handMessage, MESSAGE_HEADER_LENGTH), *COMPATIBLE_PROTOCOL_VERSIONS.crbegin());
+	
+	// Check if negotiated protocol version isn't compatible
+	if(!COMPATIBLE_PROTOCOL_VERSIONS.contains(negotiatedProtocolVersion)) {
+	
+		// Throw exception
+		throw runtime_error("Negotiated protocol version isn't compatible");
+	}
+	
+	// Check if hand message doesn't contain capabilities
+	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(Node::Capabilities)) {
+	
+		// Throw exception
+		throw runtime_error("Hand message doesn't contain capabilities");
+	}
+	
+	// Get capabilities from hand message
+	const Node::Capabilities capabilities = static_cast<Node::Capabilities>(Common::readUint32(handMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion)));
+	
+	// Check if hand message doesn't contain a nonce
+	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(Node::Capabilities) + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Hand message doesn't contain a nonce");
+	}
+	
+	// Get nonce from hand message
+	const uint64_t nonce = Common::readUint64(handMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(Node::Capabilities));
+	
+	// Check if hand message doesn't contain a total difficulty
+	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Hand message doesn't contain a total difficulty");
+	}
+	
+	// Get total difficulty from hand message
+	const uint64_t totalDifficulty = Common::readUint64(handMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce));
+	
+	// Check if total difficulty is invalid
+	if(totalDifficulty < Consensus::GENESIS_BLOCK_HEADER.getTotalDifficulty()) {
+	
+		// Throw exception
+		throw runtime_error("Total difficulty is invalid");
+	}
+	
+	// Read client address from hand message
+	const NetworkAddress clientAddress = readNetworkAddress(handMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty));
+	
+	// Check client addresses's family
+	vector<uint8_t>::size_type clientAddressLength;
+	switch(clientAddress.family) {
+	
+		// IPv4 or IPv6
+		case NetworkAddress::Family::IPV4:
+		case NetworkAddress::Family::IPV6:
+		
+			// Set client address length
+			clientAddressLength = sizeof(clientAddress.family) + clientAddress.addressLength + sizeof(clientAddress.port);
+			
+			// Check if client address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L187-L202)
+			if(!clientAddress.port) {
+			
+				// Throw exception
+				throw runtime_error("Client address's port is invalid");
+			}
+		
+			// Break
+			break;
+		
+		// Onion service
+		case NetworkAddress::Family::ONION_SERVICE:
+		
+			// Set client address length
+			clientAddressLength = sizeof(clientAddress.family) + sizeof(uint64_t) + clientAddress.addressLength;
+			
+			// Check if client address's address is invalid (mwc-node allows addresses to not end with .onion)
+			if(clientAddress.addressLength <= sizeof(".onion") - sizeof('\0') || memcmp(&reinterpret_cast<const uint8_t *>(clientAddress.address)[clientAddress.addressLength - (sizeof(".onion") - sizeof('\0'))], ".onion", sizeof(".onion") - sizeof('\0')) || memchr(clientAddress.address, '[', clientAddress.addressLength) || memchr(clientAddress.address, ']', clientAddress.addressLength) || memchr(clientAddress.address, ':', clientAddress.addressLength) || !Common::isUtf8(reinterpret_cast<const char *>(clientAddress.address), clientAddress.addressLength)) {
+			
+				// Throw exception
+				throw runtime_error("Client address's address is invalid");
+			}
+			
+			// Break
+			break;
+		
+		// Default
+		default:
+		
+			// Throw exception
+			throw runtime_error("Unknown client address family");
+		
+			// Break
+			break;
+	}
+	
+	// Read server address from hand message
+	const NetworkAddress serverAddress = readNetworkAddress(handMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength);
+	
+	// Check server addresses's family
+	vector<uint8_t>::size_type serverAddressLength;
+	switch(serverAddress.family) {
+	
+		// IPv4 or IPv6
+		case NetworkAddress::Family::IPV4:
+		case NetworkAddress::Family::IPV6:
+		
+			// Set server address length
+			serverAddressLength = sizeof(serverAddress.family) + serverAddress.addressLength + sizeof(serverAddress.port);
+			
+			// Check if server address's port is invalid (mwc-node allows addresses to have port zero https://github.com/mwcproject/mwc-node/blob/master/p2p/src/types.rs#L187-L202)
+			if(!serverAddress.port) {
+			
+				// Throw exception
+				throw runtime_error("Server address's port is invalid");
+			}
+		
+			// Break
+			break;
+		
+		// Onion service
+		case NetworkAddress::Family::ONION_SERVICE:
+		
+			// Set server address length
+			serverAddressLength = sizeof(serverAddress.family) + sizeof(uint64_t) + serverAddress.addressLength;
+			
+			// Check if server address's address is invalid (mwc-node allows addresses to not end with .onion)
+			if(serverAddress.addressLength <= sizeof(".onion") - sizeof('\0') || memcmp(&reinterpret_cast<const uint8_t *>(serverAddress.address)[serverAddress.addressLength - (sizeof(".onion") - sizeof('\0'))], ".onion", sizeof(".onion") - sizeof('\0')) || memchr(serverAddress.address, '[', serverAddress.addressLength) || memchr(serverAddress.address, ']', serverAddress.addressLength) || memchr(serverAddress.address, ':', serverAddress.addressLength) || !Common::isUtf8(reinterpret_cast<const char *>(serverAddress.address), serverAddress.addressLength)) {
+			
+				// Throw exception
+				throw runtime_error("Server address's address is invalid");
+			}
+			
+			// Break
+			break;
+		
+		// Default
+		default:
+		
+			// Throw exception
+			throw runtime_error("Unknown server address family");
+		
+			// Break
+			break;
+	}
+	
+	// Check if hand message doesn't contain a user agent length
+	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(uint64_t)) {
+	
+		// Throw exception
+		throw runtime_error("Hand message doesn't contain a user agent length");
+	}
+	
+	// Get user agent length from hand message
+	const uint64_t userAgentLength = Common::readUint64(handMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength);
+	
+	// Check if user agent length is invalid
+	if(!userAgentLength) {
+	
+		// Throw exception
+		throw runtime_error("User agent length is invalid");
+	}
+	
+	// Check if user agent length is too big
+	if(userAgentLength > MAXIMUM_USER_AGENT_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("User agent length is too big");
+	}
+	
+	// Check if hand message doesn't contain a user agent
+	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(userAgentLength) + userAgentLength) {
+	
+		// Throw exception
+		throw runtime_error("Hand message doesn't contain a user agent");
+	}
+	
+	// Get user agent from hand message
+	const string userAgent(handMessage.cbegin() + MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(userAgentLength), handMessage.cbegin() + MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(userAgentLength) + userAgentLength);
+	
+	// Check if user agent is invalid
+	if(!Common::isUtf8(userAgent.c_str(), userAgent.size())) {
+	
+		// Throw exception
+		throw runtime_error("User agent is invalid");
+	}
+	
+	// Check if hand message doesn't contain a genesis block hash
+	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH) {
+	
+		// Throw exception
+		throw runtime_error("Hand message doesn't contain a genesis block hash");
+	}
+	
+	// Get genesis block hash from hand message
+	const uint8_t *genesisBlockHash = &handMessage[MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(userAgentLength) + userAgentLength];
+	
+	// Get genesis block's block hash
+	const array blockHash = Consensus::GENESIS_BLOCK_HEADER.getBlockHash();
+	
+	// Check if genesis block hash is invalid
+	if(memcmp(genesisBlockHash, blockHash.data(), blockHash.size())) {
+	
+		// Throw exception
+		throw runtime_error("Genesis block hash is invalid");
+	}
+	
+	// Check if negotiated protocol version is at least four
+	uint64_t baseFee;
+	if(negotiatedProtocolVersion >= 4) {
+	
+		// Check if hand message doesn't contain a base fee
+		if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH + sizeof(baseFee)) {
+		
+			// Throw exception
+			throw runtime_error("Hand message doesn't contain a base fee");
+		}
+		
+		// Get base fee from hand message
+		baseFee = Common::readUint64(handMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(nonce) + sizeof(totalDifficulty) + clientAddressLength + serverAddressLength + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH);
+	}
+	
+	// Otherwise
+	else {
+	
+		// Set base fee to the base fee before protocol version four
+		baseFee = BASE_FEE_BEFORE_PROTOCOL_VERSION_FOUR;
+	}
+	
+	// Return capabilities, total difficulty, user agent, negotiated protocol version, base fee, and client address
+	return {capabilities, totalDifficulty, userAgent, negotiatedProtocolVersion, baseFee, clientAddress};
+}
+
 // Read shake message
 tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readShakeMessage(const vector<uint8_t> &shakeMessage) {
 
-	// Check if shake message doesn't contain a version
+	// Check if shake message doesn't contain a negotiated protocol version
 	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint32_t)) {
 	
 		// Throw exception
-		throw runtime_error("Shake message doesn't contain a version");
+		throw runtime_error("Shake message doesn't contain a negotiated protocol version");
 	}
 
-	// Get protocol version from message shake
-	const uint32_t protocolVersion = min(Common::readUint32(shakeMessage, MESSAGE_HEADER_LENGTH), *COMPATIBLE_PROTOCOL_VERSIONS.crbegin());
+	// Get negotiated protocol version from shake message
+	const uint32_t negotiatedProtocolVersion = min(Common::readUint32(shakeMessage, MESSAGE_HEADER_LENGTH), *COMPATIBLE_PROTOCOL_VERSIONS.crbegin());
 	
-	// Check if protocol version isn't compatible
-	if(!COMPATIBLE_PROTOCOL_VERSIONS.contains(protocolVersion)) {
+	// Check if negotiated protocol version isn't compatible
+	if(!COMPATIBLE_PROTOCOL_VERSIONS.contains(negotiatedProtocolVersion)) {
 	
 		// Throw exception
-		throw runtime_error("Protocol version isn't compatible");
+		throw runtime_error("Negotiated protocol version isn't compatible");
 	}
 	
 	// Check if shake message doesn't contain capabilities
-	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(Node::Capabilities)) {
+	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(Node::Capabilities)) {
 	
 		// Throw exception
 		throw runtime_error("Shake message doesn't contain capabilities");
 	}
 	
 	// Get capabilities from shake message
-	const Node::Capabilities capabilities = static_cast<Node::Capabilities>(Common::readUint32(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(protocolVersion)));
+	const Node::Capabilities capabilities = static_cast<Node::Capabilities>(Common::readUint32(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion)));
 	
 	// Check if shake message doesn't contain a total difficulty
-	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(uint64_t)) {
+	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(uint64_t)) {
 	
 		// Throw exception
 		throw runtime_error("Shake message doesn't contain a total difficulty");
 	}
 	
 	// Get total difficulty from shake message
-	const uint64_t totalDifficulty = Common::readUint64(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities));
+	const uint64_t totalDifficulty = Common::readUint64(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities));
 	
 	// Check if total difficulty is invalid
 	if(totalDifficulty < Consensus::GENESIS_BLOCK_HEADER.getTotalDifficulty()) {
@@ -526,14 +849,14 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readSha
 	}
 	
 	// Check if shake message doesn't contain a user agent length
-	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(uint64_t)) {
+	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(uint64_t)) {
 	
 		// Throw exception
 		throw runtime_error("Shake message doesn't contain a user agent length");
 	}
 	
 	// Get user agent length from shake message
-	const uint64_t userAgentLength = Common::readUint64(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty));
+	const uint64_t userAgentLength = Common::readUint64(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty));
 	
 	// Check if user agent length is invalid
 	if(!userAgentLength) {
@@ -550,14 +873,14 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readSha
 	}
 	
 	// Check if shake message doesn't contain a user agent
-	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength) {
+	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength) {
 	
 		// Throw exception
 		throw runtime_error("Shake message doesn't contain a user agent");
 	}
 	
 	// Get user agent from shake message
-	const string userAgent(shakeMessage.cbegin() + MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength), shakeMessage.cbegin() + MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength);
+	const string userAgent(shakeMessage.cbegin() + MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength), shakeMessage.cbegin() + MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength);
 	
 	// Check if user agent is invalid
 	if(!Common::isUtf8(userAgent.c_str(), userAgent.size())) {
@@ -567,14 +890,14 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readSha
 	}
 	
 	// Check if shake message doesn't contain a genesis block hash
-	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH) {
+	if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH) {
 	
 		// Throw exception
 		throw runtime_error("Shake message doesn't contain a genesis block hash");
 	}
 	
 	// Get genesis block hash from shake message
-	const uint8_t *genesisBlockHash = &shakeMessage[MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength];
+	const uint8_t *genesisBlockHash = &shakeMessage[MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength];
 	
 	// Get genesis block's block hash
 	const array blockHash = Consensus::GENESIS_BLOCK_HEADER.getBlockHash();
@@ -586,19 +909,19 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readSha
 		throw runtime_error("Genesis block hash is invalid");
 	}
 	
-	// Check if protocol version is at least four
+	// Check if negotiated protocol version is at least four
 	uint64_t baseFee;
-	if(protocolVersion >= 4) {
+	if(negotiatedProtocolVersion >= 4) {
 	
 		// Check if shake message doesn't contain a base fee
-		if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH + sizeof(baseFee)) {
+		if(shakeMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH + sizeof(baseFee)) {
 		
 			// Throw exception
 			throw runtime_error("Shake message doesn't contain a base fee");
 		}
 		
 		// Get base fee from shake message
-		baseFee = Common::readUint64(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(protocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH);
+		baseFee = Common::readUint64(shakeMessage, MESSAGE_HEADER_LENGTH + sizeof(negotiatedProtocolVersion) + sizeof(capabilities) + sizeof(totalDifficulty) + sizeof(userAgentLength) + userAgentLength + Crypto::BLAKE2B_HASH_LENGTH);
 	}
 	
 	// Otherwise
@@ -608,8 +931,8 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> Message::readSha
 		baseFee = BASE_FEE_BEFORE_PROTOCOL_VERSION_FOUR;
 	}
 	
-	// Return capabilities, total difficulty, user agent, protocol version, and base fee
-	return {capabilities, totalDifficulty, userAgent, protocolVersion, baseFee};
+	// Return capabilities, total difficulty, user agent, negotiated protocol version, and base fee
+	return {capabilities, totalDifficulty, userAgent, negotiatedProtocolVersion, baseFee};
 }
 
 // Read ping message
