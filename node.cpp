@@ -4232,32 +4232,33 @@ void Node::acceptInboundPeers() {
 				// IPv6
 				case AF_INET6:
 				
-					// Check if Windows
-					#ifdef _WIN32
-					
-						// Check if address wasn't recently connected
-						if(!recentIpv6Addresses.contains(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.u.Byte))) {
+					{
+						// Check if Windows
+						#ifdef _WIN32
 						
-							// Set that address was recently connected
-							recentIpv6Addresses.insert(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.u.Byte));
+							// Get address as a number
+							const unsigned __int128 numberAddress = *reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.u.Byte);
 							
-					// Otherwise
-					#else
-					
+						// Otherwise
+						#else
+						
+							// Get address as a number
+							const unsigned __int128 numberAddress = *reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.s6_addr);
+						#endif
+						
 						// Check if address wasn't recently connected
-						if(!recentIpv6Addresses.contains(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.s6_addr))) {
-						
+						if(!recentIpv6Addresses.contains(numberAddress)) {
+							
 							// Set that address was recently connected
-							recentIpv6Addresses.insert(*reinterpret_cast<const unsigned __int128 *>(&reinterpret_cast<const sockaddr_in6 *>(&address)->sin6_addr.s6_addr));
-					#endif
-					
-					}
+							recentIpv6Addresses.insert(numberAddress);
+						}
+							
+						// Otherwise
+						else {
 						
-					// Otherwise
-					else {
-					
-						// Set invalid address to true
-						invalidAddress = true;
+							// Set invalid address to true
+							invalidAddress = true;
+						}
 					}
 					
 					// Break
