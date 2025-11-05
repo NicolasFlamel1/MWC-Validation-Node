@@ -432,33 +432,73 @@ bool Common::initialize() {
 		// Check if not initialized
 		if(!isInitialized) {
 		
-			// Check if setting signal handler failed
-			if(signal(SIGINT, [](const int signal) {
+			// Check if Windows
+			#ifdef _WIN32
 			
-				// Check signal
-				switch(signal) {
+				// Check if setting signal handler failed
+				if(signal(SIGINT, [](const int signal) {
 				
-					// Interrupt
-					case SIGINT:
+					// Check signal
+					switch(signal) {
 					
-						// Throw error if atomic bool isn't always lock free
-						static_assert(atomic_bool::is_always_lock_free, "Atomic bool isn't always lock free");
+						// Interrupt
+						case SIGINT:
+						
+							// Throw error if atomic bool isn't always lock free
+							static_assert(atomic_bool::is_always_lock_free, "Atomic bool isn't always lock free");
+							
+							// Set signal occurred to true
+							signalOccurred.store(true);
+							
+							// Set closing to true
+							closing.store(true);
+							
+							// Break
+							break;
+					}
 					
-						// Set closing to true
-						closing.store(true);
-						
-						// Set signal occurred to true
-						signalOccurred.store(true);
-						
-						// Break
-						break;
+				}) == SIG_ERR) {
+				
+					// Return false
+					return false;
 				}
 				
-			}) == SIG_ERR) {
+			// Otherwise
+			#else
 			
-				// Return false
-				return false;
-			}
+				// Initialize signal action to restart syscalls when interrupted
+				struct sigaction signalAction = {};
+				signalAction.sa_flags = SA_RESTART;
+				signalAction.sa_handler = [](const int signal) {
+				
+					// Check signal
+					switch(signal) {
+					
+						// Interrupt or terminate
+						case SIGINT:
+						case SIGTERM:
+				
+							// Throw error if atomic bool isn't always lock free
+							static_assert(atomic_bool::is_always_lock_free, "Atomic bool isn't always lock free");
+							
+							// Set signal occurred to true
+							signalOccurred.store(true);
+							
+							// Set closing to true
+							closing.store(true);
+							
+							// Break
+							break;
+					}
+				};
+				
+				// Check if setting signal action failed
+				if(sigaction(SIGINT, &signalAction, nullptr) || sigaction(SIGTERM, &signalAction, nullptr)) {
+				
+					// Return false
+					return false;
+				}
+			#endif
 			
 			// Set is initialized to true
 			isInitialized = true;
