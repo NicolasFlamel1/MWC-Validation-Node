@@ -4007,6 +4007,33 @@ bool Peer::processRequestsAndOrResponses() {
 					// Create get peer addresses message
 					const vector getPeerAddressesMessage = Message::createGetPeerAddressesMessage(node->getDesiredPeerCapabilities());
 					
+					// Initialize network addresses
+					vector<NetworkAddress> networkAddresses;
+					
+					// Check if node is listening
+					if(node->isListening()) {
+					
+						// Check if Tor is enabled
+						#ifdef ENABLE_TOR
+					
+							// Check if node's listening address isn't an Onion service or shake capabilities includes Tor address
+							if(node->getListeningNetworkAddress()->family != NetworkAddress::Family::ONION_SERVICE || (shakeCapabilities & Node::Capabilities::TOR_ADDRESS)) {
+							
+								// Append node's listening network address to list
+								networkAddresses.push_back(*node->getListeningNetworkAddress());
+							}
+							
+						// Otherwise
+						#else
+						
+							// Append node's listening network address to list
+							networkAddresses.push_back(*node->getListeningNetworkAddress());
+						#endif
+					}
+					
+					// Create peer addresses message
+					const vector peerAddressesMessage = networkAddresses.empty() ? vector<uint8_t>() : Message::createPeerAddressesMessage(networkAddresses);
+					
 					{
 						// Lock for writing
 						lock_guard writeLock(lock);
@@ -4034,6 +4061,20 @@ bool Peer::processRequestsAndOrResponses() {
 						
 							// Increment number of messages sent
 							++numberOfMessagesSent;
+						}
+						
+						// Check if network addresses isn't empty
+						if(!networkAddresses.empty()) {
+						
+							// Append peer addresses message to write buffer
+							writeBuffer.insert(writeBuffer.cend(), peerAddressesMessage.cbegin(), peerAddressesMessage.cend());
+							
+							// Check if not at the max number of messages sent
+							if(numberOfMessagesSent != INT_MAX) {
+							
+								// Increment number of messages sent
+								++numberOfMessagesSent;
+							}
 						}
 					}
 					
@@ -4266,6 +4307,41 @@ bool Peer::processRequestsAndOrResponses() {
 					
 					// Initialize network addresses
 					vector<NetworkAddress> networkAddresses;
+					
+					// Check if node is listening
+					if(node->isListening()) {
+					
+						// Check if Tor is enabled
+						#ifdef ENABLE_TOR
+					
+							// Check if node has the desired capabilities
+							if((Node::CAPABILITIES & (desiredCapabilities & ~Node::Capabilities::TOR_ADDRESS)) == (desiredCapabilities & ~Node::Capabilities::TOR_ADDRESS)) {
+						
+						// Otherwise
+						#else
+						
+							// Check if node has the desired capabilities
+							if((Node::CAPABILITIES & desiredCapabilities) == desiredCapabilities) {
+						#endif
+						
+							// Check if Tor is enabled
+							#ifdef ENABLE_TOR
+						
+								// Check if node's listening address isn't an Onion service or capabilities includes Tor address
+								if(node->getListeningNetworkAddress()->family != NetworkAddress::Family::ONION_SERVICE || (capabilities & Node::Capabilities::TOR_ADDRESS)) {
+								
+									// Append node's listening network address to list
+									networkAddresses.push_back(*node->getListeningNetworkAddress());
+								}
+								
+							// Otherwise
+							#else
+							
+								// Append node's listening network address to list
+								networkAddresses.push_back(*node->getListeningNetworkAddress());
+							#endif
+						}
+					}
 					
 					// Initialize addresses
 					list<variant<in_addr, in6_addr, string>> addresses;
