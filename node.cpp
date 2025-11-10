@@ -25,7 +25,7 @@ const uint64_t Node::DEFAULT_BASE_FEE = 1000;
 #ifdef ENABLE_TOR
 
 	// Capabilities
-	const Node::Capabilities Node::CAPABILITIES = static_cast<MwcValidationNode::Node::Capabilities>(Node::Capabilities::PEER_LIST | Node::Capabilities::TOR_ADDRESS);
+	const Node::Capabilities Node::CAPABILITIES = static_cast<Node::Capabilities>(Node::Capabilities::PEER_LIST | Node::Capabilities::TOR_ADDRESS);
 
 // Otherwise
 #else
@@ -75,8 +75,18 @@ const uint64_t Node::DEFAULT_BASE_FEE = 1000;
 	};
 #endif
 
-// Desired number of peers
-const list<Peer>::size_type Node::DESIRED_NUMBER_OF_PEERS = 8;
+// Check if desired number of peers is set
+#ifdef SET_DESIRED_NUMBER_OF_PEERS
+
+	// Desired number of peers
+	const list<Peer>::size_type Node::DESIRED_NUMBER_OF_PEERS = SET_DESIRED_NUMBER_OF_PEERS;
+	
+// Otherwise
+#else
+
+	// Desired number of peers
+	const list<Peer>::size_type Node::DESIRED_NUMBER_OF_PEERS = 8;
+#endif
 
 // Minimum number of connected and healthy peers to start syncing
 const list<Peer>::size_type Node::MINIMUM_NUMBER_OF_CONNECTED_AND_HEALTHY_PEERS_TO_START_SYNCING = 4;
@@ -788,8 +798,18 @@ void Node::start(const char *torProxyAddress, const uint16_t torProxyPort, const
 		}
 	}
 	
-	// Set desired peer capabilities to desired peer capabilities
-	this->desiredPeerCapabilities = desiredPeerCapabilities;
+	// Check if Tor is enabled
+	#ifdef ENABLE_TOR
+	
+		// Set desired peer capabilities to desired peer capabilities and Tor address capabilities
+		this->desiredPeerCapabilities = static_cast<Node::Capabilities>(desiredPeerCapabilities | Node::Capabilities::TOR_ADDRESS);
+		
+	// Otherwise
+	#else
+	
+		// Set desired peer capabilities to desired peer capabilities
+		this->desiredPeerCapabilities = desiredPeerCapabilities;
+	#endif
 	
 	// Try
 	try {

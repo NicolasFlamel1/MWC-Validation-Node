@@ -154,3 +154,4 @@ The following flags can be defined before `#include "./mwc_validation_node.h"` t
 * `#define PRUNE_HEADERS`: Removes headers after they are no longer needed to verify the blockchain.
 * `#define PRUNE_KERNELS`: Removes kernels after they are no longer needed to verify the blockchain.
 * `#define PRUNE_RANGEPROOFS`: Removes rangeproofs after they are no longer needed to verify the blockchain.
+* `#define SET_DESIRED_NUMBER_OF_PEERS=8`: Sets the number of peers that the node will attempt to be connected to.
