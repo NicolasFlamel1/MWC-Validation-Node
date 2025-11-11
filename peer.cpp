@@ -806,13 +806,13 @@ void Peer::connectOutbound(const string address) {
 		#ifdef ENABLE_TOR
 		
 			// Check if getting address info for the node's Tor proxy failed
-			if(getaddrinfo(node->getTorProxyAddress().c_str(), node->getTorProxyPort().c_str(), &hints, &addressInfo) || !addressInfo) {
+			if(getaddrinfo(node->getTorProxyAddress().c_str(), node->getTorProxyPort().c_str(), &hints, &addressInfo)) {
 		
 		// Otherwise
 		#else
 		
 			// Check if getting address info for the current address failed
-			if(getaddrinfo(currentAddress.c_str(), port, &hints, &addressInfo) || !addressInfo) {
+			if(getaddrinfo(currentAddress.c_str(), port, &hints, &addressInfo)) {
 		#endif
 		
 			// Delay

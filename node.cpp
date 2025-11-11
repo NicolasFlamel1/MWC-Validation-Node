@@ -604,7 +604,7 @@ void Node::start(const char *torProxyAddress, const uint16_t torProxyPort, const
 		
 		// Check if getting address info for the listening address failed
 		addrinfo *temp;
-		if(getaddrinfo(listeningAddress, to_string(listeningPort).c_str(), &hints, &temp) || !temp) {
+		if(getaddrinfo(listeningAddress, to_string(listeningPort).c_str(), &hints, &temp)) {
 		
 			// Throw exception
 			throw runtime_error("Getting address info for the listening address failed");
@@ -612,6 +612,13 @@ void Node::start(const char *torProxyAddress, const uint16_t torProxyPort, const
 		
 		// Set address info to the result
 		addressInfo = unique_ptr<addrinfo, decltype(&freeaddrinfo)>(temp, freeaddrinfo);
+		
+		// Check if there's no info the for listening address
+		if(!temp) {
+		
+			// Throw exception
+			throw runtime_error("Getting address info for the listening address failed");
+		}
 		
 		// Check address info family
 		switch(addressInfo->ai_family) {
