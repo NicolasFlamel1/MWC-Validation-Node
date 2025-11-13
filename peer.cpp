@@ -4749,11 +4749,8 @@ bool Peer::processRequestsAndOrResponses() {
 						// Check if letting node know that a peer is healthy failed
 						if(!node->peerHealthy(identifier)) {
 						
-							// Set ban to true
-							ban = true;
-							
-							// Break
-							break;
+							// Return false
+							return false;
 						}
 						
 						{
