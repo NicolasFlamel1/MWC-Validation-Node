@@ -993,6 +993,16 @@ void Peer::connectOutbound(const string address) {
 				// Check if getting server identifier was successful
 				if(!serverIdentifier.empty()) {
 				
+					// Check if node is listening and peer is the node
+					if(node->isListening() && serverAddress.family == node->getListeningNetworkAddress()->family && serverAddress.addressLength == node->getListeningNetworkAddress()->addressLength && !memcmp(serverAddress.address, node->getListeningNetworkAddress()->address, serverAddress.addressLength) && (serverAddress.family == NetworkAddress::Family::ONION_SERVICE || serverAddress.port == node->getListeningNetworkAddress()->port)) {
+					
+						// Set don't retry to true
+						dontRetry = true;
+						
+						// Break
+						break;
+					}
+					
 					{
 						// Lock node for reading
 						shared_lock nodeReadLock(node->getLock());
@@ -1554,6 +1564,41 @@ void Peer::connectOutbound(const string address) {
 																		// Check if getting server identifier was successful
 																		if(!serverIdentifier.empty()) {
 																		
+																			// Check if node is listening and peer is the node
+																			if(node->isListening() && serverAddress.family == node->getListeningNetworkAddress()->family && !memcmp(serverAddress.address, node->getListeningNetworkAddress()->address, serverAddress.addressLength) && serverAddress.port == node->getListeningNetworkAddress()->port) {
+																			
+																				// Check if Windows
+																				#ifdef _WIN32
+																				
+																					// Shutdown socket receive and send
+																					shutdown(socket, SD_BOTH);
+																					
+																					// Close socket
+																					closesocket(socket);
+																					
+																					// Set socket to invalid
+																					socket = INVALID_SOCKET;
+																					
+																				// Otherwise
+																				#else
+																				
+																					// Shutdown socket receive and send
+																					shutdown(socket, SHUT_RDWR);
+																					
+																					// Close socket
+																					close(socket);
+																					
+																					// Set socket to invalid
+																					socket = -1;
+																				#endif
+																				
+																				// Set don't retry to true
+																				dontRetry = true;
+																				
+																				// Break
+																				break;
+																			}
+																			
 																			{
 																				// Lock node for reading
 																				shared_lock nodeReadLock(node->getLock());
@@ -3738,7 +3783,7 @@ bool Peer::processRequestsAndOrResponses() {
 								#endif
 								
 								// Check if getting client info was successful
-								if(!getsockname(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
+								if(!getpeername(socket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoLength)) {
 								
 									// Check client info's family
 									switch(clientInfo.ss_family) {
@@ -4704,8 +4749,11 @@ bool Peer::processRequestsAndOrResponses() {
 						// Check if letting node know that a peer is healthy failed
 						if(!node->peerHealthy(identifier)) {
 						
-							// Return false
-							return false;
+							// Set ban to true
+							ban = true;
+							
+							// Break
+							break;
 						}
 						
 						{
