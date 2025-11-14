@@ -147,7 +147,7 @@ int main() {
 All node functions throw a runtime exception if they fail. All callback functions may be running in a separate thread so make sure any variables access in them are thread safe. Only one callback function will run at a time and access to the node within the callback functions is thread safe. Don't call a node's destructor, `node.broadcastTransaction()`, or `node.broadcastBlock()` inside the callback functions.
 
 The following flags can be defined before `#include "./mwc_validation_node.h"` to enable or change certain features:
-* `#define DISABLE_SIGNAL_HANDLER`: Don't use builtin signal handler for `SIGINT` that stops the node.
+* `#define DISABLE_SIGNAL_HANDLER`: Don't use builtin signal handler for `SIGINT` and `SIGTERM` that stops the node.
 * `#define ENABLE_FLOONET`: Uses floonet instead of mainnet.
 * `#define ENABLE_TOR`: Uses the Tor SOCKS5 proxy listening at `localhost:9050` for all peer communication. This address can be changed by providing an address and port to the node's `node.start()` function.
 * `#define ENABLE_MEMPOOL`: Enables keeping track of transactions in the node's mempool. Mempool related node callback functions and `node.getNextBlock()` can be used with this enabled.
@@ -155,3 +155,8 @@ The following flags can be defined before `#include "./mwc_validation_node.h"` t
 * `#define PRUNE_KERNELS`: Removes kernels after they are no longer needed to verify the blockchain.
 * `#define PRUNE_RANGEPROOFS`: Removes rangeproofs after they are no longer needed to verify the blockchain.
 * `#define SET_DESIRED_NUMBER_OF_PEERS=8`: Sets the number of peers that the node will attempt to be connected to.
+
+### Software that uses this node
+The following is a list of software that uses this node to interact with the MimbleWimble Coin network.
+* [MWC Pay](https://github.com/NicolasFlamel1/MWC-Pay): A MimbleWimble Coin payment processor.
+* [MWC Node Map](https://github.com/NicolasFlamel1/MWC-Node-Map): A map of recently online MimbleWimble Coin nodes.
