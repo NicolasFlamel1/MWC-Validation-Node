@@ -558,7 +558,7 @@ tuple<Message::Type, vector<uint8_t>::size_type> Message::readMessageHeader(cons
 }
 
 // Read hand message
-tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress> Message::readHandMessage(const vector<uint8_t> &handMessage) {
+tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress, uint64_t> Message::readHandMessage(const vector<uint8_t> &handMessage) {
 
 	// Check if hand message doesn't contain a protocol version
 	if(handMessage.size() < MESSAGE_HEADER_LENGTH + sizeof(uint32_t)) {
@@ -797,8 +797,8 @@ tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress> 
 		baseFee = BASE_FEE_BEFORE_PROTOCOL_VERSION_FOUR;
 	}
 	
-	// Return capabilities, total difficulty, user agent, negotiated protocol version, base fee, and client address
-	return {capabilities, totalDifficulty, userAgent, negotiatedProtocolVersion, baseFee, clientAddress};
+	// Return capabilities, total difficulty, user agent, negotiated protocol version, base fee, client address, and nonce
+	return {capabilities, totalDifficulty, userAgent, negotiatedProtocolVersion, baseFee, clientAddress, nonce};
 }
 
 // Read shake message

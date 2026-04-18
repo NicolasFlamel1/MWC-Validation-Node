@@ -171,7 +171,7 @@ class Message final {
 		static tuple<Type, vector<uint8_t>::size_type> readMessageHeader(const vector<uint8_t> &messageHeader);
 		
 		// Read hand message
-		static tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress> readHandMessage(const vector<uint8_t> &handMessage);
+		static tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress, uint64_t> readHandMessage(const vector<uint8_t> &handMessage);
 		
 		// Read shake message
 		static tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t> readShakeMessage(const vector<uint8_t> &shakeMessage);

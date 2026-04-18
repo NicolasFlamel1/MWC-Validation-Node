@@ -3730,7 +3730,7 @@ bool Peer::processRequestsAndOrResponses() {
 				if(isInbound && communicationState == CommunicationState::HANDSHAKE_PENDING) {
 				
 					// Initialize hand components
-					tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress> handComponents;
+					tuple<Node::Capabilities, uint64_t, string, uint32_t, uint64_t, NetworkAddress, uint64_t> handComponents;
 					
 					// Try
 					try {
@@ -3749,13 +3749,21 @@ bool Peer::processRequestsAndOrResponses() {
 						break;
 					}
 					
-					// Get hand capabilities, total difficulty, user agent, negotiated protocol version, base fee, and client address from hand components
+					// Get hand capabilities, total difficulty, user agent, negotiated protocol version, base fee, client address, and nonce from hand components
 					const Node::Capabilities &handCapabilities = get<0>(handComponents);
 					const uint64_t &handTotalDifficulty = get<1>(handComponents);
 					const string &handUserAgent = get<2>(handComponents);
 					const uint32_t &handNegotiatedProtocolVersion = get<3>(handComponents);
 					const uint64_t &handBaseFee = get<4>(handComponents);
 					const NetworkAddress &handClientAddress = get<5>(handComponents);
+					const uint64_t &handNonce = get<6>(handComponents);
+					
+					// Check if peer is the node
+					if(handNonce == nonce) {
+					
+						// Return false
+						return false;
+					}
 					
 					// Check hand client address's family
 					string clientIdentifier;
