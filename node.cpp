@@ -41,13 +41,16 @@ const uint64_t Node::DEFAULT_BASE_FEE = 1000;
 	const unordered_set<string> Node::DEFAULT_DNS_SEEDS = {
 		"seed1.mwc.mw:13414",
 		"seed2.mwc.mw:13414",
+		"3.97.39.110:13414",
+		"13.209.51.140:13414",
 		
 		// Check if Tor is enabled
 		#ifdef ENABLE_TOR
 		
-			"wt635fgwmhokk25lv7y2jvrg63mokg7nfni5owrtzalz3nx22dgjytid.onion",
-			"kin4i3wohlsqlzrdwdlowh2kaa7wtkxsvp6asn7vttspnrwowgquglyd.onion",
-			"vstdjxrzh67udhm3fedanul2sy7fwudasjmwxy54pady6dxclty2zmqd.onion"
+			"zwecav6dgftsoscybpzufbo77d452mk3mox2fqzjqocu7265bxgq6oad.onion",
+			"5xwjlg6fykkj2hhvlnernj4s2jmuv5en5i3i32qld3k5jznuzpbiblid.onion",
+			"oqtl7wlzukgp7r6kdp3uvyelzmc72ngknwd23lo7uw63rwornvcmg3yd.onion",
+			"wt635fgwmhokk25lv7y2jvrg63mokg7nfni5owrtzalz3nx22dgjytid.onion"
 		#endif
 	};
 
@@ -56,19 +59,23 @@ const uint64_t Node::DEFAULT_BASE_FEE = 1000;
 
 	// Default DNS seeds
 	const unordered_set<string> Node::DEFAULT_DNS_SEEDS = {
-		"mainnet.seed1.mwc.mw:3414",
 		"mainnet.seed2.mwc.mw:3414",
-		"greg1.mainnet.seed.mwc.mw:3414",
-		"greg2.mainnet.seed.mwc.mw:3414",
 		"mwcseed.ddns.net:3414",
+		"3.132.79.177:3414",
+		"18.217.245.152:3414",
+		"3.6.231.127:3414",
+		"52.78.112.116:3414",
 		
 		// Check if Tor is enabled
 		#ifdef ENABLE_TOR
 		
-			"uukwrgtxogz6kkpcejssb7aenb7ey7pr3h5i4llhse445dfpbp63osyd.onion",
+			"t5p26dycaa7w6vzc424mahhykncv2w2tt24isaluraszhpoc6viwcqyd.onion",
+			"6y2r3zcscduyaqvak4nr5muo72n46fqacz2bnfqnxmf3oksapjepkcyd.onion",
 			"xsjhexie5v7gxmdkvzkzb4qifywnolb6v22wzvppscs2gog6ljribuad.onion",
+			"p5qo2pgkv5qpjnrlxzesf4ikcxyvvtwg6aolpamp24es5lic3btshrqd.onion",
 			"ltjbwsexjixh5p2qxjohxd342fxhag7ljuvkjnnmkuu6wer6cg4skoad.onion",
-			"wmksifwk6gh22qydmbbnv7iyphnr7jfmwsazgxbo244mkwa2k2fol2yd.onion",
+			"plnrnhuuwjcowtjejqx6ou4m2bxkvkqq2rj4ot6cwgf53chgw2keu7yd.onion",
+			"q3l5s4idfo7ukmbvz6mgowe3w65bt4w4skeskzs4g2ixpmw2euvxxvyd.onion",
 			"z5ys2rogjas46tpyu343m4tamkiog6pkpznfwpu3iff55b7xypd3wcad.onion",
 			"n4ac7b65tgtachkh5ii5zytmjkbqc3bq64rhllhz4npyrbxvz7ic5byd.onion"
 		#endif
